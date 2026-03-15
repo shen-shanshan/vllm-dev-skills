@@ -20,9 +20,9 @@
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
-| [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️⭐️ |
 | vllm-feature-tutorial | Code Reading | | |
 | vllm-pr-summary | Code Reading | | |
+| [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️⭐️ |
 | [vllm-ascend-multimodal-issues](./skills/vllm-ascend-multimodal-issues/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️⭐️ |
 
 ## 🛠️ Configuration
