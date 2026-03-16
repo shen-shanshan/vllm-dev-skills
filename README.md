@@ -20,8 +20,8 @@
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Reading | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
 | vllm-feature-tutorial | Code Reading | | |
-| vllm-pr-summary | Code Reading | | |
 | [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️⭐️ |
 | [vllm-ascend-multimodal-issues](./skills/vllm-ascend-multimodal-issues/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️⭐️ |
 
