@@ -2,7 +2,7 @@
 
 <div align='left'>
   <img src=https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg >
-  <img src=https://img.shields.io/badge/License-MIT-turquoise.svg >
+  <img src="https://img.shields.io/badge/License-Apache--2.0-turquoise.svg">
   <img src=https://img.shields.io/badge/Maintained%3F-yes-green.svg >
   <img src=https://img.shields.io/badge/Contributions-welcome-blue >
   <img src=https://img.shields.io/github/watchers/shen-shanshan/vllm-dev-skills?color=9cc >
