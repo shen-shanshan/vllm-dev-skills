@@ -15,16 +15,12 @@
 
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
-The content is derived from real-world engineering experience, emphasizing clarity, modularity, and adaptability. By structuring these skills into a coherent resource, this project aims to help developers quickly apply proven solutions, reduce trial-and-error, and better understand the interaction between agents and high-performance LLM serving frameworks.
-
-It is intended for engineers seeking to streamline their development process and deepen their understanding of agent-based systems in production environments.
-
 ## 🚀 Skills
 <!-- | | | | | -->
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
-| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Reading | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Reading | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
 | vllm-feature-tutorial | Code Reading | | |
 | [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️⭐️ |
 | [vllm-ascend-multimodal-issues](./skills/vllm-ascend-multimodal-issues/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️⭐️ |
