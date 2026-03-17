@@ -13,7 +13,11 @@
 
 ## 📌 Overview
 
-This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems. The content is derived from real-world engineering experience, emphasizing clarity, modularity, and adaptability. By structuring these skills into a coherent resource, this project aims to help developers quickly apply proven solutions, reduce trial-and-error, and better understand the interaction between agents and high-performance LLM serving frameworks. It is intended for engineers seeking to streamline their development process and deepen their understanding of agent-based systems in production environments.
+This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
+
+The content is derived from real-world engineering experience, emphasizing clarity, modularity, and adaptability. By structuring these skills into a coherent resource, this project aims to help developers quickly apply proven solutions, reduce trial-and-error, and better understand the interaction between agents and high-performance LLM serving frameworks.
+
+It is intended for engineers seeking to streamline their development process and deepen their understanding of agent-based systems in production environments.
 
 ## 🚀 Skills
 <!-- | | | | | -->
