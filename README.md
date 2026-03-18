@@ -8,7 +8,6 @@
   <img src=https://img.shields.io/github/watchers/shen-shanshan/vllm-dev-skills?color=9cc >
   <img src=https://img.shields.io/github/forks/shen-shanshan/vllm-dev-skills.svg?style=social >
   <img src=https://img.shields.io/github/stars/shen-shanshan/vllm-dev-skills.svg?style=social >
-  <p>
 </div align='left'>
 
 ## 📌 Overview
