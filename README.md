@@ -1,4 +1,4 @@
-# vLLM Development Skills
+# vLLM Dev Skills
 
 <div align='left'>
   <img src=https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg >
@@ -14,26 +14,54 @@
 
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
+**📖 (1) Learn the Code Base**
+
+- Code Reading:
+  - vllm-feature-tutorial
+
+**💡 (2) Develop New Features & Performance Optimization**
+
+- Change Proposing:
+  - [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md)
+- Code Testing:
+  - vllm-ut-generator
+- Performance Optimization:
+  - [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md)
+- Code Submitting:
+  - vllm-pr-desc-generator
+
+**🛠️ (3) Maintain vLLM Repository**
+
+- Code Review:
+  - [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md)
+- Issue Analysis:
+  - vllm-multimodal-issues
+
 ## 🚀 Skills
 <!-- | | | | | -->
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
-| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Reading | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
-| vllm-feature-tutorial | Code Reading | | |
-| [vllm-ascend-ut-generator](./skills/vllm-ascend-ut-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️⭐️ |
-| [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️⭐️ |
+| vllm-feature-tutorial | Code Reading | | ⭐️⭐️⭐️⭐️ |
+| [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️⭐️ |
+| vllm-ut-generator | Code Testing | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️⭐️ |
+| [vllm-ascend-ut-generator](./skills/vllm-ascend-ut-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️ |
+| [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
+| vllm-pr-desc-generator | Code Submitting | | |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
+| vllm-multimodal-issues | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️⭐️⭐️ |
 | [vllm-ascend-multimodal-issues](./skills/vllm-ascend-multimodal-issues/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️ |
 
 ## 🛠️ Configuration
 
-- [Configure Claude Code in VSCode](https://api.lingyaai.cn/model_intro/Claude-Code.html)
 - [Lingya API](https://api.lingyaai.cn/)
+- [Configure Claude Code in VSCode](https://api.lingyaai.cn/model_intro/Claude-Code.html)
+- [Configure Claude Code CLI with Claude HUD](https://github.com/jarrodwatts/claude-hud)
 
 ## 📚 Usage Docs
 
-- [Agent Skills](https://agentskills.io/home#why-agent-skills)
 - [Extend Claude with skills](https://code.claude.com/docs/en/skills)
+- [Agent Skills](https://agentskills.io/home#why-agent-skills)
 
 ## ©️ Citation
 
