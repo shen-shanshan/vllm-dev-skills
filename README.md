@@ -28,7 +28,7 @@ This repository collects and organizes practical agent skills developed while wo
 - Performance Optimization:
   - [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md)
 - Code Submitting:
-  - vllm-pr-desc-generator
+  - [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md)
 
 **🛠️ (3) Maintain vLLM Repository**
 
@@ -47,7 +47,7 @@ This repository collects and organizes practical agent skills developed while wo
 | vllm-ut-generator | Code Testing | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️⭐️ |
 | [vllm-ascend-ut-generator](./skills/vllm-ascend-ut-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️ |
 | [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
-| vllm-pr-desc-generator | Code Submitting | | |
+| [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Submitting | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
 | vllm-multimodal-issues | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️⭐️⭐️ |
 | [vllm-ascend-multimodal-issues](./skills/vllm-ascend-multimodal-issues/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️ |
