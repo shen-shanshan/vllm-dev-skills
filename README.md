@@ -14,10 +14,12 @@
 
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
+---
+
 **📖 (1) Learn the Code Base**
 
 - Code Reading:
-  - vllm-feature-tutorial
+  - [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md)
 
 **💡 (2) Develop New Features & Performance Optimization**
 
@@ -37,12 +39,13 @@ This repository collects and organizes practical agent skills developed while wo
 - Issue Analysis:
   - vllm-multimodal-issues
 
+---
 ## 🚀 Skills
 <!-- | | | | | -->
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
-| vllm-feature-tutorial | Code Reading | | ⭐️⭐️⭐️⭐️ |
+| [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️ |
 | [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️⭐️ |
 | vllm-ut-generator | Code Testing | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️⭐️ |
 | [vllm-ascend-ut-generator](./skills/vllm-ascend-ut-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️ |
