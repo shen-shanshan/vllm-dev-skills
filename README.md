@@ -24,6 +24,7 @@ This repository collects and organizes practical agent skills developed while wo
 **💡 (2) Develop New Features & Performance Optimization**
 
 - Change Proposing:
+  - [vllm-feature-design](./skills/vllm-feature-design/SKILL.md)
   - [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md)
 - Code Testing:
   - vllm-ut-generator
@@ -46,6 +47,7 @@ This repository collects and organizes practical agent skills developed while wo
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
 | [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️ |
+| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
 | [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️⭐️ |
 | vllm-ut-generator | Code Testing | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️⭐️ |
 | [vllm-ascend-ut-generator](./skills/vllm-ascend-ut-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️ |
