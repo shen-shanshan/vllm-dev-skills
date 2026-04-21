@@ -1,5 +1,5 @@
 ---
-name: vllm-ascend-ut-generator
+name: vllm-ascend-test-generator
 description: Generate test cases for the vllm-ascend project. Use this skill when the user wants to write unit tests or end-to-end tests for vllm-ascend code, functions, scenarios, or features. Triggered by requests like "帮我写XXX的测试用例", "生成XXX的单元测试", "为XXX功能写测试", "generate tests for XXX", "write unit test for XXX function".
 ---
 
