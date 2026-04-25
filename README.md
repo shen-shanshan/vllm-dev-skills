@@ -14,25 +14,27 @@
 
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
-**(1) Learn the Codebase 📖**
+---
+**💡 Learn the Codebase:**
 
 - Code Reading: [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md)
 
-**(2) Develop New Features 💡**
+**🧑🏻‍💻 Develop New Features:**
 
 - Feature Proposing: [vllm-feature-design](./skills/vllm-feature-design/SKILL.md), [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md)
 - Code Submitting: [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md)
 - Code Testing: [vllm-test-generator](./skills/vllm-test-generator/SKILL.md)
 
-**(3) Performance Optimization 🚀**
+**🚀 Performance Optimization:**
 
 - Benchmark Analysis: [vllm-benchmark-result-summary](./skills/vllm-benchmark-result-summary/SKILL.md)
 
-**(4) Maintain vLLM Repository 🛠️**
+**🛠️ Repository Maintenance:**
 
 - Code Review: [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md)
 - Issue Analysis: [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md)
 
+---
 ## 🚀 Skills
 <!-- | | | | | -->
 
