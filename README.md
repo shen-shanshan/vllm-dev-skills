@@ -14,48 +14,40 @@
 
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
----
+**(1) Learn the Codebase 📖**
 
-**📖 (1) Learn the Code Base**
+- Code Reading: [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md)
 
-- Code Reading:
-  - [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md)
+**(2) Develop New Features 💡**
 
-**💡 (2) Develop New Features & Performance Optimization**
+- Feature Proposing: [vllm-feature-design](./skills/vllm-feature-design/SKILL.md), [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md)
+- Code Submitting: [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md)
+- Code Testing: [vllm-test-generator](./skills/vllm-test-generator/SKILL.md)
 
-- Change Proposing:
-  - [vllm-feature-design](./skills/vllm-feature-design/SKILL.md)
-  - [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md)
-- Code Testing:
-  - [vllm-test-generator](./skills/vllm-test-generator/SKILL.md)
-- Performance Optimization:
-  - [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md)
-- Code Submitting:
-  - [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md)
+**(3) Performance Optimization 🚀**
 
-**🛠️ (3) Maintain vLLM Repository**
+- Benchmark Analysis: [vllm-benchmark-result-summary](./skills/vllm-benchmark-result-summary/SKILL.md)
 
-- Code Review:
-  - [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md)
-- Issue Analysis:
-  - vllm-multimodal-issues
+**(4) Maintain vLLM Repository 🛠️**
 
----
+- Code Review: [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md)
+- Issue Analysis: [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md)
+
 ## 🚀 Skills
 <!-- | | | | | -->
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
 | [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️ |
-| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
-| [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️⭐️ |
+| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Feature Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
+| [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Feature Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️⭐️ |
+| [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Submitting | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️⭐️ |
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️⭐️ |
 | [vllm-ascend-test-generator](./skills/vllm-ascend-test-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️ |
-| [vllm-benchmark-summary](./skills/vllm-benchmark-summary/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
-| [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Submitting | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️ |
-| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️ |
-| vllm-multimodal-issues | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️⭐️⭐️ |
-| [vllm-ascend-multimodal-issues](./skills/vllm-ascend-multimodal-issues/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️ |
+| [vllm-benchmark-result-summary](./skills/vllm-benchmark-result-summary/SKILL.md) | Benchmark Analysis | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
+| [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️⭐️⭐️ |
+| [vllm-ascend-multimodal-open-issue-analyzer](./skills/vllm-ascend-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️ |
 
 ## 🛠️ Configuration
 

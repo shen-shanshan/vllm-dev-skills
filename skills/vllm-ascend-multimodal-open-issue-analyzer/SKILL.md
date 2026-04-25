@@ -1,5 +1,5 @@
 ---
-name: vllm-ascend-multimodal-issues
+name: vllm-ascend-multimodal-open-issue-analyzer
 description: Fetch and organize multimodal-related open issues from the GitHub project vllm-project/vllm-ascend. Use this skill when the user wants to collect, search, or summarize open issues related to multimodal models (e.g., Qwen-VL, Qwen2.5-VL, Qwen-Omni, LLaVA, InternVL, MiniCPM-V, etc.) in the vllm-ascend repository. Triggered by requests like "搜集vllm-ascend中多模态相关的issue", "整理Qwen-VL的open issue", "查一下vllm-ascend有哪些多模态问题还没解决".
 ---
 
