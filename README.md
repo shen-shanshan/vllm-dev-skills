@@ -40,16 +40,16 @@ This repository collects and organizes practical agent skills developed while wo
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
-| [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️ |
-| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Feature Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
-| [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Feature Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️⭐️ |
+| [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Feature Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Feature Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️ |
 | [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Submitting | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️⭐️ |
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️⭐️ |
-| [vllm-ascend-test-generator](./skills/vllm-ascend-test-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️ |
+| [vllm-ascend-test-generator](./skills/vllm-ascend-test-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️⭐️ |
 | [vllm-benchmark-result-summary](./skills/vllm-benchmark-result-summary/SKILL.md) | Benchmark Analysis | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
-| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
-| [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️⭐️⭐️ |
-| [vllm-ascend-multimodal-open-issue-analyzer](./skills/vllm-ascend-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️⭐️ |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️ |
+| [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
+| [vllm-ascend-multimodal-open-issue-analyzer](./skills/vllm-ascend-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️ |
 
 ## 🛠️ Configuration
 
