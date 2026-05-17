@@ -17,22 +17,21 @@ This repository collects and organizes practical agent skills developed while wo
 ---
 **💡 Learn the Codebase:**
 
-- Code Reading: [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md)
+- Code Reading: [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md), [vllm-model-tutorial](./skills/vllm-model-tutorial/SKILL.md)
 
 **🧑🏻‍💻 Develop New Features:**
 
-- Feature Proposing: [vllm-feature-design](./skills/vllm-feature-design/SKILL.md), [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md)
-- Code Submitting: [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md)
+- Change Proposing: [vllm-feature-design](./skills/vllm-feature-design/SKILL.md), [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md), [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md)
 - Code Testing: [vllm-test-generator](./skills/vllm-test-generator/SKILL.md)
 
 **🚀 Performance Optimization:**
 
 - Benchmark Analysis: [vllm-benchmark-result-summary](./skills/vllm-benchmark-result-summary/SKILL.md)
 
-**🛠️ Repository Maintenance:**
+**🛠️ Maintainer Jobs:**
 
 - Code Review: [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md)
-- Issue Analysis: [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md)
+- Issue Resolving: [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md)
 
 ---
 ## 🚀 Skills
@@ -41,24 +40,25 @@ This repository collects and organizes practical agent skills developed while wo
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
 | [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️⭐️ |
-| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Feature Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️⭐️ |
-| [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Feature Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️ |
-| [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Submitting | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️⭐️ |
+| [vllm-model-tutorial](./skills/vllm-model-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM models. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
+| [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️ |
+| [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️ |
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️⭐️ |
-| [vllm-ascend-test-generator](./skills/vllm-ascend-test-generator/SKILL.md) | Code Testing | Generate unit tests or end-to-end tests for vllm-ascend. | ⭐️⭐️⭐️⭐️ |
 | [vllm-benchmark-result-summary](./skills/vllm-benchmark-result-summary/SKILL.md) | Benchmark Analysis | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
-| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️ |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
-| [vllm-ascend-multimodal-open-issue-analyzer](./skills/vllm-ascend-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm-ascend. | ⭐️ |
+
+## 📚 Usage Examples
+
+_Coming soon..._
 
 ## 🛠️ Configuration
 
 - [Configure Claude Code in VSCode](https://api.lingyaai.cn/model_intro/Claude-Code.html)
 - [Configure Claude Code CLI with Claude HUD](https://github.com/jarrodwatts/claude-hud)
+- [Awesome DeepSeek Agent](https://github.com/deepseek-ai/awesome-deepseek-agent)
 - [Lingya API](https://api.lingyaai.cn/)
-
-## 📚 Usage Docs
-
 - [Extend Claude with skills](https://code.claude.com/docs/en/skills)
 - [Agent Skills](https://agentskills.io/home#why-agent-skills)
 
