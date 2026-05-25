@@ -393,11 +393,17 @@ $$h = w = \lceil(1024 / 16) / 4\rceil = \lceil 64/4 \rceil = 16$$
 
 $$h_2 = w_2 = \lceil(640 / 16) / 4\rceil = \lceil 40/4 \rceil = 10$$
 
-$$\text{global_tokens} = h \times (w + 1) = 16 \times 17 = 272$$
+$$
+\text{global\_tokens} = h \times (w + 1) = 16 \times 17 = 272
+$$
 
-$$\text{local_tokens} = (n_H \times h_2) \times (n_W \times w_2 + 1)$$
+$$
+\text{local\_tokens} = (n_H \times h_2) \times (n_W \times w_2 + 1)
+$$
 
-$$\text{total} = \text{global_tokens} + \text{local_tokens} + 1 \text{ (view_separator)}$$
+$$
+\text{total} = \text{global\_tokens} + \text{local\_tokens} + 1\ \text{(view\_separator)}
+$$
 
 对于单 tile（不触发分块），token 数固定约 272 + 1 = 273。对于大图（如 3×2 = 6 tiles），token 数可达 ~800。
 
@@ -420,39 +426,78 @@ $$\text{total} = \text{global_tokens} + \text{local_tokens} + 1 \text{ (view_sep
 
 ```mermaid
 flowchart TB
+
     subgraph Input["输入处理"]
-        TI[Text Input IDs]
-        PI[Image Pixel Values<br/>(global + local crops)]
+
+        TI["Text Input IDs"]
+
+        PI["Image Pixel Values<br/>(global + local crops)"]
+
     end
+
 
     subgraph VisionEnc["视觉编码 (DeepEncoder)"]
-        GE[_encode_global_features]
-        LE[_encode_local_features]
+
+        GE["_encode_global_features"]
+
+        LE["_encode_local_features"]
+
     end
+
 
     subgraph EmbedFusion["Embedding 融合"]
-        TE[Text Embeddings]
-        VE[Vision Embeddings<br/>local + global + separator]
-        Merge[Merge Embeddings<br/>替换 image token 位置]
+
+        TE["Text Embeddings"]
+
+        VE["Vision Embeddings<br/>local + global + separator"]
+
+        Merge["Merge Embeddings<br/>替换 image token 位置"]
+
     end
+
 
     subgraph LLM["语言模型 (DeepSeek3B-MoE)"]
-        L1[Transformer Layer 1<br/>MLA Attention + MoE FFN]
-        L2[Transformer Layer 2]
-        LD[...]
-        LN[Transformer Layer N]
-        FinalNorm[Final RMSNorm]
+
+        L1["Transformer Layer 1<br/>MLA Attention + MoE FFN"]
+
+        L2["Transformer Layer 2"]
+
+        LD["Intermediate Layers"]
+
+        LN["Transformer Layer N"]
+
+        FinalNorm["Final RMSNorm"]
+
     end
+
 
     subgraph Output["输出"]
-        Logits[Logits]
-        Sample[Sampling<br/>含 NGram 约束]
+
+        Logits["Logits"]
+
+        Sample["Sampling<br/>含 NGram 约束"]
+
     end
 
+
     TI --> TE
-    PI --> GE & LE
-    GE & LE --> VE
-    TE & VE --> Merge --> L1 --> L2 --> LD --> LN --> FinalNorm --> Logits --> Sample
+
+    PI --> GE
+    PI --> LE
+
+    GE --> VE
+    LE --> VE
+
+    TE --> Merge
+    VE --> Merge
+
+    Merge --> L1
+    L1 --> L2
+    L2 --> LD
+    LD --> LN
+    LN --> FinalNorm
+    FinalNorm --> Logits
+    Logits --> Sample
 ```
 
 ## 4.2 视觉编码流程详解
@@ -554,36 +599,71 @@ def _pixel_values_to_embedding(self, pixel_values, images_crop, images_spatial_c
 
 ```mermaid
 flowchart TB
+
     subgraph Layer["Single Transformer Layer (Pre-Norm)"]
-        Input[Input Hidden States<br/>[batch, seq, 2048]]
-        
+
+        Input["Input Hidden States<br/>(batch, seq, 2048)"]
+
+
         subgraph Attn["MLA Attention Block"]
-            Norm1[RMSNorm]
-            QKV[Q/KV Latent Projection]
-            AttnCalc[MLA Attention Computation]
-            OutProj[Output Projection]
-            Res1[Residual Add]
+
+            Norm1["RMSNorm"]
+
+            QKV["QKV Latent Projection"]
+
+            AttnCalc["MLA Attention Computation"]
+
+            OutProj["Output Projection"]
+
+            Res1["Residual Add"]
+
         end
-        
+
+
         subgraph MoE["MoE FFN Block"]
-            Norm2[RMSNorm]
-            Gate[Gate/Router]
-            SharedE[Shared Expert]
-            RoutedE[Routed Expert Top-K]
-            Combine[Weighted Combine]
-            Res2[Residual Add]
+
+            Norm2["RMSNorm"]
+
+            Gate["Gate Router"]
+
+            SharedE["Shared Expert"]
+
+            RoutedE["Routed Expert Top-K"]
+
+            Combine["Weighted Combine"]
+
+            Res2["Residual Add"]
+
         end
-        
-        Output[Output Hidden States<br/>[batch, seq, 2048]]
+
+
+        Output["Output Hidden States<br/>(batch, seq, 2048)"]
+
     end
-    
-    Input --> Norm1 --> QKV --> AttnCalc --> OutProj --> Res1
+
+
+    Input --> Norm1
+    Norm1 --> QKV
+    QKV --> AttnCalc
+    AttnCalc --> OutProj
+    OutProj --> Res1
+
     Input --> Res1
-    Res1 --> Norm2 --> Gate
+
+    Res1 --> Norm2
+
+    Norm2 --> Gate
     Norm2 --> SharedE
+
     Gate --> RoutedE
-    SharedE & RoutedE --> Combine --> Res2
+
+    SharedE --> Combine
+    RoutedE --> Combine
+
+    Combine --> Res2
+
     Res1 --> Res2
+
     Res2 --> Output
 ```
 
@@ -611,34 +691,63 @@ DeepEncoder 是 DeepSeek-OCR 的核心创新，由 **SAM ViT-B** 和 **DeepCLIP 
 
 ```mermaid
 flowchart TB
+
     subgraph DeepEncoder["DeepEncoder 完整架构"]
-        Img[输入图像<br/>B × 3 × H × W]
-        
+
+        Img["输入图像<br/>B x 3 x H x W"]
+
+
         subgraph SAM["SAM ViT-B Encoder"]
-            PE1[Patch Embedding<br/>16×16 conv, 3→768]
-            PosE1[Absolute Position Embedding]
-            Blocks[12× Transformer Blocks<br/>Window Attention + Global Attention]
-            Neck[Neck: Conv + LayerNorm2d × 2]
-            Stride[Stride-2 Conv → 256ch<br/>Stride-2 Conv → 1024ch]
+
+            PE1["Patch Embedding<br/>16x16 conv, 3 -> 768"]
+
+            PosE1["Absolute Position Embedding"]
+
+            Blocks["12 Transformer Blocks<br/>Window Attention and Global Attention"]
+
+            Neck["Neck<br/>Conv + LayerNorm2d x 2"]
+
+            Stride["Stride-2 Conv -> 256ch<br/>Stride-2 Conv -> 1024ch"]
+
         end
-        
-        subgraph SecondEnc["第二编码器 (v1: CLIP / v2: Qwen2)"]
-            PE2[Patch Embedding<br/>14×14 (CLIP) / 16×16 (Qwen2)]
-            EncBlocks[24× Encoder Blocks<br/>MHA (CLIP) / GQA+Mixed Attn (Qwen2)]
+
+
+        subgraph SecondEnc["第二编码器 (v1 CLIP or v2 Qwen2)"]
+
+            PE2["Patch Embedding<br/>14x14 CLIP or 16x16 Qwen2"]
+
+            EncBlocks["24 Encoder Blocks<br/>MHA CLIP or GQA Mixed Attention Qwen2"]
+
         end
-        
+
+
         subgraph Fusion["特征融合"]
-            Concat[Channel-wise Concat<br/>CLIP_patches ⊕ SAM_features]
-            Proj[MlpProjector<br/>Linear → GELU → Linear]
+
+            Concat["Channel Concat<br/>CLIP patches + SAM features"]
+
+            Proj["MlpProjector<br/>Linear -> GELU -> Linear"]
+
         end
+
     end
-    
-    Img --> PE1 & PE2
-    PE1 --> PosE1 --> Blocks --> Neck --> Stride
+
+
+    Img --> PE1
+    Img --> PE2
+
+    PE1 --> PosE1
+    PosE1 --> Blocks
+    Blocks --> Neck
+    Neck --> Stride
+
     PE2 --> EncBlocks
+
     Stride --> Concat
     EncBlocks --> Concat
-    Concat --> Proj --> Out[视觉 Token Embeddings<br/>B × N × 2048]
+
+    Concat --> Proj
+
+    Proj --> Out["视觉 Token Embeddings<br/>B x N x 2048"]
 ```
 
 ## 5.2 SAM ViT-B 详解
@@ -696,19 +805,40 @@ DeepSeek-OCR2 用 Qwen2 解码器替换 CLIP，这是架构上的一个重大变
 
 ```mermaid
 flowchart TB
+
     subgraph Qwen2Enc["Qwen2 Decoder-as-Encoder"]
-        Input[SAM 输出特征<br/>[B, 1024, H/64, W/64]]
-        
-        Flatten[展平为序列<br/>flatten(2).permute(0,2,1)]
-        
-        subgraph Decoder["24× Qwen2 Decoder Layers"]
-            MixedAttn[混合注意力<br/>non-causal + causal<br/>由 token_type_ids 控制]
-            GQA[GQA: 14 Q-heads / 2 KV-heads]
-            SwiGLU[SwiGLU FFN<br/>896 → 4864 → 896]
+
+        Input["SAM 输出特征<br/>(B, 1024, H_div_64, W_div_64)"]
+
+
+        Flatten["展平为序列<br/>flatten and permute"]
+
+
+        subgraph Decoder["24 Qwen2 Decoder Layers"]
+
+            MixedAttn["混合注意力<br/>non-causal and causal<br/>由 token_type_ids 控制"]
+
+            GQA["GQA<br/>14 Q heads and 2 KV heads"]
+
+            SwiGLU["SwiGLU FFN<br/>896 -> 4864 -> 896"]
+
         end
+
+
+        Output["视觉特征<br/>(B, N, 896)"]
+
     end
-    
-    Input --> Flatten --> Decoder --> Output[视觉特征<br/>[B, N, 896]]
+
+
+    Input --> Flatten
+
+    Flatten --> MixedAttn
+
+    MixedAttn --> GQA
+
+    GQA --> SwiGLU
+
+    SwiGLU --> Output
 ```
 
 ### Qwen2 Encoder 架构参数

@@ -14,6 +14,9 @@
 
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
+![](./assets/overview.png)
+
+<!--
 ---
 **💡 Learn the Codebase:**
 
@@ -34,6 +37,8 @@ This repository collects and organizes practical agent skills developed while wo
 - Issue Resolving: [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md)
 
 ---
+-->
+
 ## 🚀 Skills
 <!-- | | | | | -->
 
