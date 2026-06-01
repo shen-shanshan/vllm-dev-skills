@@ -160,26 +160,76 @@ MFA 是 Step3 最核心的创新，旨在**在保持注意力表达能力的同�
 
 ```mermaid
 flowchart TB
-    subgraph MFA["Multi-Matrix Factorization Attention"]
-        HS[Hidden States<br/>[B, S, 7168]]
-        HS --> QKV_PROJ[QKV Projection<br/>7168 → 2048 + 256 + 256]
-        QKV_PROJ --> Q_SHARED[Shared Q<br/>[B, S, 2048]]
-        QKV_PROJ --> K[K, 1 head<br/>[B, S, 256]]
-        QKV_PROJ --> V[V, 1 head<br/>[B, S, 256]]
 
-        Q_SHARED --> Q_NORM[RMSNorm]
-        Q_NORM --> WQ[WQ Up-Projection<br/>2048 → 64×256=16384]
-        WQ --> Q_MULTI[Multi-Head Q<br/>[B, S, 64, 256]]
+    subgraph MFA["Multi Matrix Factorization Attention"]
 
-        Q_MULTI --> Q_ROPE[Apply RoPE]
-        K --> K_ROPE[Apply RoPE]
+        HS["Hidden States<br/>(B, S, 7168)"]
 
-        Q_ROPE --> ATT[Attention<br/>Score = QK^T/√256]
-        K_ROPE --> ATT
-        V --> ATT
 
-        ATT --> O_PROJ[O Projection<br/>16384 → 7168]
-        O_PROJ --> OUT[Output<br/>[B, S, 7168]]
+        QKVPROJ["QKV Projection<br/>7168 -> 2048 and 256 and 256"]
+
+
+        QSHARED["Shared Q<br/>(B, S, 2048)"]
+
+        KHEAD["K single head<br/>(B, S, 256)"]
+
+        VHEAD["V single head<br/>(B, S, 256)"]
+
+
+        QNORM["RMSNorm"]
+
+        WQ["WQ Up Projection<br/>2048 -> 64 x 256 -> 16384"]
+
+        QMULTI["Multi Head Q<br/>(B, S, 64, 256)"]
+
+
+        QROPE["Apply RoPE"]
+
+        KROPE["Apply RoPE"]
+
+
+        ATT["Attention Computation"]
+
+
+        OPROJ["O Projection<br/>16384 -> 7168"]
+
+        OUT["Output<br/>(B, S, 7168)"]
+
+
+
+        HS --> QKVPROJ
+
+
+        QKVPROJ --> QSHARED
+
+        QKVPROJ --> KHEAD
+
+        QKVPROJ --> VHEAD
+
+
+        QSHARED --> QNORM
+
+        QNORM --> WQ
+
+        WQ --> QMULTI
+
+
+        QMULTI --> QROPE
+
+        KHEAD --> KROPE
+
+
+        QROPE --> ATT
+
+        KROPE --> ATT
+
+        VHEAD --> ATT
+
+
+        ATT --> OPROJ
+
+        OPROJ --> OUT
+
     end
 ```
 
@@ -228,26 +278,78 @@ Step3-VL 采用 **48 专家 + 1 共享专家** 的 MoE 设计，每 token 激活
 
 ```mermaid
 flowchart TB
-    subgraph MoELayer["MoE Layer (Layers 4-59)"]
-        HS[Hidden States<br/>[B, S, 7168]]
-        HS --> LN[Post-Attention RMSNorm]
-        LN --> GATE[Router Gate<br/>Linear 7168→48]
-        LN --> SHARED[Shared Expert<br/>SwiGLU FFN 7168→5120→7168]
 
-        GATE --> SOFTMAX[Softmax + Top-3 Filter]
-        SOFTMAX --> D[Expert Dispatch]
+    subgraph MoELayer["MoE Layer Layers 4 to 59"]
 
-        D --> E0[Expert 0<br/>SwiGLU 7168→5120→7168]
-        D --> E1[Expert 1]
-        D --> E47[Expert 47]
+        HS["Hidden States<br/>(B, S, 7168)"]
 
-        E0 --> COMBINE[Weighted Sum<br/>Σ w_i × E_i(x)]
+
+        LN["Post Attention RMSNorm"]
+
+
+        GATE["Router Gate<br/>Linear 7168 -> 48"]
+
+
+        SHARED["Shared Expert<br/>SwiGLU FFN 7168 -> 5120 -> 7168"]
+
+
+        SOFTMAX["Softmax and Top 3 Filter"]
+
+
+        D["Expert Dispatch"]
+
+
+        E0["Expert 0<br/>SwiGLU 7168 -> 5120 -> 7168"]
+
+        E1["Expert 1"]
+
+        E47["Expert 47"]
+
+
+        COMBINE["Weighted Sum"]
+
+
+        ADD["Add"]
+
+
+        OUT["Output<br/>(B, S, 7168)"]
+
+
+
+        HS --> LN
+
+
+        LN --> GATE
+
+        LN --> SHARED
+
+
+        GATE --> SOFTMAX
+
+        SOFTMAX --> D
+
+
+        D --> E0
+
+        D --> E1
+
+        D --> E47
+
+
+        E0 --> COMBINE
+
         E1 --> COMBINE
+
         E47 --> COMBINE
 
-        SHARED --> ADD[Add]
+
+        SHARED --> ADD
+
         COMBINE --> ADD
-        ADD --> OUT[Output<br/>[B, S, 7168]]
+
+
+        ADD --> OUT
+
     end
 ```
 
@@ -406,15 +508,43 @@ flowchart TB
 
 ```mermaid
 flowchart LR
+
     subgraph DenseLayer["Single Dense Layer"]
+
         direction TB
-        H1[Input Hidden<br/>[B, S, 7168]] --> LN1[RMSNorm]
-        LN1 --> MFA[MFA Attention<br/>Q: 2048→16384, K:256, V:256]
-        MFA --> ADD1[Residual Add]
-        ADD1 --> LN2[RMSNorm]
-        LN2 --> FFN[SwiGLU FFN<br/>7168→18432→7168]
-        FFN --> ADD2[Residual Add]
-        ADD2 --> H2[Output Hidden<br/>[B, S, 7168]]
+
+
+        H1["Input Hidden<br/>(B, S, 7168)"]
+
+        LN1["RMSNorm"]
+
+        MFA["MFA Attention<br/>Q 2048 -> 16384<br/>K 256<br/>V 256"]
+
+        ADD1["Residual Add"]
+
+        LN2["RMSNorm"]
+
+        FFN["SwiGLU FFN<br/>7168 -> 18432 -> 7168"]
+
+        ADD2["Residual Add"]
+
+        H2["Output Hidden<br/>(B, S, 7168)"]
+
+
+        H1 --> LN1
+
+        LN1 --> MFA
+
+        MFA --> ADD1
+
+        ADD1 --> LN2
+
+        LN2 --> FFN
+
+        FFN --> ADD2
+
+        ADD2 --> H2
+
     end
 ```
 
@@ -422,21 +552,71 @@ flowchart LR
 
 ```mermaid
 flowchart LR
+
     subgraph MoELayer["Single MoE Layer"]
+
         direction TB
-        H1[Input Hidden<br/>[B, S, 7168]] --> LN1[RMSNorm]
-        LN1 --> MFA[MFA Attention]
-        MFA --> ADD1[Residual Add]
-        ADD1 --> LN2[RMSNorm]
-        LN2 --> ROUTER[Router Gate<br/>Linear 7168→48]
-        LN2 --> SHARED[Shared Expert<br/>SwiGLU 7168→5120→7168]
-        ROUTER --> TOP3[Softmax + Top-3]
-        TOP3 --> EXPERTS[Routed Experts 0-47]
-        EXPERTS --> SUM[Weighted Sum]
-        SHARED --> ADD_EXP[Add Shared + Routed]
-        SUM --> ADD_EXP
-        ADD_EXP --> ADD2[Residual Add]
-        ADD2 --> H2[Output Hidden<br/>[B, S, 7168]]
+
+
+        H1["Input Hidden<br/>(B, S, 7168)"]
+
+        LN1["RMSNorm"]
+
+        MFA["MFA Attention"]
+
+        ADD1["Residual Add"]
+
+        LN2["RMSNorm"]
+
+        ROUTER["Router Gate<br/>Linear 7168 -> 48"]
+
+        SHARED["Shared Expert<br/>SwiGLU 7168 -> 5120 -> 7168"]
+
+        TOP3["Softmax and Top 3"]
+
+        EXPERTS["Routed Experts 0 to 47"]
+
+        SUM["Weighted Sum"]
+
+        ADDEXP["Add Shared and Routed"]
+
+        ADD2["Residual Add"]
+
+        H2["Output Hidden<br/>(B, S, 7168)"]
+
+
+
+        H1 --> LN1
+
+        LN1 --> MFA
+
+        MFA --> ADD1
+
+        ADD1 --> LN2
+
+
+        LN2 --> ROUTER
+
+        LN2 --> SHARED
+
+
+        ROUTER --> TOP3
+
+        TOP3 --> EXPERTS
+
+
+        EXPERTS --> SUM
+
+
+        SHARED --> ADDEXP
+
+        SUM --> ADDEXP
+
+
+        ADDEXP --> ADD2
+
+        ADD2 --> H2
+
     end
 ```
 
