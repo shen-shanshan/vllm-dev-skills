@@ -10,11 +10,9 @@
   <img src=https://img.shields.io/github/stars/shen-shanshan/vllm-dev-skills.svg?style=social >
 </div align='left'>
 
-<br>
+## 📌 Overview
 
 ![](./assets/overview.png)
-
-## 📌 Overview
 
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
