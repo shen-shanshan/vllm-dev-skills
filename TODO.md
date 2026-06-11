@@ -1,6 +1,7 @@
-# TODO
+# Roadmap
 
-- [ ] Add usage examples (prompts) for each skill
-- [ ] 写发现 vllm 新需求的 skill
-- [ ] 写蒸馏 vllm maintainer 做 PR review 的 skill
-- [ ] 用 GitHub Page 搭建网页，展示生成的教程文档
+- [x] Add usage examples (prompts and outputs) for each skill into `README.md`.
+- [ ] Add agent tricks section into `README.md`.
+- [ ] Write vllm-dev-demand-observation skill.
+- [ ] Write vllm-pr-review skill, refering to [open-code-review](https://github.com/alibaba/open-code-review).
+- [ ] Support github-page to improve doc readability.
