@@ -12,25 +12,38 @@
 
 ## 📌 Overview
 
-This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
+![](./assets/ai-summary-20260611.png)
+
+A curated collection of Claude Code agent skills that accelerate the entire vLLM development lifecycle — from understanding codebases and triaging issues to designing features, contributing changes, and analyzing performance. Each skill encapsulates a specific development task as a reusable, composable workflow, enabling vLLM developers and community contributors to work more efficiently with AI-assisted tooling.
 
 ## 🚀 Skills
 <!-- | | | | | -->
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
+| [vllm-dev-task-discovery](./skills/vllm-dev-task-discovery/SKILL.md) | Demand Discovery | Analyze contribution opportunities in the vLLM repository for community developers. | ⭐️⭐️⭐️ |
 | [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-model-tutorial](./skills/vllm-model-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM models. | ⭐️⭐️⭐️⭐️⭐️ |
-| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Reading | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
-| [vllm-dev-task-discovery](./skills/vllm-dev-task-discovery/SKILL.md) | Demand Discovery | Analyze contribution opportunities in the vLLM repository for community developers. | ⭐️⭐️⭐️ |
 | [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
 | [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️ |
 | [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Contribution | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️⭐️ |
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Contribution | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️ |
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
 
 ## 📖 Usages
+
+**📚 vllm-dev-task-discovery**
+
+Prompt:
+
+```text
+我想了解 vLLM 的多模态模块中最近还有哪些可以给社区开发者贡献的事情。（Optional：请帮我分析并整理出当前 top 20 的 tasks）
+/vllm-dev-task-discovery
+```
+
+Output: [vllm_dev_task_multimodal_20260611](./skills/vllm-dev-task-discovery/outputs/vllm_dev_task_multimodal_20260611.md).
 
 **📚 vllm-feature-tutorial**
 
@@ -53,28 +66,6 @@ Prompt:
 ```
 
 Output: [deepseek_ocr](./skills/vllm-model-tutorial/outputs/deepseek_ocr.md).
-
-**📚 vllm-pr-summary**
-
-Prompt:
-
-```text
-https://github.com/vllm-project/vllm/pull/35963
-/vllm-pr-summary
-```
-
-Output: [pr-35963-summary](./skills/vllm-pr-summary/outputs/pr-35963-summary.md).
-
-**📚 vllm-dev-task-discovery**
-
-Prompt:
-
-```text
-我想了解 vLLM 的多模态模块中最近还有哪些可以给社区开发者贡献的事情。（Optional：请帮我分析并整理出当前 top 20 的 tasks）
-/vllm-dev-task-discovery
-```
-
-Output: [vllm_dev_task_multimodal_20260611](./skills/vllm-dev-task-discovery/outputs/vllm_dev_task_multimodal_20260611.md).
 
 **📚 vllm-feature-design**
 
@@ -212,6 +203,17 @@ P99 ITL (ms):                            1470.33
 ```
 
 Output: [benchmark_comparison_20260323_150830](./skills/vllm-benchmark-result-analysis/outputs/benchmark_comparison_20260323_150830.md) (related PR: [#7104](https://github.com/vllm-project/vllm-ascend/pull/7104)).
+
+**📚 vllm-pr-summary**
+
+Prompt:
+
+```text
+https://github.com/vllm-project/vllm/pull/35963
+/vllm-pr-summary
+```
+
+Output: [pr-35963-summary](./skills/vllm-pr-summary/outputs/pr-35963-summary.md).
 
 **📚 vllm-multimodal-open-issue-analyzer**
 
