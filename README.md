@@ -12,8 +12,6 @@
 
 ## 📌 Overview
 
-![](./assets/overview.png)
-
 This repository collects and organizes practical agent skills developed while working on the vLLM project. It focuses on reusable patterns, tools, and workflows that improve efficiency when building, debugging, and optimizing large language model inference systems.
 
 ## 🚀 Skills
@@ -24,6 +22,7 @@ This repository collects and organizes practical agent skills developed while wo
 | [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-model-tutorial](./skills/vllm-model-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM models. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Reading | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-dev-task-discovery](./skills/vllm-dev-task-discovery/SKILL.md) | Demand Discovery | Analyze contribution opportunities in the vLLM repository for community developers. | ⭐️⭐️⭐️ |
 | [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
 | [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️ |
 | [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Contribution | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️⭐️ |
@@ -65,6 +64,17 @@ https://github.com/vllm-project/vllm/pull/35963
 ```
 
 Output: [pr-35963-summary](./skills/vllm-pr-summary/outputs/pr-35963-summary.md).
+
+**📚 vllm-dev-task-discovery**
+
+Prompt:
+
+```text
+我想了解 vLLM 的多模态模块中最近还有哪些可以给社区开发者贡献的事情。（Optional：请帮我分析并整理出当前 top 20 的 tasks）
+/vllm-dev-task-discovery
+```
+
+Output: [vllm_dev_task_multimodal_20260611](./skills/vllm-dev-task-discovery/outputs/vllm_dev_task_multimodal_20260611.md).
 
 **📚 vllm-feature-design**
 
