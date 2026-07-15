@@ -63,8 +63,6 @@ Prompt:
 ```text
 我想了解 vLLM 中的 DeepSeek-OCR 模型，尤其是其 ViT 部分对多模态输入的处理流程，请帮我总结一份技术文档。
 /vllm-model-tutorial
-
-我想了解 vLLM 中的 ERNIE-4.5-VL 模型，尤其是其 ViT 部分对多模态输入的处理流程，请帮我总结一份技术文档。
 ```
 
 Output: [deepseek_ocr](./skills/vllm-model-tutorial/outputs/deepseek_ocr.md).
