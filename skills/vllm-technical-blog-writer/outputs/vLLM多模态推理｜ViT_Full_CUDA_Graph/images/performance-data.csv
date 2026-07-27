@@ -1,0 +1,28 @@
+source,model,hardware,scenario,backend,metric,before,after,unit
+official-docs,Qwen3-VL-30B-A3B,1xGB200,VisionArena 3000+300,FlashAttention,mean encoder_forward_ms,5.13,4.52,ms
+official-docs,Qwen3-VL-30B-A3B,1xGB200,VisionArena 3000+300,FlashAttention,p99 encoder_forward_ms,9.16,6.26,ms
+official-docs,Qwen3-VL-30B-A3B,1xGB200,VisionArena 3000+300,FlashInfer,mean encoder_forward_ms,5.42,4.36,ms
+official-docs,Qwen3-VL-30B-A3B,1xGB200,VisionArena 3000+300,FlashInfer,p99 encoder_forward_ms,10.87,6.49,ms
+official-docs,Qwen3-VL-32B,4xGB200 TP4 ViT-DP4,20x336x336/request 1000+200,FlashAttention,mean encoder_forward_ms,28.39,23.16,ms
+official-docs,Qwen3-VL-32B,4xGB200 TP4 ViT-DP4,20x336x336/request 1000+200,FlashAttention,p99 encoder_forward_ms,238.78,205.28,ms
+official-docs,Qwen3-VL-32B,4xGB200 TP4 ViT-DP4,20x336x336/request 1000+200,FlashInfer,mean encoder_forward_ms,23.24,12.91,ms
+official-docs,Qwen3-VL-32B,4xGB200 TP4 ViT-DP4,20x336x336/request 1000+200,FlashInfer,p99 encoder_forward_ms,172.41,26.05,ms
+PR,Qwen3-VL,1xA100,video,FlashAttention,mean encoder_forward_ms,3.67,4.57,ms
+PR,Qwen3-VL,1xA100,video,FlashAttention,p99 encoder_forward_ms,17.03,6.53,ms
+PR,Qwen3-VL,1xA100,video,FlashInfer,mean encoder_forward_ms,8.38,6.55,ms
+PR,Qwen3-VL,1xA100,video,FlashInfer,p99 encoder_forward_ms,58.62,7.27,ms
+PR,InternVL3-2B,1xRTX4090,image,,mean TTFT,81.82,76.81,ms
+PR,InternVL3-2B,1xRTX4090,image,,p99 TTFT,147.65,122.11,ms
+PR,Kimi-VL-A3B,1xRTX4090,image,,mean TTFT,132.91,111.13,ms
+PR,Kimi-VL-A3B,1xRTX4090,image,,p99 TTFT,290.47,193.25,ms
+PR,GLM,1xRTX4090,image,,mean encoder_forward_ms,4.17,4.05,ms
+PR,GLM,2xRTX4090 ViT-DP,image,,mean encoder_forward_ms,6.01,2.24,ms
+PR,GLM,1xRTX4090,video,,mean encoder_forward_ms,7.26,4.54,ms
+PR,GLM,2xRTX4090 ViT-DP,video,,mean encoder_forward_ms,9.51,3.16,ms
+PR,DeepSeek-OCR,,224,,mean encoder_forward_ms improvement,13.93,,percent
+PR,DeepSeek-OCR,,448,,mean encoder_forward_ms improvement,20.96,,percent
+PR,DeepSeek-OCR,,896 tiled,,mean encoder_forward_ms improvement,4.59,,percent
+PR,DeepSeek-OCR,,1024 tiled,,mean encoder_forward_ms improvement,6.56,,percent
+PR,Llama4,,image,,throughput,2.88,3.53,req/s
+PR,Llama4,,image,,mean TTFT,1428.66,1193.91,ms
+PR,Llama4,,image,,p99 TPOT,138.57,158.27,ms

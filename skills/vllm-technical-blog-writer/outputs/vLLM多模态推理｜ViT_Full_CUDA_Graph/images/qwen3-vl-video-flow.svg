@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="680" viewBox="0 0 1680 680">
+  <rect width="1680" height="680" fill="#ffffff"/>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#64748b"/></marker></defs>
+  <style>text{font-family:"Microsoft YaHei","Noto Sans CJK SC","Segoe UI",sans-serif;fill:#1f2937;font-size:15px}.node{fill:#f8fafc;stroke:#64748b;stroke-width:1.5}.accent{fill:#eff6ff;stroke:#2563eb;stroke-width:1.5}.gate{fill:#fefce8;stroke:#a16207;stroke-width:1.5}.warn{fill:#fff7ed;stroke:#c2410c;stroke-width:1.5}.edge{stroke:#64748b;stroke-width:1.5;fill:none;marker-end:url(#arrow)}.dash{stroke:#64748b;stroke-width:1.5;stroke-dasharray:5 4;fill:none;marker-end:url(#arrow)}.label{font-size:13px;fill:#475569;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}</style>
+  <path d="M210 340H240" class="edge"/><path d="M440 340H470" class="edge"/><path d="M670 340H720" class="edge"/><path d="M920 340H950" class="edge"/><path d="M1150 340H1180" class="edge"/><path d="M1410 340H1440" class="edge"/>
+  <rect x="30" y="290" width="180" height="100" rx="8" class="node"/><text x="120" y="330" text-anchor="middle"><tspan x="120">&#x89C6;&#x9891;&#x5E27;&#x4E0E; grid_thw</tspan><tspan x="120" dy="24">(t, h, w), t &gt; 1</tspan></text>
+  <rect x="240" y="290" width="200" height="100" rx="8" class="accent"/><text x="340" y="330" text-anchor="middle"><tspan x="340">Merge &#x540E;&#x89C6;&#x89C9; Token</tspan><tspan x="340" dy="24">t&#x00D7;(h/merge)&#x00D7;(w/merge)</tspan></text>
+  <rect x="470" y="290" width="200" height="100" rx="8" class="node"/><text x="570" y="330" text-anchor="middle"><tspan x="570">&#x89C6;&#x9891; ItemSpec</tspan><tspan x="570" dy="24">output_tokens</tspan></text>
+  <polygon points="820,245 920,340 820,435 720,340" class="gate"/><text x="820" y="330" text-anchor="middle"><tspan x="820">&#x8FD0;&#x884C;&#x65F6; Packing</tspan><tspan x="820" dy="24">Token Budget + &#x6700;&#x5927; Item &#x6570;</tspan></text>
+  <rect x="950" y="290" width="200" height="100" rx="8" class="accent"/><text x="1050" y="330" text-anchor="middle"><tspan x="1050">&#x9009;&#x62E9;&#x6700;&#x5C0F;&#x53EF;&#x5BB9;&#x7EB3; Budget</tspan><tspan x="1050" dy="24">&#x9759;&#x6001; Graph</tspan></text>
+  <rect x="1180" y="290" width="230" height="100" rx="8" class="node"/><text x="1295" y="330" text-anchor="middle"><tspan x="1295">&#x56FA;&#x5B9A;&#x89C6;&#x9891; metadata / buffer</tspan><tspan x="1295" dy="24">&#x6709;&#x6548;&#x503C;&#x62F7;&#x8D1D; + padding</tspan></text>
+  <rect x="1440" y="290" width="200" height="100" rx="8" class="accent"/><text x="1540" y="330" text-anchor="middle"><tspan x="1540">Graph Replay</tspan><tspan x="1540" dy="24">&#x56FA;&#x5B9A; Shape</tspan></text>
+  <text x="935" y="320" text-anchor="middle" class="label">&#x5F62;&#x6210; Sub-batch</text>
+  <path d="M775 415L665 515" class="edge"/><text x="665" y="455" text-anchor="middle" class="label">&#x5355; Item &#x8D85;&#x6700;&#x5927; Budget</text>
+  <rect x="540" y="515" width="230" height="95" rx="8" class="accent"/><text x="655" y="553" text-anchor="middle"><tspan x="655">Eager Fallback</tspan><tspan x="655" dy="24">&#x672C;&#x6587;&#x57FA;&#x7EBF;&#x660E;&#x786E;&#x652F;&#x6301;</tspan></text>
+  <path d="M865 415L950 515" class="edge"/><text x="1000" y="448" text-anchor="middle" class="label"><tspan x="1000">&#x7D2F;&#x8BA1; Token &#x8D85;&#x9650; /</tspan><tspan x="1000" dy="18">Item &#x6570;&#x8FBE;&#x5230;&#x4E0A;&#x9650;</tspan></text>
+  <rect x="820" y="515" width="260" height="95" rx="8" class="node"/><text x="950" y="553" text-anchor="middle"><tspan x="950">&#x7ED3;&#x675F;&#x5F53;&#x524D; Sub-batch</tspan><tspan x="950" dy="24">&#x4E0B;&#x4E00; Item &#x7EE7;&#x7EED; Packing</tspan></text>
+  <rect x="1085" y="35" width="420" height="80" rx="8" class="warn"/><text x="1295" y="68" text-anchor="middle"><tspan x="1295">&#x5B9E;&#x9645;&#x603B;&#x5E27;&#x6570;&#x5FC5;&#x987B;&#x4E0D;&#x8D85;&#x8FC7;&#x5BB9;&#x91CF;</tspan><tspan x="1295" dy="22">&#x8D85;&#x9650;&#x65E0;&#x5145;&#x5206;&#x5B89;&#x5168; fallback</tspan></text>
+  <path d="M1295 115V145" class="dash"/>
+  <rect x="1160" y="145" width="270" height="80" rx="8" class="node"/><text x="1295" y="178" text-anchor="middle"><tspan x="1295">Capture-time &#x5BB9;&#x91CF;&#x4E0A;&#x754C;</tspan><tspan x="1295" dy="22">max_frames_per_batch</tspan></text>
+  <path d="M1295 225V290" class="dash"/><text x="1370" y="255" text-anchor="middle" class="label">&#x51B3;&#x5B9A;&#x56FA;&#x5B9A;&#x5BB9;&#x91CF;</text>
+</svg>

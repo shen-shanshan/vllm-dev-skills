@@ -1,0 +1,14 @@
+flowchart LR
+    image["DeepSeek-OCR 图像"] --> split{"输入尺寸与切图策略"}
+    split --> global["Global Image<br/>全局语义"]
+    split --> local["Local Patches<br/>高分辨率细节，可为空"]
+    global --> globalBudget{"Global Budget 命中？"}
+    local --> localBudget{"Local Budget 命中？"}
+    globalBudget -->|是| globalGraph["Global Graph Replay"]
+    globalBudget -->|否| globalEager["Global Eager"]
+    localBudget -->|是| localGraph["Local Graph Replay"]
+    localBudget -->|否| localEager["Local Eager"]
+    globalGraph --> merge["模型侧后处理与合并"]
+    globalEager --> merge
+    localGraph --> merge
+    localEager --> merge

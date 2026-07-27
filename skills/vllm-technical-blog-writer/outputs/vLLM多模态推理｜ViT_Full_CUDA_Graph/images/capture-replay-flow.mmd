@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant R as GPUModelRunner
+    participant M as EncoderCudaGraph<br/>Manager
+    participant V as SupportsEncoderCudaGraph<br/>模型
+    participant G as CUDA
+    Note over R,G: capture_model 阶段
+    R->>M: capture(encoder_graph_pool)
+    loop 每个 token budget
+        M->>V: 准备固定 Shape 的<br/>CaptureInputs
+        M->>V: Warmup encoder_cudagraph_forward
+        M->>G: 捕获完整 Encoder Forward
+        M->>M: 保存 Graph、输入与输出 Buffer
+    end
+    Note over R,G: 请求执行阶段
+    R->>M: execute(mm_kwargs)
+    M->>V: 计算 ItemSpec 并选择<br/>子 Batch
+    M->>V: 准备 ReplayBuffers
+    M->>M: 原地清零与拷贝<br/>静态输入
+    M->>G: graph.replay()
+    G-->>M: 写入固定 output_buffer
+    M->>V: 后处理并恢复原顺序
+    M-->>R: Encoder Embeddings

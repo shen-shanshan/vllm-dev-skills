@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="500" viewBox="0 0 1800 500">
+  <rect width="1800" height="500" fill="#ffffff"/>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#64748b"/></marker></defs>
+  <style>text{font-family:"Microsoft YaHei","Noto Sans CJK SC","Segoe UI",sans-serif;fill:#1f2937;font-size:15px}.node{fill:#f8fafc;stroke:#64748b;stroke-width:1.5}.accent{fill:#eff6ff;stroke:#2563eb;stroke-width:1.5}.note{fill:#fff7ed;stroke:#c2410c;stroke-width:1.5}.edge{stroke:#64748b;stroke-width:1.5;fill:none;marker-end:url(#arrow)}.dash{stroke:#64748b;stroke-width:1.5;stroke-dasharray:5 4;fill:none;marker-end:url(#arrow)}</style>
+  <path d="M210 145H230" class="edge"/><path d="M410 145H430" class="edge"/><path d="M610 145H630" class="edge"/><path d="M810 145H830" class="edge"/><path d="M1010 145H1030" class="edge"/><path d="M1210 145H1230" class="edge"/><path d="M1410 145H1430" class="edge"/><path d="M1610 145H1630" class="edge"/>
+  <rect x="30" y="100" width="180" height="90" rx="8" class="node"/><text x="120" y="138" text-anchor="middle"><tspan x="120">&#x56FE;&#x50CF;&#x8F93;&#x5165;</tspan><tspan x="120" dy="22">336&#x00D7;336</tspan></text>
+  <rect x="230" y="100" width="180" height="90" rx="8" class="accent"/><text x="320" y="138" text-anchor="middle"><tspan x="320">Patch Grid 24&#x00D7;24</tspan><tspan x="320" dy="22">input_size = 576</tspan></text>
+  <rect x="430" y="100" width="180" height="90" rx="8" class="node"/><text x="520" y="138" text-anchor="middle"><tspan x="520">Spatial Merge &#x00D7;2</tspan><tspan x="520" dy="22">12&#x00D7;12</tspan></text>
+  <rect x="630" y="100" width="180" height="90" rx="8" class="accent"/><text x="720" y="138" text-anchor="middle"><tspan x="720">ItemSpec</tspan><tspan x="720" dy="22">output_tokens = 144</tspan></text>
+  <rect x="830" y="100" width="180" height="90" rx="8" class="node"/><text x="920" y="138" text-anchor="middle"><tspan x="920">Greedy Packing</tspan><tspan x="920" dy="22">&#x6309; output_tokens &#x88C5;&#x7BB1;</tspan></text>
+  <rect x="1030" y="100" width="180" height="90" rx="8" class="accent"/><text x="1120" y="138" text-anchor="middle"><tspan x="1120">&#x9009;&#x62E9;&#x6700;&#x5C0F;&#x9759;&#x6001; Budget</tspan><tspan x="1120" dy="22">144 &#x2264; Budget</tspan></text>
+  <rect x="1230" y="100" width="180" height="90" rx="8" class="node"/><text x="1320" y="138" text-anchor="middle"><tspan x="1320">&#x56FA;&#x5B9A; input buffers</tspan><tspan x="1320" dy="22">&#x524D;&#x7F00;&#x62F7;&#x8D1D; + padding</tspan></text>
+  <rect x="1430" y="100" width="180" height="90" rx="8" class="node"/><text x="1520" y="138" text-anchor="middle"><tspan x="1520">Graph Replay</tspan><tspan x="1520" dy="22">&#x56FA;&#x5B9A; Shape</tspan></text>
+  <rect x="1630" y="100" width="140" height="90" rx="8" class="accent"/><text x="1700" y="138" text-anchor="middle"><tspan x="1700">&#x6709;&#x6548;&#x8F93;&#x51FA;</tspan><tspan x="1700" dy="22">144 tokens</tspan></text>
+  <rect x="600" y="310" width="240" height="80" rx="8" class="note"/><text x="720" y="342" text-anchor="middle"><tspan x="720">&#x52A8;&#x6001;&#x5206;&#x8FA8;&#x7387;&#xFF1A;&#x4E0D;&#x540C; h&#x00D7;w</tspan><tspan x="720" dy="22">&#x8F6C;&#x4E3A;&#x4E0D;&#x540C; output_tokens</tspan></text><path d="M720 310V205" class="dash"/>
+  <rect x="985" y="310" width="270" height="80" rx="8" class="note"/><text x="1120" y="342" text-anchor="middle"><tspan x="1120">&#x9759;&#x6001; Budget &#x5438;&#x6536; Shape &#x5DEE;&#x5F02;</tspan><tspan x="1120" dy="22">Graph &#x5730;&#x5740;&#x4E0E; Shape &#x4E0D;&#x53D8;</tspan></text><path d="M1120 310V205" class="dash"/>
+</svg>

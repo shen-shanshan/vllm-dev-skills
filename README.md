@@ -31,6 +31,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
+| [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | Technical Writing | Write or complete Chinese vLLM technical blog posts in the author's established style, with concise architecture, flow, and sequence diagrams. | ⭐️⭐️⭐️⭐️ |
 
 ## 📖 Usages
 
@@ -224,6 +225,24 @@ Prompt:
 ```
 
 Output: [vllm_multimodal_issues_20260425_030830](./skills/vllm-multimodal-open-issue-analyzer/outputs/vllm_multimodal_issues_20260425_030830.md).
+
+**📚 vllm-technical-blog-writer**
+
+Scenario 1 — write a complete article from a topic:
+
+```text
+请以“vLLM 中的 Automatic Prefix Caching”为主题，分析最新代码和相关资料，并参考我过往的写作风格生成一篇完整的中文技术博客。请按需补充简洁的架构图和流程图。
+/vllm-technical-blog-writer
+```
+
+Scenario 2 — complete an existing Markdown draft:
+
+```text
+请基于我提供的“vLLM多模态推理｜ViT_Full_CUDA_Graph\index.md”文章模板和参考资料，结合 vllm-project/vllm 最新 main 分支的代码，按 [Agent TODO] 的要求补充剩余内容。新增图片请放在文章同级的 ./images 目录中。
+/vllm-technical-blog-writer
+```
+
+Output: New articles are saved under [`./skills/vllm-technical-blog-writer/outputs/<article-slug>/`](./skills/vllm-technical-blog-writer/outputs/), with referenced images stored in the article's `images/` directory. Existing drafts are updated in place.
 
 ## 💡 Tricks
 

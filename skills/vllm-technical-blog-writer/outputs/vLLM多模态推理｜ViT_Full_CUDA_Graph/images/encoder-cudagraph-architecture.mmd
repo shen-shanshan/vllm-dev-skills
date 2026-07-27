@@ -1,0 +1,8 @@
+flowchart TB
+    config["CompilationConfig<br/>四个 encoder CUDA Graph 配置项"] --> runner["GPUModelRunner<br/>生命周期与运行时入口"]
+    runner --> manager["EncoderCudaGraphManager<br/>预算、Capture、Replay、Packing、DP"]
+    manager --> defs["encoder_cudagraph_defs.py<br/>Config / ItemSpec<br/>CaptureInputs / ReplayBuffers"]
+    manager --> protocol["SupportsEncoderCudaGraph<br/>模型侧协议"]
+    protocol --> models["Qwen / InternVL / DeepSeek-OCR<br/>Step3-VL / LFM2-VL 等模型"]
+    manager --> graphs["BudgetGraphMetadata<br/>每个预算对应 Graph 与静态 Buffer"]
+    graphs --> gpu["独立 Encoder Graph Pool<br/>CUDA Graph Replay"]

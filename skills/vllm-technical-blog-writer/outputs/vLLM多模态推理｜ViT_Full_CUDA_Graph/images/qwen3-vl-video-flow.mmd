@@ -1,0 +1,11 @@
+flowchart LR
+    video["视频帧与 grid_thw<br/>(t, h, w)，t > 1"] --> tokens["Merge 后视觉 Token<br/>t×(h/merge)×(w/merge)"]
+    tokens --> spec["视频 ItemSpec<br/>output_tokens"]
+    spec --> packing{"运行时 Packing<br/>Token Budget + 最大 Item 数"}
+    packing -->|"形成 Sub-batch"| budget["选择最小可容纳 Budget<br/>静态 Graph"]
+    budget --> buffers["固定视频 metadata / buffer<br/>有效值拷贝 + padding"]
+    buffers --> replay["Graph Replay<br/>固定 Shape"]
+    packing -->|"单 Item 超最大 Budget"| eager["Eager Fallback<br/>明确支持"]
+    packing -->|"累计 Token 超限 / Item 数达到上限"| split["结束当前 Sub-batch<br/>下一 Item 继续 Packing"]
+    frameCap["Capture-time 容量上界<br/>max_frames_per_batch"] -. "决定固定容量" .-> buffers
+    frameRisk["实际总帧数必须不超过容量<br/>超限无充分安全 fallback"] -.-> frameCap

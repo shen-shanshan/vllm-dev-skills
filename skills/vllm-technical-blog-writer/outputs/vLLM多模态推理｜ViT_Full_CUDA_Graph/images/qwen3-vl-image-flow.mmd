@@ -1,0 +1,11 @@
+flowchart LR
+    image["图像输入<br/>336×336"] --> patch["Patch Grid 24×24<br/>input_size = 576"]
+    patch --> merge["Spatial Merge ×2<br/>12×12"]
+    merge --> spec["ItemSpec<br/>output_tokens = 144"]
+    spec --> packing["Greedy Packing<br/>按 output_tokens 装箱"]
+    packing --> budget["选择最小静态 Budget<br/>144 ≤ Budget"]
+    budget --> buffers["固定 input buffers<br/>有效前缀拷贝 + padding"]
+    buffers --> replay["Graph Replay<br/>固定 Shape"]
+    replay --> output["截取有效输出<br/>144 tokens"]
+    dynamic["动态分辨率<br/>不同 h×w"] -. "转为 output_tokens" .-> spec
+    budgetNote["静态 Budget 吸收 Shape 差异<br/>Graph 地址与 Shape 不变"] -.-> budget

@@ -1,0 +1,28 @@
+group,model,hardware_scenario,metric,metric_type,before,after,unit,relative_gain_percent,semantic,comparison,source_url,note
+Qwen3-VL Image,Qwen3-VL,1xGB200 VisionArena FA,Mean Encoder Forward,latency,5.13,4.52,ms,11.8,收益,eager→CG,https://github.com/vllm-project/vllm/pull/35963,official docs
+Qwen3-VL Image,Qwen3-VL,1xGB200 VisionArena FA,P99 Encoder Forward,latency,9.16,6.26,ms,31.6,收益,eager→CG,https://docs.vllm.ai/en/latest/design/cuda_graphs_multimodal/,official docs
+Qwen3-VL Image,Qwen3-VL,1xGB200 VisionArena FI,Mean Encoder Forward,latency,5.42,4.36,ms,19.6,收益,eager→CG,https://github.com/vllm-project/vllm/pull/35963,official docs
+Qwen3-VL Image,Qwen3-VL,1xGB200 VisionArena FI,P99 Encoder Forward,latency,10.87,6.49,ms,40.3,收益,eager→CG,https://docs.vllm.ai/en/latest/design/cuda_graphs_multimodal/,official docs
+Qwen3-VL Image,Qwen3-VL,4xGB200 TP4+ViT DP4 FA,Mean Encoder Forward,latency,28.39,23.16,ms,18.4,收益,eager→CG,https://github.com/vllm-project/vllm/pull/35963,official docs
+Qwen3-VL Image,Qwen3-VL,4xGB200 TP4+ViT DP4 FA,P99 Encoder Forward,latency,238.78,205.28,ms,14.0,收益,eager→CG,https://docs.vllm.ai/en/latest/design/cuda_graphs_multimodal/,official docs
+Qwen3-VL Image,Qwen3-VL,4xGB200 TP4+ViT DP4 FI,Mean Encoder Forward,latency,23.24,12.91,ms,44.4,收益,eager→CG,https://github.com/vllm-project/vllm/pull/35963,official docs
+Qwen3-VL Image,Qwen3-VL,4xGB200 TP4+ViT DP4 FI,P99 Encoder Forward,latency,172.41,26.05,ms,84.9,收益,eager→CG,https://docs.vllm.ai/en/latest/design/cuda_graphs_multimodal/,official docs
+Qwen3-VL Video,Qwen3-VL,1xA100 video FlashAttention,Mean Encoder Forward,latency,3.67,4.57,ms,-24.52,回退,eager→CG,https://github.com/vllm-project/vllm/pull/38061,
+Qwen3-VL Video,Qwen3-VL,1xA100 video FlashAttention,P99 Encoder Forward,latency,17.03,6.53,ms,61.66,收益,eager→CG,https://github.com/vllm-project/vllm/pull/38061,
+Qwen3-VL Video,Qwen3-VL,1xA100 video FlashInfer,Mean Encoder Forward,latency,8.38,6.55,ms,21.84,收益,eager→CG,https://github.com/vllm-project/vllm/pull/38061,
+Qwen3-VL Video,Qwen3-VL,1xA100 video FlashInfer,P99 Encoder Forward,latency,58.62,7.27,ms,87.59,收益,eager→CG,https://github.com/vllm-project/vllm/pull/38061,
+InternVL,InternVL3-2B,1xRTX 4090,Mean TTFT,latency,81.82,76.81,ms,6.12,收益,eager→CG,https://github.com/vllm-project/vllm/pull/41759,
+InternVL,InternVL3-2B,1xRTX 4090,P99 TTFT,latency,147.65,122.11,ms,17.29,收益,eager→CG,https://github.com/vllm-project/vllm/pull/41759,
+Kimi,Kimi-VL-A3B,1xRTX 4090,Mean TTFT,latency,132.91,111.13,ms,16.39,收益,eager→CG,https://github.com/vllm-project/vllm/pull/41992,
+Kimi,Kimi-VL-A3B,1xRTX 4090,P99 TTFT,latency,290.47,193.25,ms,33.47,收益,eager→CG,https://github.com/vllm-project/vllm/pull/41992,
+GLM,GLM,1xRTX 4090 image,Mean Encoder Forward,latency,4.17,4.05,ms,2.88,收益,eager→CG,https://github.com/vllm-project/vllm/pull/40576,
+GLM,GLM,2xRTX 4090 ViT DP image,Mean Encoder Forward,latency,6.01,2.24,ms,62.73,收益,eager→CG,https://github.com/vllm-project/vllm/pull/40576,
+GLM,GLM,1xRTX 4090 video,Mean Encoder Forward,latency,7.26,4.54,ms,37.47,收益,eager→CG,https://github.com/vllm-project/vllm/pull/40576,
+GLM,GLM,2xRTX 4090 ViT DP video,Mean Encoder Forward,latency,9.51,3.16,ms,66.77,收益,eager→CG,https://github.com/vllm-project/vllm/pull/40576,
+DeepSeek-OCR,DeepSeek-OCR,224,Mean Encoder Forward,reported_gain,,,percent,13.93,收益,eager→CG,https://github.com/vllm-project/vllm/pull/43586,PR 仅提供相对改善值
+DeepSeek-OCR,DeepSeek-OCR,448,Mean Encoder Forward,reported_gain,,,percent,20.96,收益,eager→CG,https://github.com/vllm-project/vllm/pull/43586,PR 仅提供相对改善值
+DeepSeek-OCR,DeepSeek-OCR,896 tiled,Mean Encoder Forward,reported_gain,,,percent,4.59,收益,eager→CG,https://github.com/vllm-project/vllm/pull/43586,PR 仅提供相对改善值
+DeepSeek-OCR,DeepSeek-OCR,1024 tiled,Mean Encoder Forward,reported_gain,,,percent,6.56,收益,eager→CG,https://github.com/vllm-project/vllm/pull/43586,PR 仅提供相对改善值
+Llama4,Llama4,image,Throughput,throughput,2.88,3.53,req/s,22.57,收益,eager→CG,https://github.com/vllm-project/vllm/pull/40660,
+Llama4,Llama4,image,Mean TTFT,latency,1428.66,1193.91,ms,16.43,收益,eager→CG,https://github.com/vllm-project/vllm/pull/40660,
+Llama4,Llama4,image,P99 TPOT,latency,138.57,158.27,ms,-14.22,回退,eager→CG,https://github.com/vllm-project/vllm/pull/40660,

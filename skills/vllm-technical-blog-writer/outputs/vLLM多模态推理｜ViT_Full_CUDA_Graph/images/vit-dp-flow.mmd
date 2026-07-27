@@ -1,0 +1,11 @@
+flowchart TB
+    items["多图 Item<br/>按 input_size 估计负载"] --> assign["负载均衡分配到 TP Ranks"]
+    assign --> r0["Rank 0<br/>本地 Packing + Replay"]
+    assign --> r1["Rank 1<br/>本地 Packing + Replay"]
+    assign --> r2["Rank 2<br/>本地 Packing + Replay"]
+    assign --> r3["Rank 3<br/>本地 Packing + Replay"]
+    r0 --> gather["Pad 后 All-Gather"]
+    r1 --> gather
+    r2 --> gather
+    r3 --> gather
+    gather --> restore["去 Padding<br/>恢复原始 Item 顺序"]

@@ -1,0 +1,10 @@
+flowchart LR
+    input["原始 Item Token<br/>900, 300, 700, 500"] --> sort["升序排序<br/>300, 500, 700, 900"]
+    sort --> batch1["Sub-batch 1<br/>300 + 500 = 800<br/>选择 1024 Budget"]
+    sort --> batch2["Sub-batch 2<br/>700<br/>选择 1024 Budget"]
+    sort --> batch3["Sub-batch 3<br/>900<br/>选择 1024 Budget"]
+    check{"max_budget = 1024<br/>max_items = 2"}
+    check --> batch1
+    check --> batch2
+    check --> batch3
+    note["Sequential Next-Fit<br/>工程启发式，并非一般装箱全局最优"] -.-> sort
