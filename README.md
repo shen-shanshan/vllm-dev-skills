@@ -250,11 +250,37 @@ _Coming soon..._
 
 ## 🛠️ Configuration
 
-- [Agent Skills](https://agentskills.io/home#why-agent-skills)
-- [Extend Claude with skills](https://code.claude.com/docs/en/skills)
-- [Configure Claude Code in VSCode](https://api.lingyaai.cn/model_intro/Claude-Code.html)
-- [Configure Claude Code CLI with Claude HUD](https://github.com/jarrodwatts/claude-hud)
-- [Awesome DeepSeek Agent](https://github.com/deepseek-ai/awesome-deepseek-agent)
+通过符号链接将该项目的 `skills` 目录链接到 `~/.claude/skills/` 下：
+
+```bash
+ln -sfn /path/to/skill-directory ~/.claude/skills/skill-name
+
+# 示例（新增一个叫 vllm-new-skill 的 skill）：
+ln -sfn /Users/shanshan-shen/Documents/GitHub/vllm-dev-skills/skills/vllm-new-skill ~/.claude/skills/vllm-new-skill
+```
+
+参数说明：
+
+- `-s`：创建符号链接；
+- `-f`：如果目标已存在则覆盖（方便更新）；
+- `-n`：如果目标是已有目录的符号链接，覆盖它而不是跟进到目录内部。
+
+批量链接该目录下所有新增 skill 的命令：
+
+```bash
+for dir in /Users/shanshan-shen/Documents/GitHub/vllm-dev-skills/skills/*/; do
+  name=$(basename "$dir")
+  ln -sfn "$dir" ~/.claude/skills/"$name"
+done
+```
+
+> [!TIP]
+>
+> - [Agent Skills](https://agentskills.io/home#why-agent-skills)
+> - [Extend Claude with skills](https://code.claude.com/docs/en/skills)
+> - [Configure Claude Code in VSCode](https://api.lingyaai.cn/model_intro/Claude-Code.html)
+> - [Configure Claude Code CLI with Claude HUD](https://github.com/jarrodwatts/claude-hud)
+> - [Awesome DeepSeek Agent](https://github.com/deepseek-ai/awesome-deepseek-agent)
 
 ## ©️ Citation
 
