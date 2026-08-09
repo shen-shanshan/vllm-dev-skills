@@ -677,3 +677,10 @@ model = vllm.LLM(
 | BatchDescriptor | BatchDescriptor | 描述 batch 形状/均匀性的 dispatch key |
 | Stream Capture Break | Stream Capture Break | 在 CUDA stream capture 中途结束当前 graph 并恢复 |
 | Weak Ref Tensor | Weak Reference Tensor | 避免 strong ref 占用 cudagraph pool 内存的弱引用 tensor |
+
+---
+
+Q:
+
+- 对于 deepseek-v4 模型，在 full and piecewise 模式下，在处理 decode 请求时，加了 @eager_break_during_capture 的 attention_impl() 方法还会 break 吗？
+- 多流 overlap（如：launch stream / wait stream 同步）等操作可以被捕获进 cuda graph 吗？这个行为在 cuda 和 rocm 平台上有什么区别？
