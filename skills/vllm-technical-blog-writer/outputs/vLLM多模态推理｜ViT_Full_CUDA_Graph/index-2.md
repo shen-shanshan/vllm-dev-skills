@@ -4,9 +4,9 @@
 
 多模态理解一直是大模型推理中非常重要的一个场景，其中，ViT（Vision Transformer）作为视觉编码器需要处理大量的图像和视频信息。以 Qwen3-VL 为例，一张 336×336 的图像会产生大约 576 个 Patch（也就是图像的“token”），而在多图或视频推理场景下，模型需要处理的 Patch 数量更是成倍增长。
 
-在传统的 Eager 模式下，每个 CUDA Kernel 的启动都需要 Host 侧的 CPU 去做调度，这个 Kernel Launch Overhead 在 ViT 前向计算包含大量执行时间较短、计算粒度较小的 CUDA Kernel 时尤为显著。在 vLLM 中，社区早已为 LLM Backbone 的部分支持了 CUDA Graph（包括 4 种模式），极大地提高了语言模型的推理速度，而 ViT Full CUDA Graph 则将 CUDA Graph 的覆盖范围从语言模型扩展到了 ViT Encoder，两者相互独立、可以同时启用。该特性的引入为 vLLM 的多模态模块补齐了关键的一角，极大地提高了推理引擎针对视觉输入的推理性能。
+在传统的 Eager 模式下，每个 CUDA Kernel 的启动都需要 Host 侧的 CPU 去做调度，这个 Kernel Launch Overhead 在 ViT 前向计算包含大量执行时间较短、计算粒度较小的 CUDA Kernel 时尤为显著。在 vLLM 中，社区早已为 LLM Backbone 集成了 CUDA Graph（Decoder CUDA Graph，包括四种模式），极大地提高了语言模型的推理速度，而 ViT Full CUDA Graph（Encoder CUDA Graph）则将 CUDA Graph 的覆盖范围从语言模型扩展到了 ViT Encoder，两者相互独立、可以同时启用。该特性的引入为 vLLM 的多模态模块补齐了关键的一角，极大地提高了推理引擎针对视觉输入的推理性能。
 
-本文将从 CUDA Graph 的基本原理开始介绍，并以 vLLM 中 LLM Backbone CUDA Graph 的设计作为参考，深入解析 ViT Full CUDA Graph 的整体设计、关键算法、扩展功能、模型集成以及性能调优等内容。
+本文将从 CUDA Graph 的基本原理开始介绍，并以 vLLM 中 Decoder CUDA Graph 的设计作为参考，深入解析 ViT Full CUDA Graph 的整体设计、关键算法、扩展功能、模型集成以及性能调优等内容。
 
 ## 二、CUDA Graph 的基本原理
 
@@ -21,6 +21,8 @@ CUDA Graph 正是为了解决这一问题而提出的，它将多个 GPU 操作�
 ![](./images/cuda-graph-基本原理.png)
 
 由于 Graph 中的 Kernel 和参数在创建后保持固定，Graph 重放（Replay）无需重复执行参数设置和 Kernel 调度等流程，从而可以显著减少 CPU 的开销，提高 CPU 与 GPU 的协同效率。虽然 Graph 中的 Kernel 在 GPU 上通常也会获得一定的执行效率提升，但 CUDA Graph 最主要的优势还是在于消除频繁的 CPU → GPU 提交开销，从而提升整体的执行性能。
+
+> TODO: 补充 deepseek-v4 的 profiling。连线垂直 -> host bound。
 
 ### 2.2 Workflow：怎么使用 CUDA Graph？✅
 
@@ -82,7 +84,7 @@ Graph 在 Capture 时就已经确定了执行流程，因此后续 Replay 只能
 
 下面我们将通过一些具体的例子来说明到底什么情况下是不能使用 CUDA Graph 的。
 
-**（1）动态显存分配（❌️）：**
+**（1）动态显存分配：**
 
 ```python
 y = torch.cat([a, b], dim=0)
@@ -97,7 +99,7 @@ out[:len(a)].copy_(a)
 out[len(a):].copy_(b)
 ```
 
-**（2）动态 Shape 或动态图（❌️）：**
+**（2）动态 Shape 或动态图：**
 
 ```python
 torch.cat([a[:k], b], dim=0)
@@ -114,7 +116,7 @@ y = torch.cat(xs)
 
 这里输出 Shape 或输入 Tensor 数量依赖运行时数据，每次执行的 Graph 拓扑都可能不同，因此无法进行 Capture。
 
-**（3）GPU→CPU 同步（❌️）：**
+**（3）GPU→CPU 同步：**
 
 ```python
 x.item()
@@ -136,7 +138,7 @@ g.replay()
 value = output.item()  # 在 Graph 外读取
 ```
 
-**（4）根据 GPU 结果执行 Python 逻辑（❌️）：**
+**（4）根据 GPU 结果执行 Python 逻辑：**
 
 ```python
 if x.sum() > 0:
@@ -153,76 +155,70 @@ idx = x.argmax().item()
 
 **总结一下：CUDA Graph 并不是禁止 Python API，而是禁止“运行时的动态行为”。凡是涉及动态分配、动态 Shape、GPU→CPU 同步、或依赖 GPU 结果进行 Python 控制流的操作，都不适合放在 CUDA Graph 的 Capture 路径中。**
 
-### 2.4 Tricks：CUDA Graph 的显存管理
+### 2.4 Tricks：CUDA Graph 的显存管理✅
 
 CUDA Graph 每次 Replay 都会访问与 Capture 时完全相同的虚拟内存地址，如果 Capture 期间使用的内存被 PyTorch 释放，Replay 时就可能访问非法地址；如果这些内存被重新分配给其他 Tensor，则 Replay 可能会覆盖这些 Tensor 的数据，导致结果错误。因此，Graph 使用的内存必须在整个 Graph 生命周期内保持有效，并在每次 Replay 时保持相同的地址。
 
 为了解决这一问题，PyTorch 的 Caching Allocator 在检测到 CUDA Graph Capture 开始后，会为当前 Graph 创建一个**私有内存池（Graph-private Memory Pool）**。Capture 过程中所有新的 GPU 内存分配都来自该私有内存池，而不会被普通的内存分配器复用。该内存池会一直保留，直到对应的 CUDAGraph 对象以及 Capture 期间创建的所有 Tensor 都被释放，从而保证 Graph Replay 始终能够访问正确的内存地址。
 
-默认情况下，每一次 Capture 都会创建一个独立的私有内存池。这种方式能够完全避免不同 Graph 之间的内存相互干扰，但当一个程序包含多个 CUDA Graph 时，也可能导致 GPU 内存占用增加。
-
-为了减少内存开销，PyTorch 提供了**共享私有内存池（Shared Private Memory Pool）**，多个 CUDA Graph 可以共享同一个内存池，但必须满足以下条件：
+默认情况下，每一次 Capture 都会创建一个独立的私有内存池。这种方式能够完全避免不同 Graph 之间的内存相互干扰，但当一个程序包含多个 CUDA Graph 时，也可能导致 GPU 内存占用增加。为了减少内存开销，PyTorch 提供了**共享私有内存池（Shared Private Memory Pool）**，多个 CUDA Graph 可以共享同一个内存池，但必须满足以下条件：
 
 - 这些 Graph 不会并发执行；
 - 如果 Graph 之间存在依赖关系，则必须始终按照 Capture 时相同的顺序进行 Replay；
 - 如果 Graph 之间没有数据依赖，也可以共享内存池，但需要注意，一个 Graph 的 Replay 可能会覆盖另一个 Graph 的输出，因此如果需要保留输出结果，应提前对输出 Tensor 调用 `clone()`。
 
-这种共享内存池的方式能够在保证正确性的前提下显著降低 CUDA Graph 的额外内存开销，在 vLLM 等需要维护多个 Graph（针对不同 Batch Size）的推理框架中被广泛采用。
+这种共享内存池的方式能够在保证正确性的前提下显著降低 CUDA Graph 的额外内存开销，在 vLLM 等需要维护多个 Graph 的推理框架中被广泛采用（后续会详细介绍）。
 
-### 2.5 FAQ
+### 2.5 FAQ✅
 
-**💡 Q1：在 Capture 之前为什么还需要 Warmup？**
+**Q1：在 Capture 之前为什么还要 Warmup？**
 
-Warmup 并不是 CUDA Graph 本身的要求，而是 PyTorch（以及其他深度学习框架）为了保证 Capture 得到一个稳定、可复用的 Graph 而必须做的准备工作。
-
-在 Capture 之前，通常需要先对模型执行若干次 Warmup。其原因在于，CUDA Graph 希望捕获的是一段稳定、可重复执行的 GPU 工作负载，而首次执行模型时往往伴随着大量一次性的初始化操作，例如 CUDA Context 创建、Kernel 加载、cuBLAS/cuDNN 等计算库的 Handle 初始化、算法自动选择（Autotuning）、GPU 内存池建立以及 Workspace 分配等。
-
-如果直接进行 Capture，这些初始化操作也会被记录到 Graph 中，不仅增加额外开销，还可能导致 Graph 无法正确复用。
+在 Capture 之前，通常需要先对模型执行若干次 Warmup。其原因在于，CUDA Graph 希望捕获的是一段稳定、可重复执行的 GPU 工作负载，而首次执行模型时往往伴随着大量一次性的初始化操作，例如 CUDA Context 创建、Kernel 加载、cuBLAS/cuDNN 等计算库的 Handle 初始化、算法自动选择（Autotuning）、GPU 内存池建立以及 Workspace 分配等。如果直接进行 Capture，这些初始化操作也会被记录到 Graph 中，不仅增加额外开销，还可能导致 Graph 无法正确复用。
 
 因此，Warmup 的作用就是提前完成这些一次性的初始化工作，使 Capture 阶段仅记录真正需要重复执行的 Kernel 和内存操作，从而保证后续 Graph Replay 能够以固定的执行流程和内存地址高效运行，充分发挥 CUDA Graph 降低 CPU 调度开销的优势。
 
-另外，Warmup 使用的 Shape、dtype、backend 和真正 Capture 的路径也要一致。Warmup 的目的不是“把所有输入都跑一遍”，而是让当前待捕获路径中的一次性初始化先发生；如果后续切换了 Attention backend 或走到另一条模型分支，仍然可能触发新的初始化。
+另外，Warmup 使用的 Shape、Dtype、Backend 和真正 Capture 的路径也要一致。Warmup 的目的不是“把所有输入都跑一遍”，而是让当前待捕获路径中的一次性初始化先发生。如果后续切换了 Attention Backend 或走到另一条模型分支，仍然可能触发新的初始化。
 
-**💡 Q2：CUDA Graph 和 `torch.compile` 的区别是什么？**
+**Q2：CUDA Graph 和 `torch.compile` 的区别是什么？**
 
 它们解决的是不同层面的问题：
 
-- **CUDA Graph 是运行期的优化**：在第一次运行时，把 GPU 上所有的 kernel 启动序列“捕获”下来，之后每次推理直接“回放”这段录像，省掉了 CPU 侧反复下发 kernel 的开销。它不关心你的代码写得好不好、有没有优化过，它只管“一次性下发”；
-- **`torch.compile` 是编译期的优化**：把你写的 Python 代码追踪（trace）成一张计算图（FX Graph），然后在这张图上做各种变换：算子融合、内存优化、最后直接生成更贴近硬件的 kernel 代码（比如 GPU 上的 Triton kernel）。即使不配合 CUDA Graph，仅仅以普通的 eager 路径去执行这些编译后的子图，性能也可能比原始 eager 执行更好。但当它和 CUDA Graph 叠加时，重点就不再是 CPU 侧的 launch 开销，而是 fusion、codegen 以及调度优化带来的收益。
+- **CUDA Graph 是运行期的优化**：在第一次运行时，把 GPU 上所有的 Kernel 启动序列“捕获”下来，之后每次推理直接“回放”这段录像，省掉了 CPU 侧反复下发 Kernel 的开销。它不关心你的代码写得好不好、有没有优化过，它只管“一次性下发”；
+- **`torch.compile` 是编译期的优化**：把你写的 Python 代码追踪（Trace）成一张计算图（FX Graph），然后在这张图上做各种变换：算子融合、内存优化、最后直接生成更贴近硬件的 Kernel 代码（比如 GPU 上的 Triton Kernel）。即使不配合 CUDA Graph，仅仅以普通的 Eager 路径去执行这些编译后的子图，性能也可能比原始 Eager 执行更好。但当它和 CUDA Graph 叠加时，重点就不再是 CPU 侧的 Launch 开销，而是 Fusion、Codegen 以及调度优化带来的收益。
 
-它们二者可以结合起来进行使用：CUDA Graph 让计算的启动开销趋近于零，而 `torch.compile` 则让你的计算本身跑得更快（更少的 kernel、更少的中间张量，不同资源的利用效率更高）。
+它们二者可以结合起来进行使用：
 
-在 vLLM 中，两者的关系还多一层：`torch.compile` 不只是做算子融合，也为 `PIECEWISE` 模式提供统一的图表示和切分边界；ViT Full CUDA Graph 则由独立的 Encoder 管理器直接捕获完整视觉编码器路径。不要因此把“编译图”和“CUDA Graph”混为一谈：前者决定计算如何组织，后者决定一串已经确定的 GPU 工作如何一次提交。
+CUDA Graph 让计算的启动开销趋近于零，而 `torch.compile` 则让你的计算本身跑得更快（更少的 Kernel、更少的中间张量，不同资源的利用效率更高）。
 
-## 三、vLLM 中的 CUDA Graph
+在 vLLM 中，两者的关系还多一层：
 
-> NOTE：本小节将简要介绍 vLLM 中现有 text-only CUDA Graph 的设计思想，不深入具体的代码细节，对这部分已经非常熟悉了的读者可以跳过本节，直接从第四节开始阅读。
+`torch.compile` 不只是做算子融合，也为 `PIECEWISE` 模式提供统一的图表示和切分边界。然而，vLLM 社区最近正在逐渐放弃对 `torch.compile` 的集成。为了能让 `PIECEWISE` CUDA Graph 的使用能够完全和 `torch.compile` 解耦，社区后面又引入了 Breakable CUDA Graph，它能够在一次 Capture Stream 中通过 `@eager_break_during_capture` 装饰器主动打断 Capture，使这些算子在 Eager 模式下执行，其余部分仍被 CUDA Graph 捕获，从而在不拆分 FX Graph 的前提下获得 `PIECEWISE` 模式的性能收益。
 
-### 3.1 Challenge - 动态 Shape 下的 Bucketing 策略
+## 三、vLLM 中的 Decoder CUDA Graph
 
-CUDA Graph 在大模型推理场景下的关键挑战：推理请求的 `num_tokens` 是动态的，而 CUDA Graph 需要静态 Shape。为了解决这个问题，vLLM 采用了 Bucketing 策略：**预先为多个固定桶大小分别捕获 Graph，运行时将实际请求向上对齐到最近的桶，并通过 padding 补齐。**
+> NOTE：本章将简要介绍 vLLM 中现有的 Decoder CUDA Graph 的设计思想，不深入具体的代码细节，对这部分框架已经非常熟悉了的读者可以跳过本章，直接从第四章开始阅读。
+
+### 3.1 Challenge：动态 Shape 下的 Bucketing 策略✅
+
+在大模型推理的场景下，CUDA Graph 的应用有一个关键的挑战——推理请求的 `num_tokens` 是动态的，而 CUDA Graph 需要静态 Shape。为了解决这个问题，vLLM 采取了 Bucketing 策略：即预先捕获多个固定桶大小的 Graph，运行时再将实际输入的形状向上 Padding 到最近的桶，最后重放这个桶对应的 Graph。
 
 该策略本质上是 Padding 开销与 Graph 收益的权衡：
 
 - **桶粒度过粗**：Padding 冗余计算增加；
 - **桶粒度过细**：需要维护更多的 Graph，增加显存和捕获成本。
 
-因此，在 vLLM 中，小 Batch 的请求更适合使用 CUDA Graph，大 Batch 的请求一般直接走 Eager 更划算。
+另外，这里的 Bucket 命中并不意味着没有代价：运行时仍需要准备元数据、把有效输入拷入固定 Buffer，并执行 Padding 对应的冗余计算。判断是否入图不能只看“实际 Shape 能否放进桶”，还要看该 Shape 下节省的 Launch Overhead 是否能覆盖拷贝和冗余计算。因此，小 Batch 的请求更适合使用 CUDA Graph，大 Batch 的请求一般直接走 Eager 更划算（计算已经成为主要瓶颈，而不是算子下发是瓶颈）。
 
-这里的 Bucket 命中并不意味着没有代价：运行时仍要准备元数据、把有效输入拷入固定 Buffer，并执行 Padding 对应的冗余计算。因此判断是否入图不能只看“实际 Shape 能否放进桶”，还要看该 Shape 下节省的 launch overhead 是否能覆盖拷贝和冗余计算。
-
-### 3.2 Flexibility - 四种 Graph Mode
+### 3.2 Flexibility：四种 Graph Mode✅
 
 目前，vLLM 提供了四种 Graph Mode，本质上是在权衡性能和兼容性：
 
-- `PIECEWISE`：Attention 保持 Eager，其余部分入图，兼容性最高，但无法消除 Attention 的 launch overhead；
-- `FULL`：整个 Forward 入图，性能最佳，但对 Attention backend 和 Shape 要求最高；
+- `PIECEWISE`：Attention 保持 Eager，其余部分入图，兼容性最高，但无法消除 Attention 的 Launch Overhead；
+- `FULL`：整个 Forward 入图，性能最佳，但对 Attention Backend 和 Shape 要求最高；
 - `FULL_DECODE_ONLY`：仅 Decode 使用整图，Prefill 回退 Eager，利用 Decode Shape 更规整的特点获取稳定收益；
 - `FULL_AND_PIECEWISE`（默认）：Decode 使用 `FULL`，Prefill 使用 `PIECEWISE`，在性能与兼容性之间取得最佳平衡。
 
-> NOTE：最终能否使用某种模式，还受 Attention backend、模型结构和运行时 Shape 限制，不满足条件时会自动降级或回退 Eager。
-
-这四种模式描述的是语言模型 Forward 的捕获边界，并不控制本文第四节的 Encoder CUDA Graph。ViT Full CUDA Graph 由 `cudagraph_mm_encoder` 单独开启，使用独立的 Graph、Buffer 和内存池，所以可以与 Decoder 侧任一可用模式同时工作。
+注意：这四种模式控制的是语言模型推理的捕获边界（即 Decoder CUDA Graph），和本文将要介绍的重点：ViT Full CUDA Graph 无关。ViT Full CUDA Graph 由 `compilation_config.cudagraph_mm_encoder` 单独控制开启，使用独立的 Graph、Buffer 和内存池，因此可以与 Decoder 侧任一 Graph Mode 同时工作。
 
 ### 3.3 FAQ
 
