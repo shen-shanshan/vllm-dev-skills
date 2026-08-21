@@ -1,0 +1,42 @@
+{
+  "sources": {
+    "atom-review-pr-skill.md": {
+      "url": "https://raw.githubusercontent.com/ROCm/ATOM/main/.claude/skills/review-pr/SKILL.md",
+      "sha": "728c3a3fa18e713c5b67fc4a5ff467d176282f75",
+      "previous_sha": null,
+      "status": "unchanged",
+      "size_bytes": 50096,
+      "updated_at": "2026-08-20T07:07:20.597931+00:00",
+      "checked_at": "2026-08-20T07:08:38.418467+00:00"
+    },
+    "aiter-review-pr-skill.md": {
+      "url": "https://raw.githubusercontent.com/ROCm/aiter/main/.claude/skills/review-pr/SKILL.md",
+      "sha": "3fdb11afac0e1d6bb6c5c44fe13855f427f9e6f5",
+      "previous_sha": null,
+      "status": "unchanged",
+      "size_bytes": 59722,
+      "updated_at": "2026-08-20T07:07:25.614958+00:00",
+      "checked_at": "2026-08-20T07:08:40.264540+00:00"
+    },
+    "mori-readme.md": {
+      "url": "https://raw.githubusercontent.com/ROCm/mori/main/README.md",
+      "sha": "2ab492a77f294c8d4facb4b0b9b536e998bdc76c",
+      "previous_sha": null,
+      "status": "unchanged",
+      "size_bytes": 15162,
+      "updated_at": "2026-08-20T07:07:30.136619+00:00",
+      "checked_at": "2026-08-20T07:08:42.305209+00:00"
+    },
+    "mori-structure.json": {
+      "url": "https://api.github.com/repos/ROCm/mori/git/trees/main?recursive=1",
+      "sha": "b61b99d386a57fbad737fccf73dd8321768accd5",
+      "previous_sha": null,
+      "status": "unchanged",
+      "size_bytes": 62304,
+      "updated_at": "2026-08-20T07:07:37.196953+00:00",
+      "checked_at": "2026-08-20T07:08:45.465096+00:00"
+    }
+  },
+  "updated_at": "2026-08-20T07:08:45.465214+00:00",
+  "ref": "main"
+}

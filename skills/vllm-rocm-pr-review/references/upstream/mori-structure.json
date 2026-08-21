@@ -1,0 +1,2718 @@
+{
+  "sha": "b61b99d386a57fbad737fccf73dd8321768accd5",
+  "fetched_from": "https://api.github.com/repos/ROCm/mori/git/trees/main?recursive=1",
+  "entries": [
+    {
+      "path": "README.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs",
+      "type": "tree"
+    },
+    {
+      "path": "docs/MORI-CCO-GUIDE.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-EP-BENCHMARK.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-EP-GUIDE.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-IO-BENCHMARK.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-IO-GUIDE.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-IR-GUIDE.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-SHMEM-GUIDE.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-UMBP-PD-BENCHMARK.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI-UMBP-SINGLE-NODE-GUIDE.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI_IR_INTEGRATION.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI_JIT_ARCHITECTURE.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/MORI_JIT_V2_DESIGN.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/Makefile",
+      "type": "blob"
+    },
+    {
+      "path": "docs/PROFILER.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/_static",
+      "type": "tree"
+    },
+    {
+      "path": "docs/_static/.gitkeep",
+      "type": "blob"
+    },
+    {
+      "path": "docs/_templates",
+      "type": "tree"
+    },
+    {
+      "path": "docs/_templates/.gitkeep",
+      "type": "blob"
+    },
+    {
+      "path": "docs/api",
+      "type": "tree"
+    },
+    {
+      "path": "docs/api/communication.rst",
+      "type": "blob"
+    },
+    {
+      "path": "docs/api/profiler.rst",
+      "type": "blob"
+    },
+    {
+      "path": "docs/api/umbp.rst",
+      "type": "blob"
+    },
+    {
+      "path": "docs/conf.py",
+      "type": "blob"
+    },
+    {
+      "path": "docs/index.rst",
+      "type": "blob"
+    },
+    {
+      "path": "docs/installation.rst",
+      "type": "blob"
+    },
+    {
+      "path": "docs/mori_arch_20250819_v0.png",
+      "type": "blob"
+    },
+    {
+      "path": "docs/mori_arch_20260422_v1.jpg",
+      "type": "blob"
+    },
+    {
+      "path": "docs/mori_io_arch.png",
+      "type": "blob"
+    },
+    {
+      "path": "docs/mori_io_workflow.jpg",
+      "type": "blob"
+    },
+    {
+      "path": "docs/quickstart.rst",
+      "type": "blob"
+    },
+    {
+      "path": "docs/rdma_bandwidth_utilization.md",
+      "type": "blob"
+    },
+    {
+      "path": "docs/requirements.txt",
+      "type": "blob"
+    },
+    {
+      "path": "docs/timeline_internode_v1.png",
+      "type": "blob"
+    },
+    {
+      "path": "include",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/application.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/application_device_types.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/bootstrap",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/bootstrap/base_bootstrap.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/bootstrap/bootstrap.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/bootstrap/local_bootstrap.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/bootstrap/mpi_bootstrap.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/bootstrap/socket_bootstrap.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/context",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/context/context.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/memory",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/memory/memory_region.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/memory/symmetric_memory.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/memory/va_manager.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/topology",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/topology/gpu.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/topology/net.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/topology/node.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/topology/pci.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/topology/system.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/topology/topology.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/p2p",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/p2p/p2p.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/bnxt",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/bnxt/bnxt.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/bnxt/bnxt_re_dv.h",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/dv_loader.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/ibverbs",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/ibverbs/ibverbs.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/ionic",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/ionic/ionic.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/ionic/ionic_dv.h",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/mlx5",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/mlx5/mlx5.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/mlx5/mlx5_dv.h",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/mlx5/mlx5_ifc.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/providers/mlx5/mlx5_prm.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/rdma/rdma.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/sdma",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/sdma/anvil.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/tcp",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/transport/tcp/tcp.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/transport/transport.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/utils",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/application/utils/check.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/utils/cpu_affinity.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/application/utils/math.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/cco",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/cco/cco.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/cco/cco_scale_out.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/all2all",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/all2all/oneshot_all2all_sdma_async_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/all2all/oneshot_all2all_sdma_class.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/all2all/oneshot_all2all_sdma_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/all2all/sdma_all2all.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allgather",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/allgather/allgather_into_tensor.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allgather/intra_node_subgroup_broadcast_sdma_class.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allgather/intra_node_subgroup_sdma_class.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allgather/oneshot_allgather_sdma_class.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allgather/oneshot_sdma_async_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allgather/oneshot_sdma_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allgather/sdma_allgather.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allreduce.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allreduce",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/allreduce/sdma_allreduce.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allreduce/twoshot_allreduce_sdma_class.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allreduce/twoshot_sdma_async_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allreduce/twoshot_sdma_common.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/allreduce/twoshot_sdma_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/ccl_kernel_args.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/collective.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/collective_pub.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/core/algorithm_selector.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/all2all_config.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/all2all_executor.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/all2all_manager.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/allreduce_config.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/allreduce_executor.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/allreduce_manager.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/topology_detector.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/core/wall_time.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/inter_node",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/inter_node/executors",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/inter_node/executors/one_shot.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/inter_node/executors/ring_1d.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/inter_node/inter_node_ring_class.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/inter_node/kernels",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/inter_node/kernels/all_gather.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/inter_node/kernels/one_shot_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/inter_node/kernels/reduce_scatter.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/intra_node",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/intra_node/executor.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/intra_node/impl.cuh",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/intra_node/kernels",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/collective/intra_node/kernels/kernel_entity.cuh",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/intra_node/kernels/kernel_impl.cuh",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/collective/intra_node/kernels/vec_type.cuh",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/core.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/profiler",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/profiler/constants.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/profiler/kernel_profiler.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/p2p",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/p2p/device_primitives.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/p2p/p2p.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/core_device_types.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/device_primitives.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/ibverbs_handle.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/bnxt",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/bnxt/bnxt_defs.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/bnxt/bnxt_device_primitives.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/bnxt/bnxt_re_hsi.h",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/ionic",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/ionic/ionic_defs.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/ionic/ionic_device_primitives.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/ionic/ionic_fw.h",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/mlx5",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/mlx5/mlx5_defs.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/providers/mlx5/mlx5_device_primitives.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/rdma.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/rdma_device.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/rdma/utils.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/sdma",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/transport/sdma/anvil_device.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/sdma/device_primitives.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/sdma/sdma.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/transport/sdma/sdma_pkt_struct.h",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/utils",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/core/utils/udma_barrier.h",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/core/utils/utils.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/hip_compat.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/io/backend.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io/common.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io/engine.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io/enum.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io/env.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io/io.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io/logging.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/io/msgpack_adaptor.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/jit",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/jit/v2",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/jit/v2/compiler.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/jit/v2/plan_api.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/jit/v2/render.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/jit/v2/spec.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/jit/v2/toolchain.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/jit/v2/util.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/metrics",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/metrics/prometheus_metrics_server.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/ops",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/ops/cast.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/ops/dispatch_combine",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/ops/dispatch_combine/dispatch_combine.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/ops/dispatch_combine/launch.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/ops/dispatch_combine_v2",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/ops/dispatch_combine_v2/ep_cfg.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/ops/dispatch_combine_v2/ep_spec.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/ops/ops.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/pybind",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/pybind/profiler_registry.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/shmem/internal.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_api.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_device_api.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_device_api_wrapper.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_device_kernels.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_ibgda_kernels.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_p2p_kernels.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_sdma_kernels.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/shmem/shmem_static_init.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/utils",
+      "type": "tree"
+    },
+    {
+      "path": "include/mori/utils/data_types.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/utils/env_utils.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/utils/hip_compat.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/utils/hip_helper.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/utils/host_utils.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/utils/limits.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "include/mori/utils/mori_log.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "pyproject.toml",
+      "type": "blob"
+    },
+    {
+      "path": "python",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ccl",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/ccl/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ccl/collective.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ccl/hier_allgather.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ccl/host_proxy_ag.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/cco/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/cco.pxd",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/cco.pyx",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/communicator.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/device",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/cco/device/README.md",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/device/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/device/bitcode.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/device/flydsl",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/cco/device/flydsl/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/device/flydsl/_bindings.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/device/flydsl/_internal.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cco/device/flydsl/handles.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cli.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/cpp",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/cpp/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/io",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/io/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/io/engine.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/io/fabric_allocator.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/io/fabric_copy_jit.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/io/scatter_gather_jit.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/ir/README.md",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/bitcode.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/flydsl",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/ir/flydsl/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/flydsl/ops.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/flydsl/runtime.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/ops.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/triton",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/ir/triton/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/triton/ops.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ir/triton/runtime.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jax",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/jax/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jax/ops.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/jit/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit/_precompile_standalone.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit/cache.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit/config.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit/core.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit/hip_driver.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit/v2",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/jit/v2/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/jit/v2/plan_api.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/kernel_profiler",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/kernel_profiler/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/ops/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/_jit_loader.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/.gitignore",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/README.md",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/dispatch_combine_op.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/ep_plans.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/flydsl_backend.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/flydsl_compat.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/flydsl_prims.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/hip_backend.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/hip_tuning_configs.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/intranode_kernels.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/symm_arena.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/dispatch_combine_v2/tuning_configs.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/local_expert_count.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_config.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/.gitkeep",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNodeLL_ep8_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNodeLL_ep8_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNode_ep2_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNode_ep2_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNode_ep4_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNode_ep4_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNode_ep8_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi300x_IntraNode_ep8_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_AsyncLL_ep16_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_AsyncLL_ep16_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_InterNodeV1LL_ep16_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_InterNodeV1LL_ep16_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_InterNodeV1_ep16_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_InterNodeV1_ep16_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_IntraNode_ep2_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_IntraNode_ep2_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_IntraNode_ep4_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_IntraNode_ep4_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_IntraNode_ep8_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx942_mi308x_IntraNode_ep8_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNodeLL_ep8_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNodeLL_ep8_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNode_ep2_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNode_ep2_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNode_ep4_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNode_ep4_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNode_ep8_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi350x_IntraNode_ep8_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_AsyncLL_ep16_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_AsyncLL_ep16_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_InterNodeV1LL_ep16_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_InterNodeV1LL_ep16_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_InterNodeV1_ep16_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_InterNodeV1_ep16_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_IntraNodeLL_ep8_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_IntraNode_ep2_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_IntraNode_ep2_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_IntraNode_ep4_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_IntraNode_ep4_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_IntraNode_ep8_combine.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/tuning_configs/gfx950_mi355x_IntraNode_ep8_dispatch.json",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/ops/utils.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/shmem",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/shmem/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/shmem/api.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/shmem/tensor_utils.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/tensor_utils.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/tools",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/tools/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "python/mori/umbp",
+      "type": "tree"
+    },
+    {
+      "path": "python/mori/umbp/__init__.py",
+      "type": "blob"
+    },
+    {
+      "path": "setup.py",
+      "type": "blob"
+    },
+    {
+      "path": "src",
+      "type": "tree"
+    },
+    {
+      "path": "src/application",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/bootstrap",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/bootstrap/local_bootstrap.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/bootstrap/mpi_bootstrap.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/bootstrap/socket_bootstrap.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/context",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/context/context.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/memory",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/memory/memory_region.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/memory/symmetric_memory.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/memory/va_manager.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/topology",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/topology/gpu.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/topology/net.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/topology/node.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/topology/pci.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/topology/system.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/rdma",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/rdma/providers",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/bnxt",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/bnxt/bnxt.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/dv_loader.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/ibverbs",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/ibverbs/ibv_shim.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/ibverbs/ibverbs.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/ionic",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/ionic/ionic.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/mlx5",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/mlx5/mlx5.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/rdma/providers/mlx5/mlx5_abi_parity.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/rdma/rdma.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/sdma",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/sdma/anvil.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/application/transport/tcp",
+      "type": "tree"
+    },
+    {
+      "path": "src/application/transport/tcp/tcp.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/cco",
+      "type": "tree"
+    },
+    {
+      "path": "src/cco/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/cco/cco_init.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/cco/device",
+      "type": "tree"
+    },
+    {
+      "path": "src/cco/device/cco_device_wrapper.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective",
+      "type": "tree"
+    },
+    {
+      "path": "src/collective/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/core",
+      "type": "tree"
+    },
+    {
+      "path": "src/collective/core/allgather_into_tensor.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/core/allreduce_manager.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/core/collective.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/core/oneshot_all2all_sdma_class.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/core/oneshot_allgather_sdma_class.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/core/topology_detector.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/core/twoshot_allreduce_sdma_class.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/inter_node",
+      "type": "tree"
+    },
+    {
+      "path": "src/collective/inter_node/executors",
+      "type": "tree"
+    },
+    {
+      "path": "src/collective/inter_node/executors/one_shot_executor.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/inter_node/executors/ring_1d_executor.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/collective/kernels",
+      "type": "tree"
+    },
+    {
+      "path": "src/collective/kernels/ccl_kernels.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/io",
+      "type": "tree"
+    },
+    {
+      "path": "src/io/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/call_diagnostics_internal.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/engine.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/fabric",
+      "type": "tree"
+    },
+    {
+      "path": "src/io/fabric/backend_impl.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/fabric/backend_impl.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/fabric/torch_allocator.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/fabric/vpod_topology.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/fabric/vpod_topology.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/kernels",
+      "type": "tree"
+    },
+    {
+      "path": "src/io/kernels/fabric_copy.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/kernels/scatter_gather.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma",
+      "type": "tree"
+    },
+    {
+      "path": "src/io/rdma/async_event_monitor.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/async_event_monitor.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/backend_impl.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/backend_impl.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/common.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/common.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/executor.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/executor.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/ledger.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/protocol.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/rdma/protocol.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/roctx_mori.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/xgmi",
+      "type": "tree"
+    },
+    {
+      "path": "src/io/xgmi/backend_impl.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/xgmi/backend_impl.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/xgmi/hip_resource_pool.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/io/xgmi/hip_resource_pool.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/jit",
+      "type": "tree"
+    },
+    {
+      "path": "src/jit/v2",
+      "type": "tree"
+    },
+    {
+      "path": "src/jit/v2/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/jit/v2/compiler.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/jit/v2/plan_api.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/jit/v2/toolchain.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/jit/v2/util.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/metrics",
+      "type": "tree"
+    },
+    {
+      "path": "src/metrics/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/metrics/prometheus_metrics_server.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops",
+      "type": "tree"
+    },
+    {
+      "path": "src/ops/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine",
+      "type": "tree"
+    },
+    {
+      "path": "src/ops/dispatch_combine/common.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/convert.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/dispatch_combine.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/ep_local_expert_count.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/internode.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/internode_v1.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/internode_v1.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/intranode.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/intranode_1250x.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/intranode_entry.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/intranode_ll.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/launch.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/low_latency_async.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine/low_latency_async.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine_v2",
+      "type": "tree"
+    },
+    {
+      "path": "src/ops/dispatch_combine_v2/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine_v2/ep_intranode_1250x.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine_v2/ep_intranode_kernel.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/dispatch_combine_v2/ep_spec.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels",
+      "type": "tree"
+    },
+    {
+      "path": "src/ops/kernels/cast_kernel.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/ep_async_ll.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/ep_common.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/ep_internode.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/ep_internode_v1.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/ep_internode_v1ll.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/ep_intranode.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/ep_local_expert_count.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/ops/kernels/shmem_kernels.hip",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind",
+      "type": "tree"
+    },
+    {
+      "path": "src/pybind/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/mori.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/mori.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/pybind_ccl.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/pybind_io.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/pybind_ops.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/pybind_shmem.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/pybind_umbp.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/pybind_xla_ffi_ops.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/pybind/torch_utils.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/shmem",
+      "type": "tree"
+    },
+    {
+      "path": "src/shmem/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/shmem/init.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/shmem/memory.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/shmem/runtime.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/shmem/shmem_device_api_wrapper.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/CMakeLists.txt",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/distributed/bin",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/distributed/bin/client_main.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/bin/master_main.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/distributed_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/distributed/master/evict_strategy.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/eviction_manager.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/in_memory_master_metadata_store.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/master_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/master_metadata_store_factory.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/master_server.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/redis",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/distributed/master/redis/resp_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/redis/resp_cluster_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/redis_master_metadata_store.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/master/rpc_latency_timer.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/peer",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/distributed/peer/peer_dram_allocator.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/peer/peer_service.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/peer/peer_ssd_manager.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/peer/ssd_copy_pipeline.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/pool_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/proto",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/distributed/proto/umbp.proto",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/proto/umbp_peer.proto",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/proto/umbp_standalone.proto",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/routing",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/distributed/routing/route_get_strategy.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/routing/route_put_strategy.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/distributed/routing/router.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/doc",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/doc/design-master-control-plane.md",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/doc/design-redis-metadata-store.md",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/doc/design-standalone-process-mode.md",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/doc/runtime-env-vars.md",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/common",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/common/config.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/common/env_time.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/common/error_code.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/config.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/distributed_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/evict_strategy.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/eviction_manager.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/in_memory_master_metadata_store.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/master_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/master_metadata_store.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/master_metadata_store_factory.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/master_metrics.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/master_server.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/cluster_slots.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/key_schema.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/lua_scripts.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/resp_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/resp_cluster_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/resp_detail.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/resp_value.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/sharded_read.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis/thread_pool.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/redis_master_metadata_store.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/master/rpc_latency_timer.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/obs_counters.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer/batch_resolve_codec.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer/owned_location_source.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer/peer_dram_allocator.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer/peer_page_allocator.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer/peer_service.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer/peer_ssd_manager.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/peer/ssd_copy_pipeline.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/pool_allocator.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/pool_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/routing",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/routing/route_get_strategy.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/routing/route_put_strategy.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/routing/router.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/ssd_read_lease.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/distributed/types.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/block_index",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/block_index/local_block_index.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/host_mem_allocator.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/standalone_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/storage_tier.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/copy_pipeline.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/dram_tier.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/dummy_ssd_tier.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/local_storage_manager.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/segment",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/segment/segment_format.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/segment/segment_index.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/segment/segment_scanner.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/segment/segment_types.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/segment/segment_writer.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/spdk_proxy_tier.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/spdk_ssd_tier.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/ssd_tier.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/local/tiers/tier_backend.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/standalone",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/standalone/external_kv_identity_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/standalone/ipc.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/standalone/standalone_process_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/standalone/standalone_server.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/io",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/io/status.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/io/storage_io_driver.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/spdk",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/spdk/offset_allocator.hpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/spdk/proxy",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/spdk/proxy/spdk_proxy_protocol.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/spdk/proxy/spdk_proxy_shm.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/storage/spdk/spdk_env.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/include/umbp/umbp_client.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/local/block_index",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/local/block_index/local_block_index.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/host_mem_allocator.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/standalone_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/local/tiers/copy_pipeline.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/dram_tier.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/dummy_ssd_tier.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/local_storage_manager.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/segment",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/local/tiers/segment/segment_format.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/segment/segment_index.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/segment/segment_scanner.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/segment/segment_writer.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/spdk_proxy_tier.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/spdk_ssd_tier.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/ssd_tier.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/local/tiers/tier_backend.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/scripts",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/scripts/run_umbp_single_node_hicache.sh",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/standalone",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/standalone/bin",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/standalone/bin/standalone_server_main.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/standalone/external_kv_identity_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/standalone/ipc.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/standalone/standalone_process_client.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/standalone/standalone_server.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/storage/io",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/storage/io/io_uring_storage_io_driver.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage/io/posix_storage_io_driver.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage/io/storage_io_driver.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage/io/storage_io_driver_impl.h",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage/spdk",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/storage/spdk/offset_allocator.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage/spdk/proxy",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/storage/spdk/proxy/spdk_proxy_daemon.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage/spdk/proxy/spdk_proxy_shm.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/storage/spdk/spdk_env.cpp",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/tools",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/tools/redis",
+      "type": "tree"
+    },
+    {
+      "path": "src/umbp/tools/redis/docker-compose.yml",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/tools/redis/run_local_backends.sh",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/tools/redis/store.sh",
+      "type": "blob"
+    },
+    {
+      "path": "src/umbp/umbp_client_factory.cpp",
+      "type": "blob"
+    }
+  ]
+}

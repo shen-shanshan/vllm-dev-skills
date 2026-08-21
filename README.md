@@ -30,6 +30,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Contribution | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️ |
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | Code Review | Review AMD/ROCm-related PRs from vllm (aiter/mori/ROCm kernels) and generate a concise Chinese review report with severity-sorted, type-categorized findings. | ⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
 | [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | Technical Writing | Write or complete Chinese vLLM technical blog posts in the author's established style, with concise architecture, flow, and sequence diagrams. | ⭐️⭐️⭐️⭐️ |
 
@@ -215,6 +216,17 @@ https://github.com/vllm-project/vllm/pull/35963
 ```
 
 Output: [pr-35963-summary](./skills/vllm-pr-summary/outputs/pr-35963-summary.md).
+
+**📚 vllm-rocm-pr-review**
+
+Prompt:
+
+```text
+https://github.com/vllm-project/vllm/pull/29304
+/vllm-rocm-pr-review
+```
+
+Output: [pr-29304-review](./skills/vllm-rocm-pr-review/outputs/pr-29304-review.md).
 
 **📚 vllm-multimodal-open-issue-analyzer**
 
