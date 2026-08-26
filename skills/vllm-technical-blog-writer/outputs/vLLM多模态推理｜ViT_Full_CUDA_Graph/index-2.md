@@ -209,6 +209,8 @@ CUDA Graph 让计算的启动开销趋近于零，而 `torch.compile` 则让你�
 
 另外，这里的 Bucket 命中并不意味着没有代价：运行时仍需要准备元数据、把有效输入拷入固定 Buffer，并执行 Padding 对应的冗余计算。判断是否入图不能只看“实际 Shape 能否放进桶”，还要看该 Shape 下节省的 Launch Overhead 是否能覆盖拷贝和冗余计算。因此，小 Batch 的请求更适合使用 CUDA Graph，大 Batch 的请求一般直接走 Eager 更划算（计算已经成为主要瓶颈，而不是算子下发是瓶颈）。
 
+> TODO：补充 vLLM 中的具体配置方式？Padding 的是什么维度？输入形状是什么？
+
 ### 3.2 Flexibility：四种 Graph Mode✅
 
 目前，vLLM 提供了四种 Graph Mode，本质上是在权衡性能和兼容性：
@@ -220,62 +222,70 @@ CUDA Graph 让计算的启动开销趋近于零，而 `torch.compile` 则让你�
 
 注意：这四种模式控制的是语言模型推理的捕获边界（即 Decoder CUDA Graph），和本文将要介绍的重点：ViT Full CUDA Graph 无关。ViT Full CUDA Graph 由 `compilation_config.cudagraph_mm_encoder` 单独控制开启，使用独立的 Graph、Buffer 和内存池，因此可以与 Decoder 侧任一 Graph Mode 同时工作。
 
-### 3.3 FAQ
+### 3.3 FAQ✅
 
-**💡 Q1：为什么要将 Attention 排除在 Graph 之外？**
+**Q1：为什么要将 Attention 排除在 Graph 之外？**
 
 因为 Attention 是整个推理过程中动态性和实现复杂度最高的模块：
 
-- 依赖不同的 Attention Backend（如：FlashAttention、FlashInfer、Triton、ROCm AIter 等），且不同 Backend 对 CUDA Graph 的支持能力差异较大；
-- Attention 的输入 Shape（如 KV Cache 长度、BlockTable、PageTable 等）变化也最频繁，更容易触发 Graph 捕获限制。
+- Attention 依赖多种不同的 Backend（比如：FlashAttention、FlashInfer、Triton、ROCm AIter 等），且不同 Backend 对 CUDA Graph 的支持能力差异较大；
+- Attention 的输入 Shape（比如：KV Cache 长度、BlockTable、PageTable 等）变化也最频繁，更容易触发 Graph 捕获限制。
 
-所以 vLLM 的 `PIECEWISE` 模式选择将 Attention 保留在 Eager 路径，仅将 MLP、LayerNorm 等 Shape 更稳定的部分纳入 CUDA Graph，以较小的性能损失换取更好的兼容性和更高的 Graph 命中率。
+严格来说，KV Cache 长度变化本身并不一定改变被捕获 Tensor 的物理 Shape，vLLM 可以通过固定大小的 PageTable、BlockTable 和元数据 Buffer 把运行时状态写进静态地址。真正的限制是：这些 Backend 是否能在这些固定 Buffer 上以可捕获、可重放的方式工作。
 
-严格来说，KV Cache 长度变化本身不一定改变被捕获 Tensor 的物理 Shape，vLLM 可以通过固定大小的 PageTable、BlockTable 和元数据 Buffer 把运行时状态写进静态地址；真正的限制是 backend 是否能在这些固定 Buffer 上以可捕获、可重放的方式工作。
+因此，vLLM 的 `PIECEWISE` 模式选择将 Attention 保留在 Eager 路径，仅将 MLP、LayerNorm 等 Shape 更稳定的部分纳入 CUDA Graph，以较小的性能损失换取更好的兼容性和更高的 Graph 命中率。
 
-**💡 Q2：为什么默认使用 `FULL_AND_PIECEWISE` 模式？**
+**Q2：为什么默认使用 `FULL_AND_PIECEWISE` 模式？**
 
 因为 Decode 和 Prefill 对 CUDA Graph 的适配性不同：
 
 - Decode 阶段每步通常只生成 1 个新 Token，`query_len` 基本固定为 1，输入 Shape 的变化主要来自 Batch Size 和 KV Cache 长度，动态性相对较小，更容易通过 Bucketing 实现 CUDA Graph 的复用；
 - Prefill 阶段需要一次性处理不同长度的 Prompt，`query_len` 变化范围很大，Shape 更加动态，Attention 兼容性也更复杂，因此采用 `PIECEWISE` 能获得更高的 Graph 命中率和更好的稳定性。
 
-所以 vLLM 默认使用 `FULL_AND_PIECEWISE`：即 Decode 追求性能最大化，Prefill 兼顾兼容性与稳定性，在收益、兼容性和工程复杂度之间取得了最佳平衡。
+因此，vLLM 默认使用 `FULL_AND_PIECEWISE`：即 Decode 追求性能最大化，Prefill 兼顾兼容性与稳定性，在收益、兼容性和工程复杂度之间取得了最佳平衡。
 
-默认值只是通用折中，不代表所有模型和硬件上的最优配置。若 backend 明确支持 Prefill Full Graph，且业务 Shape 足够集中，可以通过基准测试评估更激进的模式；反之，兼容性检查可能把用户请求的模式降级。
+**Q3：为什么小 Batch 比大 Batch 更适合使用 CUDA Graph？**
 
-**💡 Q3：为什么小 Batch 比大 Batch 更适合使用 CUDA Graph？**
+因为 CUDA Graph 消除的是 CPU 侧的 Kernel Launch 开销，而不是 GPU 计算本身：
 
-因为 CUDA Graph 消除的是 CPU 侧的 kernel launch 开销，而不是 GPU 计算本身：
-
-- **小 Batch 时**：每个 Kernel 的计算量较小，launch overhead 占比较高，因此 Graph 带来的收益更明显；
-- **大 Batch 时**：Kernel 执行时间本身已经占据主要开销，即使消除了 launch overhead，整体加速也有限。
+- **小 Batch**：每个 Kernel 的计算量较小，Launch Overhead 占比较高，因此 Graph 带来的收益更明显；
+- **大 Batch**：Kernel 执行时间本身已经占据主要开销，即使消除了 Launch Overhead，整体加速也有限。
   
-此外，大 Batch 往往需要更大的 Bucket 和更多 padding，会引入额外冗余计算，因此收益可能进一步下降。
+另外，大 Batch 往往需要更大的 Bucket 和更多 Padding，会引入额外冗余计算，因此收益可能进一步下降。因此，更准确的说法是：CUDA Graph 更偏爱“CPU Launch 开销占比较高、Shape 可复用”的负载，而不是简单地偏爱某个 Batch Size。若小 Batch 的 Shape 极其分散、频繁回退 Eager，收益同样有限。
 
-因此更准确的说法是：CUDA Graph 更偏爱“CPU launch 开销占比较高、Shape 可复用”的负载，而不是简单地偏爱某个 Batch Size。若小 Batch 的 Shape 极其分散、频繁回退 Eager，收益同样有限。
+## 四、vLLM 中的 Encoder CUDA Graph
 
-## 四、ViT Full CUDA Graph
+### 4.1 Overview：整体设计✅
 
-### 4.1 Overview - 整体设计
+前面我们介绍了 vLLM 中的 Decoder CUDA Graph，它将 LLM Backbone 的 Forward 捕获入图，从而提高了大语言模型的推理性能。然而，对于 VL、OCR 等多模态理解模型，除了需要处理文本输入之外，还需要将图像、视频等视觉输入通过 ViT（Vision Transformer）模块编码为视觉 Token，然后将文本输入和视觉输入 Merge 到一起后再送入 LLM Backbone 进行处理。其中，整个多模态 Encoder（ViT）的处理过程都是不属于 Decoder CUDA Graph 的捕获范围的，自然也无法获得加速。因此，我们在 vLLM 社区中推动并实现了 Encoder CUDA Graph（ViT Full CUDA Graph）特性，使视觉编码过程也能享受到 CUDA Graph 的加速效果。
 
-Issue [#38175](https://github.com/vllm-project/vllm/issues/38175) 把 ViT Full CUDA Graph 作为一项跨模型演进工作来跟踪。最初的 [PR #35963](https://github.com/vllm-project/vllm/pull/35963) 先在 Qwen3-VL 图像路径上建立“按 Token Budget 捕获 + 运行时 Packing”的基础框架；[PR #38061](https://github.com/vllm-project/vllm/pull/38061) 又把同一框架扩展到 Qwen3-VL 视频，补上每 Batch 最大帧数这一维约束。随后社区继续增加 InternVL、Kimi-VL、DeepSeek-OCR、Step3-VL、Llama4、GLM 等模型适配，并持续调整协议边界。到本文基线 `5559679229bc961848b121ccdeaa8fa5d79bec98`（2026-07-26），它已经不是某个 Qwen 模型里的专用优化，而是一套模型无关的 Encoder Graph 管理框架。
+> NOTE：关于 ViT 的相关原理以及 vLLM 中多模态推理的整体流程，可以参考我之前写的这篇文章：[《vLLM 多模态推理｜ViT 性能优化》](https://zhuanlan.zhihu.com/p/2014798839354247087)。
 
-整体架构如下图所示：
+RFC [#38175](https://github.com/vllm-project/vllm/issues/38175) 跟踪并记录了整个 Encoder CUDA Graph 框架的演进过程。首个 PR [#35963](https://github.com/vllm-project/vllm/pull/35963) 为 Qwen3-VL 的图像推理建立了“按 Token Budget 捕获 + 运行时 Packing”的基础框架，由 NVIDIA 的一位实习生完成。后续我们在此基础上进一步优化了这套框架的可扩展性与可维护性，并继续适配了 InternVL、Kimi-VL、DeepSeek-OCR、Step3-VL、Llama4、GLM 等模型，也设计了更多高级的扩展功能，比如：视频推理入图、支持 ViT DP Mode、支持 Multi-Path Graph 等特性。
+
+> NOTE：这里顺带说一点题外话，分享一点我成为 vLLM 社区 Maintainer 的经验：相比于在社区里做了一个非常牛逼的 PR（比如：新特性、性能优化等），丰富了简历然后人就跑了，社区更偏爱那种能够将某一个模块持续地看护起来的人，包括但不限于：持续优化某个模块的稳定性（Bugfix）、可维护性（Refactor）、可用性（CI）、易用性（Doc）、可扩展性（持续集成新模型、新硬件、兼容其它特性等）。
+
+Encoder CUDA Graph 的整体架构如下图所示：
+
+> TODO：画图。
+
+参考：
 
 ![图：Encoder CUDA Graph 整体架构](./images/encoder-cudagraph-architecture.svg)
 
-核心组件的职责比较清晰：
+各组件的职责如下：
 
-- `EncoderCudaGraphManager`：定义在 `vllm/v1/worker/encoder_cudagraph.py`，负责预算生成、Graph Capture/Replay、Greedy Packing、Eager Fallback 和 ViT DP；
+- `EncoderCudaGraphManager`：定义在 `vllm/v1/worker/encoder_cudagraph.py`，负责 Budget List 生成、Graph Capture/Replay、Greedy Packing 以及 Eager Fallback 等功能；
+- `SupportsEncoderCudaGraph`：模型侧接口。`EncoderCudaGraphManager` 不需要理解 `pixel_values`、`grid_thw`、RoPE 或切图规则等内容，这些 Model-Specific 算法全部在模型侧实现并返回给统一的接口；
 - `encoder_cudagraph_defs.py`：定义 `EncoderCudaGraphConfig`、`EncoderItemSpec`、`EncoderCudaGraphCaptureInputs`、`EncoderCudaGraphReplayBuffers` 等数据对象；
-- `SupportsEncoderCudaGraph`：模型侧协议。Manager 不理解 `pixel_values`、`grid_thw`、RoPE 或切图规则，这些差异由模型实现封装；
-- `GPUModelRunner`：负责生命周期集成。Encoder Graph 在 `capture_model` 阶段捕获，运行时 `_execute_mm_encoder` 决定走 Graph Manager 还是普通 Encoder 路径；
-- `BudgetGraphMetadata`：保存一个预算对应的 Graph、固定输入 Buffer 和输出 Buffer。
+- `BudgetGraphMetadata`：保存每一个 Budget 对应的 Graph 信息、固定的输入 Buffer 和输出 Buffer。
+- `GPUModelRunner`：负责调度 `EncoderCudaGraphManager`。Encoder Graph 在 `capture_model` 中完成捕获，在运行时通过 `_execute_mm_encoder` 决定走 Graph Replay 还是 Fallback 到 Eager 执行。
 
-这套设计有两个关键点。第一，动态 Shape 不直接进入 Graph，而是被转换为有限组静态 Token Budget；第二，Manager 只调度“Item”和“预算”，模型负责把真实多模态输入转换成可复制到固定地址的 Tensor。这样 Qwen 的 MRoPE、InternVL 的 Batch 输入和 DeepSeek-OCR 的双路径都可以复用同一个管理器。
+关键设计如下：
 
-Encoder Graph 使用独立于 Decoder Graph 的私有内存池。`GPUModelRunner` 在捕获阶段还会通过临时的 Capture Profile 计入这部分显存，避免 Capture 完成后才发现可用显存估算过于乐观。
+- 动态 Shape 不直接进入 Graph，而是被转换为有限组静态 Token Budget（参考 Decoder CUDA Graph）；
+- `EncoderCudaGraphManager` 只负责视觉输入（MM Item）的调度和 Graph Budget 的分配，而模型则只负责把真实的多模态输入转换成可复制到固定地址的 Tensor（这样 Qwen 的 MRoPE、InternVL 的 Batch 输入和 DeepSeek-OCR 的双路径输入都可以复用同一套 Encoder Graph 接口）；
+- Encoder Graph 使用独立于 Decoder Graph 的私有内存池，`GPUModelRunner` 在捕获阶段也会通过 Capture Profile 计入这部分显存，使后续计算该给 KV Cache 分配多少显存时的显存余量更加准确，避免 OOM 问题。
 
 ### 4.2 Workflow - 执行流程
 
