@@ -29,6 +29,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 | [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Contribution | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️⭐️ |
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Contribution | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️ |
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
+| [vllm-vs-atom-decode-trace-comparison](./skills/vllm-vs-atom-decode-trace-comparison/SKILL.md) | Performance Optimization | Compare decode-phase kernel implementations of vLLM vs ATOM from torch-profiler traces, with per-layer-type comparison tables and a vLLM optimization TODO list. | ⭐️⭐️⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | Code Review | Review AMD/ROCm-related PRs from vllm (aiter/mori/ROCm kernels) and generate a concise Chinese review report with severity-sorted, type-categorized findings. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
@@ -205,6 +206,21 @@ P99 ITL (ms):                            1470.33
 ```
 
 Output: [benchmark_comparison_20260323_150830](./skills/vllm-benchmark-result-analysis/outputs/benchmark_comparison_20260323_150830.md) (related PR: [#7104](https://github.com/vllm-project/vllm-ascend/pull/7104)).
+
+**📚 vllm-vs-atom-decode-trace-comparison**
+
+Prompt:
+
+```text
+帮我对比分析 vLLM 和 ATOM 在 MiniMax-M3 上的 decode trace 差异。
+模型：MiniMaxAI/MiniMax-M3
+vllm trace：/path/to/vllm-minimax-m3-tp4-8k1k-conc8.json
+atom trace：/path/to/atom-minimax-m3-tp4-8k1k-conc8.json
+报告语言：中文
+/vllm-vs-atom-decode-trace-comparison
+```
+
+Output: [minimax-m3-trace-comparison_zh_20260905_162716](./skills/vllm-vs-atom-decode-trace-comparison/outputs/minimax-m3-trace-comparison_zh_20260905_162716.md).
 
 **📚 vllm-pr-summary**
 

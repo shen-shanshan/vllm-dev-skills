@@ -1,0 +1,1381 @@
+{
+ "engine": "vllm",
+ "file": "/Users/shanshan-shen/Documents/GitHub/rocm-beginner-to-master/vllm/models/minimax_m3/traces/vllm-minimax-m3-tp4-8k1k-conc8.json",
+ "trace_keys": [
+  "baseTimeNanoseconds",
+  "deviceProperties",
+  "displayTimeUnit",
+  "distributedInfo",
+  "hip_driver_version",
+  "hip_runtime_version",
+  "host_name",
+  "rocprofiler-sdk_version",
+  "schemaVersion",
+  "traceEvents",
+  "traceName",
+  "trace_id",
+  "vllm_version",
+  "vllm_version_tuple"
+ ],
+ "versions": {
+  "vllm_version": "0.28.1rc1.dev199+g7c5dc571c",
+  "vllm_version_tuple": [
+   "0",
+   "28",
+   "1",
+   "rc1",
+   "dev199",
+   "g7c5dc571c"
+  ],
+  "rocprofiler-sdk_version": 1.1,
+  "hip_runtime_version": 70253211,
+  "hip_driver_version": 70253211,
+  "schemaVersion": 1
+ },
+ "base_time_ns": 1782967788000000000,
+ "bracket_mode": "gpu-annot",
+ "n_windows": 6,
+ "chosen_step": 2,
+ "window_us": [
+  5460436223164.499,
+  5460436232178.304
+ ],
+ "replay_stable": true,
+ "replay_diffs": {},
+ "kernel_pid": 0,
+ "windows": [
+  {
+   "index": 0,
+   "start_us": 5460436205088.131,
+   "end_us": 5460436214268.177,
+   "kernels": 1099,
+   "note": ""
+  },
+  {
+   "index": 1,
+   "start_us": 5460436214268.177,
+   "end_us": 5460436223164.499,
+   "kernels": 1098,
+   "note": ""
+  },
+  {
+   "index": 2,
+   "start_us": 5460436223164.499,
+   "end_us": 5460436232178.304,
+   "kernels": 1098,
+   "note": ""
+  },
+  {
+   "index": 3,
+   "start_us": 5460436232178.304,
+   "end_us": 5460436241336.47,
+   "kernels": 1098,
+   "note": ""
+  },
+  {
+   "index": 4,
+   "start_us": 5460436241336.47,
+   "end_us": 5460436250357.835,
+   "kernels": 1098,
+   "note": ""
+  },
+  {
+   "index": 5,
+   "start_us": 5460436250357.835,
+   "end_us": 5460436259379.2,
+   "kernels": 1088,
+   "note": "trailing"
+  }
+ ],
+ "streams": {
+  "4": {
+   "events": 1096,
+   "busy_us": 8959.028000000031
+  },
+  "2": {
+   "events": 2,
+   "busy_us": 9.398
+  }
+ },
+ "rollup": {
+  "void at::native::vectorized_elementwise_kernel<16, at::native::FillFunctor<bool>, std::array<char*, 1ul> >(int, at::native::FillFunctor<bool>, std::array<char*, 1ul>) [clone .kd]": {
+   "count": 1,
+   "sum_us": 4.439,
+   "mean_us": 4.439,
+   "median_us": 4.439,
+   "min_us": 4.439,
+   "max_us": 4.439,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 0.0009765625,
+   "last_rel_us": 0.0009765625
+  },
+  "__amd_rocclr_copyBuffer.kd": {
+   "count": 7,
+   "sum_us": 29.713,
+   "mean_us": 4.244714285714286,
+   "median_us": 3.799,
+   "min_us": 3.519,
+   "max_us": 5.879,
+   "streams": [
+    2,
+    4
+   ],
+   "first_rel_us": 2.6806640625,
+   "last_rel_us": 9012.1259765625
+  },
+  "void (anonymous namespace)::elementwise_kernel_with_index<int, at::native::arange_cuda_out(c10::Scalar const&, c10::Scalar const&, c10::Scalar const&, at::Tensor&)::{lambda()#1}::operator()() const::{lambda()#3}::operator()() const::{lambda(long)#1}>(int, at::native::arange_cuda_out(c10::Scalar const&, c10::Scalar const&, c10::Scalar const&, at::Tensor&)::{lambda()#1}::operator()() const::{lambda()#3}::operator()() const::{lambda(long)#1}, function_traits<at::native::arange_cuda_out(c10::Scalar const&, c10::Scalar const&, c10::Scalar const&, at::Tensor&)::{lambda()#1}::operator()() const::{lambda()#3}::operator()() const::{lambda(long)#1}>::result_type*) [clone .kd]": {
+   "count": 1,
+   "sum_us": 2.719,
+   "mean_us": 2.719,
+   "median_us": 2.719,
+   "min_us": 2.719,
+   "max_us": 2.719,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 17.9208984375,
+   "last_rel_us": 17.9208984375
+  },
+  "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native::FillFunctor<int>, std::array<char*, 1ul>) [clone .kd]": {
+   "count": 2,
+   "sum_us": 8.918,
+   "mean_us": 4.459,
+   "median_us": 4.459,
+   "min_us": 4.399,
+   "max_us": 4.519,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 20.5859375,
+   "last_rel_us": 8992.4853515625
+  },
+  "_prepare_pos_seq_lens_kernel.kd": {
+   "count": 1,
+   "sum_us": 3.079,
+   "mean_us": 3.079,
+   "median_us": 3.079,
+   "min_us": 3.079,
+   "max_us": 3.079,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 38.06640625,
+   "last_rel_us": 38.06640625
+  },
+  "_combine_sampled_and_draft_tokens_kernel.kd": {
+   "count": 1,
+   "sum_us": 4.599,
+   "mean_us": 4.599,
+   "median_us": 4.599,
+   "min_us": 4.599,
+   "max_us": 4.599,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 41.1611328125,
+   "last_rel_us": 41.1611328125
+  },
+  "_gather_block_tables_kernel.kd": {
+   "count": 1,
+   "sum_us": 4.679,
+   "mean_us": 4.679,
+   "median_us": 4.679,
+   "min_us": 4.679,
+   "max_us": 4.679,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 45.7607421875,
+   "last_rel_us": 45.7607421875
+  },
+  "_compute_slot_mappings_kernel.kd": {
+   "count": 1,
+   "sum_us": 4.439,
+   "mean_us": 4.439,
+   "median_us": 4.439,
+   "min_us": 4.439,
+   "max_us": 4.439,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 50.2255859375,
+   "last_rel_us": 50.2255859375
+  },
+  "void at::native::unrolled_elementwise_kernel<at::native::CUDAFunctor_add<int>, std::array<char*, 3ul>, 4, TrivialOffsetCalculator<2, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithoutCast, at::native::memory::StoreWithoutCast>(int, at::native::CUDAFunctor_add<int>, std::array<char*, 3ul>, TrivialOffsetCalculator<2, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithoutCast, at::native::memory::StoreWithoutCast) [clone .kd]": {
+   "count": 1,
+   "sum_us": 4.239,
+   "mean_us": 4.239,
+   "median_us": 4.239,
+   "min_us": 4.239,
+   "max_us": 4.239,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 54.880859375,
+   "last_rel_us": 54.880859375
+  },
+  "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<int>, std::array<char*, 3ul> >(int, at::native::CUDAFunctor_add<int>, std::array<char*, 3ul>) [clone .kd]": {
+   "count": 1,
+   "sum_us": 4.319,
+   "mean_us": 4.319,
+   "median_us": 4.319,
+   "min_us": 4.319,
+   "max_us": 4.319,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 59.015625,
+   "last_rel_us": 59.015625
+  },
+  "triton_poi_fused_add_bitwise_and_bitwise_not_bitwise_or_ge_lt_mul_sub_0.kd": {
+   "count": 1,
+   "sum_us": 4.519,
+   "mean_us": 4.519,
+   "median_us": 4.519,
+   "min_us": 4.519,
+   "max_us": 4.519,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 72.560546875,
+   "last_rel_us": 72.560546875
+  },
+  "void at::native::(anonymous namespace)::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, 2, 2, -2>(at::cuda::detail::TensorInfo<c10::BFloat16, unsigned int>, at::cuda::detail::TensorInfo<c10::BFloat16 const, unsigned int>, at::cuda::detail::TensorInfo<long const, unsigned int>, int, int, unsigned int, long) [clone .kd]": {
+   "count": 1,
+   "sum_us": 7.599,
+   "mean_us": 7.599,
+   "median_us": 7.599,
+   "min_us": 7.599,
+   "max_us": 7.599,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 77.0810546875,
+   "last_rel_us": 77.0810546875
+  },
+  "void at::native::elementwise_kernel_manual_unroll<128, 8, at::native::gpu_kernel_impl_nocast<at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1}>(at::TensorIteratorBase&, at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1} const&)::{lambda(int, bool)#1}>(int, at::native::gpu_kernel_impl_nocast<at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1}>(at::TensorIteratorBase&, at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1} const&)::{lambda(int, bool)#1}) [clone .kd]": {
+   "count": 1,
+   "sum_us": 5.159,
+   "mean_us": 5.159,
+   "median_us": 5.159,
+   "min_us": 5.159,
+   "max_us": 5.159,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 84.6806640625,
+   "last_rel_us": 84.6806640625
+  },
+  "void aiter::cross_device_reduce_1stage<std::bfloat16_t, 4, false>(aiter::RankData*, aiter::RankData*, aiter::RankSignals, aiter::Signal*, std::bfloat16_t*, int, int) [clone .kd]": {
+   "count": 121,
+   "sum_us": 1052.888,
+   "mean_us": 8.701553719008263,
+   "median_us": 8.479,
+   "min_us": 7.279,
+   "max_us": 16.079,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 89.8408203125,
+   "last_rel_us": 8727.7626953125
+  },
+  "_gemma_rmsnorm_kernel.kd": {
+   "count": 1,
+   "sum_us": 4.359,
+   "mean_us": 4.359,
+   "median_us": 4.359,
+   "min_us": 4.359,
+   "max_us": 4.359,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 100.322265625,
+   "last_rel_us": 100.322265625
+  },
+  "hgemm_bf16_16x64x64x8_SPK6_W1x2x1_BLDS1_TN_AS1_0.kd": {
+   "count": 3,
+   "sum_us": 26.917,
+   "mean_us": 8.972333333333333,
+   "median_us": 8.799,
+   "min_us": 8.679,
+   "max_us": 9.439,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 104.681640625,
+   "last_rel_us": 345.6435546875
+  },
+  "void vllm::minimax_m3_fused_ops::fusedMiniMaxM3QNormRopeKVInsertKernel<c10::BFloat16, __hip_bfloat16, (vllm::Fp8KVCacheDataType)0, c10::BFloat16, false, false, false, false>(c10::BFloat16*, c10::BFloat16*, unsigned char*, c10::BFloat16*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, long const*, long const*, long const*, __hip_bfloat16*, c10::BFloat16*, float, float, int, int, int, int, int, int, long, long, long, long) [clone .kd]": {
+   "count": 3,
+   "sum_us": 13.837,
+   "mean_us": 4.612333333333333,
+   "median_us": 4.559,
+   "min_us": 4.399,
+   "max_us": 4.879,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 114.1220703125,
+   "last_rel_us": 354.4443359375
+  },
+  "reshape_and_cache_kernel_flash.kd": {
+   "count": 3,
+   "sum_us": 13.757000000000001,
+   "mean_us": 4.5856666666666674,
+   "median_us": 4.679,
+   "min_us": 4.279,
+   "max_us": 4.799,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 118.681640625,
+   "last_rel_us": 358.84375
+  },
+  "kernel_unified_attention.kd": {
+   "count": 3,
+   "sum_us": 82.117,
+   "mean_us": 27.372333333333334,
+   "median_us": 27.239,
+   "min_us": 26.999,
+   "max_us": 27.879,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 123.3623046875,
+   "last_rel_us": 363.1240234375
+  },
+  "reduce_segments.kd": {
+   "count": 3,
+   "sum_us": 13.957,
+   "mean_us": 4.652333333333334,
+   "median_us": 4.599,
+   "min_us": 4.439,
+   "max_us": 4.919,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 150.6015625,
+   "last_rel_us": 391.00390625
+  },
+  "_gemm_a16_w16_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_32_BLOCK_SIZE_K_256_GROUP_SIZE_M_1_NUM_KSPLIT_1_SPLITK_BLOCK_SIZE_2048_EVEN_K_1_EVEN_MN_0_cache_modifier_CG_activation_NONE_use_activation_0_ADD_BIAS_0_SKIP_REDUCE_0.kd": {
+   "count": 60,
+   "sum_us": 711.347,
+   "mean_us": 11.855783333333333,
+   "median_us": 11.799,
+   "min_us": 11.439,
+   "max_us": 13.359,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 155.2021484375,
+   "last_rel_us": 8637.5615234375
+  },
+  "_gemma_fused_add_rmsnorm_kernel.kd": {
+   "count": 120,
+   "sum_us": 572.887,
+   "mean_us": 4.774058333333333,
+   "median_us": 4.739000000000001,
+   "min_us": 4.239,
+   "max_us": 5.279,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 174.7216796875,
+   "last_rel_us": 8735.6025390625
+  },
+  "hgemm_bf16_16x64x128x5_SPK2_W1x2x1_BLDS1_TN_AS1_0.kd": {
+   "count": 6,
+   "sum_us": 84.036,
+   "mean_us": 14.006,
+   "median_us": 14.0795,
+   "min_us": 10.239,
+   "max_us": 17.799,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 179.0419921875,
+   "last_rel_us": 442.044921875
+  },
+  "_swiglu_oai_kernel.kd": {
+   "count": 3,
+   "sum_us": 12.477,
+   "mean_us": 4.159,
+   "median_us": 4.159,
+   "min_us": 4.079,
+   "max_us": 4.239,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 196.6015625,
+   "last_rel_us": 437.96484375
+  },
+  "hgemm_bf16_16x64x64x7_SPK6_W1x2x1_BLDS1_TN_AS1_0.kd": {
+   "count": 57,
+   "sum_us": 542.27,
+   "mean_us": 9.513508771929825,
+   "median_us": 9.439,
+   "min_us": 9.039,
+   "max_us": 11.159,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 467.365234375,
+   "last_rel_us": 8597.841796875
+  },
+  "void vllm::minimax_m3_fused_ops::fusedMiniMaxM3QNormRopeKVInsertKernel<c10::BFloat16, unsigned char, (vllm::Fp8KVCacheDataType)1, c10::BFloat16, true, true, true, false>(c10::BFloat16*, c10::BFloat16*, unsigned char*, c10::BFloat16*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, long const*, long const*, long const*, unsigned char*, c10::BFloat16*, float, float, int, int, int, int, int, int, long, long, long, long) [clone .kd]": {
+   "count": 57,
+   "sum_us": 278.144,
+   "mean_us": 4.879719298245615,
+   "median_us": 4.879,
+   "min_us": 4.559,
+   "max_us": 5.119,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 477.2451171875,
+   "last_rel_us": 8607.2822265625
+  },
+  "_decode_index_score_balanced_kernel.kd": {
+   "count": 57,
+   "sum_us": 438.628,
+   "mean_us": 7.695228070175438,
+   "median_us": 7.679,
+   "min_us": 7.319,
+   "max_us": 8.119,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 481.8046875,
+   "last_rel_us": 8612.2021484375
+  },
+  "_decode_topk_fused_kernel.kd": {
+   "count": 57,
+   "sum_us": 268.58500000000004,
+   "mean_us": 4.71201754385965,
+   "median_us": 4.719,
+   "min_us": 4.399,
+   "max_us": 5.159,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 489.724609375,
+   "last_rel_us": 8619.8017578125
+  },
+  "_gqa_sparse_decode_kernel.kd": {
+   "count": 57,
+   "sum_us": 449.347,
+   "mean_us": 7.883280701754385,
+   "median_us": 7.879,
+   "min_us": 7.559,
+   "max_us": 8.559,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 494.8046875,
+   "last_rel_us": 8624.5224609375
+  },
+  "_merge_topk_attn_out_kernel.kd": {
+   "count": 57,
+   "sum_us": 274.746,
+   "mean_us": 4.8201052631578944,
+   "median_us": 4.799,
+   "min_us": 4.599,
+   "max_us": 5.079,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 503.365234375,
+   "last_rel_us": 8632.7216796875
+  },
+  "_rocm_fp32_router_gemm_kernel.kd": {
+   "count": 57,
+   "sum_us": 307.266,
+   "mean_us": 5.390631578947369,
+   "median_us": 5.359,
+   "min_us": 5.119,
+   "max_us": 6.999,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 534.56640625,
+   "last_rel_us": 8662.6015625
+  },
+  "void aiter::grouped_topk_kernel<float, float __vector(4), 1, true, true, false>(float*, float const*, float*, int*, unsigned long, unsigned long, int, int, int, int, float) [clone .kd]": {
+   "count": 57,
+   "sum_us": 257.984,
+   "mean_us": 4.526035087719298,
+   "median_us": 4.519,
+   "min_us": 4.319,
+   "max_us": 4.759,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 540.1259765625,
+   "last_rel_us": 8667.76171875
+  },
+  "void aiter::opus_moe_sorting_entry<aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0> >, aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0> >::Kargs>(aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0> >::Kargs) [clone .kd]": {
+   "count": 57,
+   "sum_us": 391.705,
+   "mean_us": 6.8720175438596485,
+   "median_us": 6.839,
+   "min_us": 6.519,
+   "max_us": 7.679,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 544.8056640625,
+   "last_rel_us": 8672.3623046875
+  },
+  "void at::native::vectorized_elementwise_kernel<8, at::native::FillFunctor<c10::BFloat16>, std::array<char*, 1ul> >(int, at::native::FillFunctor<c10::BFloat16>, std::array<char*, 1ul>) [clone .kd]": {
+   "count": 57,
+   "sum_us": 252.907,
+   "mean_us": 4.436964912280702,
+   "median_us": 4.439,
+   "min_us": 4.119,
+   "max_us": 4.56,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 552.486328125,
+   "last_rel_us": 8679.40234375
+  },
+  "void ck_tile::kentry<2, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)1, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)3, ck_tile::moe::MoeSilu>, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)1, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)3, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> > >(ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)1, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)3, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> >) [clone .kd]": {
+   "count": 57,
+   "sum_us": 1505.878,
+   "mean_us": 26.418912280701754,
+   "median_us": 25.879,
+   "min_us": 21.639,
+   "max_us": 34.239,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 557.005859375,
+   "last_rel_us": 8683.8818359375
+  },
+  "void aiter::swiglu_act_and_mul_kernel<std::bfloat16_t, std::bfloat16_t, 8>(std::bfloat16_t*, std::bfloat16_t const*, int) [clone .kd]": {
+   "count": 57,
+   "sum_us": 259.225,
+   "mean_us": 4.54780701754386,
+   "median_us": 4.559,
+   "min_us": 4.279,
+   "max_us": 4.719,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 591.24609375,
+   "last_rel_us": 8709.72265625
+  },
+  "void ck_tile::kentry<2, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)0, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)2, ck_tile::moe::MoeSilu>, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)0, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)2, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> > >(ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)0, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)2, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> >) [clone .kd]": {
+   "count": 57,
+   "sum_us": 834.271,
+   "mean_us": 14.636333333333333,
+   "median_us": 14.559,
+   "min_us": 11.439,
+   "max_us": 19.039,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 595.8857421875,
+   "last_rel_us": 8714.0029296875
+  },
+  "void at::native::vectorized_gather_kernel<16, long>(char*, char*, long*, int, long, long, long, long, bool) [clone .kd]": {
+   "count": 1,
+   "sum_us": 4.479,
+   "mean_us": 4.479,
+   "median_us": 4.479,
+   "min_us": 4.479,
+   "max_us": 4.479,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8751.6025390625,
+   "last_rel_us": 8751.6025390625
+  },
+  "_gemm_a16_w16_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_32_BLOCK_SIZE_K_256_GROUP_SIZE_M_1_NUM_KSPLIT_1_SPLITK_BLOCK_SIZE_6144_EVEN_K_1_EVEN_MN_0_cache_modifier_CG_activation_NONE_use_activation_0_ADD_BIAS_0_SKIP_REDUCE_0.kd": {
+   "count": 1,
+   "sum_us": 129.88,
+   "mean_us": 129.88,
+   "median_us": 129.88,
+   "min_us": 129.88,
+   "max_us": 129.88,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8756.0830078125,
+   "last_rel_us": 8756.0830078125
+  },
+  "ncclDevKernel_Generic_1(ncclDevKernelArgsStorage<4096ul>) [clone .kd]": {
+   "count": 1,
+   "sum_us": 53.84,
+   "mean_us": 53.84,
+   "median_us": 53.84,
+   "min_us": 53.84,
+   "max_us": 53.84,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8885.9638671875,
+   "last_rel_us": 8885.9638671875
+  },
+  "void at::native::elementwise_kernel_manual_unroll<128, 8, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1}>(at::TensorIteratorBase&, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1} const&)::{lambda(int, bool)#1}>(int, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1}>(at::TensorIteratorBase&, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1} const&)::{lambda(int, bool)#1}) [clone .kd]": {
+   "count": 1,
+   "sum_us": 7.359,
+   "mean_us": 7.359,
+   "median_us": 7.359,
+   "min_us": 7.359,
+   "max_us": 7.359,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8958.1416015625,
+   "last_rel_us": 8958.1416015625
+  },
+  "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}>(long, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}) [clone .kd]": {
+   "count": 1,
+   "sum_us": 4.199,
+   "mean_us": 4.199,
+   "median_us": 4.199,
+   "min_us": 4.199,
+   "max_us": 4.199,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8965.64453125,
+   "last_rel_us": 8965.64453125
+  },
+  "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}>(long, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}) [clone .kd]": {
+   "count": 1,
+   "sum_us": 4.599,
+   "mean_us": 4.599,
+   "median_us": 4.599,
+   "min_us": 4.599,
+   "max_us": 4.599,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8969.6923828125,
+   "last_rel_us": 8969.6923828125
+  },
+  "_gumbel_sample_kernel.kd": {
+   "count": 1,
+   "sum_us": 6.439,
+   "mean_us": 6.439,
+   "median_us": 6.439,
+   "min_us": 6.439,
+   "max_us": 6.439,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8974.4453125,
+   "last_rel_us": 8974.4453125
+  },
+  "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::ArgMaxOps<float>, unsigned int, long, 4, 4> >(at::native::ReduceOp<float, at::native::ArgMaxOps<float>, unsigned int, long, 4, 4>) [clone .kd]": {
+   "count": 1,
+   "sum_us": 7.399,
+   "mean_us": 7.399,
+   "median_us": 7.399,
+   "min_us": 7.399,
+   "max_us": 7.399,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8980.884765625,
+   "last_rel_us": 8980.884765625
+  },
+  "void at::native::_scatter_gather_elementwise_kernel<256, 4, at::native::_cuda_scatter_gather_internal_kernel<false, at::native::OpaqueType<8>, long>::operator()<at::native::TensorAssign>(at::TensorIterator&, long, long, long, at::native::TensorAssign const&)::{lambda(int)#1}>(int, at::native::_cuda_scatter_gather_internal_kernel<false, at::native::OpaqueType<8>, long>::operator()<at::native::TensorAssign>(at::TensorIterator&, long, long, long, at::native::TensorAssign const&)::{lambda(int)#1}) [clone .kd]": {
+   "count": 1,
+   "sum_us": 4.199,
+   "mean_us": 4.199,
+   "median_us": 4.199,
+   "min_us": 4.199,
+   "max_us": 4.199,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8988.091796875,
+   "last_rel_us": 8988.091796875
+  },
+  "_get_num_sampled_and_rejected_kernel.kd": {
+   "count": 1,
+   "sum_us": 3.519,
+   "mean_us": 3.519,
+   "median_us": 3.519,
+   "min_us": 3.519,
+   "max_us": 3.519,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 8996.681640625,
+   "last_rel_us": 8996.681640625
+  },
+  "_post_update_kernel.kd": {
+   "count": 1,
+   "sum_us": 4.559,
+   "mean_us": 4.559,
+   "median_us": 4.559,
+   "min_us": 4.559,
+   "max_us": 4.559,
+   "streams": [
+    4
+   ],
+   "first_rel_us": 9009.24609375,
+   "last_rel_us": 9009.24609375
+  }
+ },
+ "middle_slice": {
+  "__amd_rocclr_copyBuffer.kd": {
+   "count": 7,
+   "occ_index": 3,
+   "ts_rel_us": 63.44140625,
+   "dur_us": 4.399,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.479,
+    4.519,
+    4.399,
+    4.399,
+    4.759,
+    4.719
+   ],
+   "dur_median_us": 4.4990000000000006,
+   "dur_min_us": 4.399,
+   "dur_max_us": 4.759
+  },
+  "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, at::native::FillFunctor<int>, std::array<char*, 1ul>) [clone .kd]": {
+   "count": 2,
+   "occ_index": 1,
+   "ts_rel_us": 8992.4853515625,
+   "dur_us": 4.399,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.439,
+    4.479,
+    4.399,
+    4.479,
+    4.399,
+    null
+   ],
+   "dur_median_us": 4.439,
+   "dur_min_us": 4.399,
+   "dur_max_us": 4.479
+  },
+  "void aiter::cross_device_reduce_1stage<std::bfloat16_t, 4, false>(aiter::RankData*, aiter::RankData*, aiter::RankSignals, aiter::Signal*, std::bfloat16_t*, int, int) [clone .kd]": {
+   "count": 121,
+   "occ_index": 60,
+   "ts_rel_us": 4327.3212890625,
+   "dur_us": 7.879,
+   "stream": 4,
+   "dur_by_step_us": [
+    7.599,
+    7.799,
+    7.879,
+    9.2,
+    9.159,
+    9.479
+   ],
+   "dur_median_us": 8.519,
+   "dur_min_us": 7.599,
+   "dur_max_us": 9.479
+  },
+  "hgemm_bf16_16x64x64x8_SPK6_W1x2x1_BLDS1_TN_AS1_0.kd": {
+   "count": 3,
+   "occ_index": 1,
+   "ts_rel_us": 224.1630859375,
+   "dur_us": 8.679,
+   "stream": 4,
+   "dur_by_step_us": [
+    8.679,
+    8.839,
+    8.679,
+    8.799,
+    8.559,
+    8.639
+   ],
+   "dur_median_us": 8.679,
+   "dur_min_us": 8.559,
+   "dur_max_us": 8.839
+  },
+  "void vllm::minimax_m3_fused_ops::fusedMiniMaxM3QNormRopeKVInsertKernel<c10::BFloat16, __hip_bfloat16, (vllm::Fp8KVCacheDataType)0, c10::BFloat16, false, false, false, false>(c10::BFloat16*, c10::BFloat16*, unsigned char*, c10::BFloat16*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, long const*, long const*, long const*, __hip_bfloat16*, c10::BFloat16*, float, float, int, int, int, int, int, int, long, long, long, long) [clone .kd]": {
+   "count": 3,
+   "occ_index": 1,
+   "ts_rel_us": 232.8427734375,
+   "dur_us": 4.879,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.639,
+    4.559,
+    4.879,
+    4.479,
+    4.719,
+    4.559
+   ],
+   "dur_median_us": 4.599,
+   "dur_min_us": 4.479,
+   "dur_max_us": 4.879
+  },
+  "reshape_and_cache_kernel_flash.kd": {
+   "count": 3,
+   "occ_index": 1,
+   "ts_rel_us": 237.72265625,
+   "dur_us": 4.799,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.599,
+    4.519,
+    4.799,
+    4.439,
+    4.519,
+    4.599
+   ],
+   "dur_median_us": 4.559,
+   "dur_min_us": 4.439,
+   "dur_max_us": 4.799
+  },
+  "kernel_unified_attention.kd": {
+   "count": 3,
+   "occ_index": 1,
+   "ts_rel_us": 242.5234375,
+   "dur_us": 26.999,
+   "stream": 4,
+   "dur_by_step_us": [
+    26.64,
+    26.759,
+    26.999,
+    27.079,
+    26.4,
+    26.84
+   ],
+   "dur_median_us": 26.799500000000002,
+   "dur_min_us": 26.4,
+   "dur_max_us": 27.079
+  },
+  "reduce_segments.kd": {
+   "count": 3,
+   "occ_index": 1,
+   "ts_rel_us": 269.5234375,
+   "dur_us": 4.919,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.759,
+    4.719,
+    4.919,
+    4.879,
+    4.719,
+    4.839
+   ],
+   "dur_median_us": 4.799,
+   "dur_min_us": 4.719,
+   "dur_max_us": 4.919
+  },
+  "_gemm_a16_w16_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_32_BLOCK_SIZE_K_256_GROUP_SIZE_M_1_NUM_KSPLIT_1_SPLITK_BLOCK_SIZE_2048_EVEN_K_1_EVEN_MN_0_cache_modifier_CG_activation_NONE_use_activation_0_ADD_BIAS_0_SKIP_REDUCE_0.kd": {
+   "count": 60,
+   "occ_index": 30,
+   "ts_rel_us": 4379.08203125,
+   "dur_us": 11.879,
+   "stream": 4,
+   "dur_by_step_us": [
+    11.759,
+    11.679,
+    11.879,
+    11.719,
+    11.719,
+    11.639
+   ],
+   "dur_median_us": 11.719,
+   "dur_min_us": 11.639,
+   "dur_max_us": 11.879
+  },
+  "_gemma_fused_add_rmsnorm_kernel.kd": {
+   "count": 120,
+   "occ_index": 60,
+   "ts_rel_us": 4400.8017578125,
+   "dur_us": 4.959,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.999,
+    5.079,
+    4.959,
+    5.119,
+    4.999,
+    5.079
+   ],
+   "dur_median_us": 5.039,
+   "dur_min_us": 4.959,
+   "dur_max_us": 5.119
+  },
+  "hgemm_bf16_16x64x128x5_SPK2_W1x2x1_BLDS1_TN_AS1_0.kd": {
+   "count": 6,
+   "occ_index": 3,
+   "ts_rel_us": 320.083984375,
+   "dur_us": 10.719,
+   "stream": 4,
+   "dur_by_step_us": [
+    11.079,
+    11.52,
+    10.719,
+    10.759,
+    10.799,
+    10.759
+   ],
+   "dur_median_us": 10.779,
+   "dur_min_us": 10.719,
+   "dur_max_us": 11.52
+  },
+  "_swiglu_oai_kernel.kd": {
+   "count": 3,
+   "occ_index": 1,
+   "ts_rel_us": 315.84375,
+   "dur_us": 4.239,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.159,
+    4.439,
+    4.239,
+    4.199,
+    4.199,
+    4.079
+   ],
+   "dur_median_us": 4.199,
+   "dur_min_us": 4.079,
+   "dur_max_us": 4.439
+  },
+  "hgemm_bf16_16x64x64x7_SPK6_W1x2x1_BLDS1_TN_AS1_0.kd": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4485.443359375,
+   "dur_us": 9.399,
+   "stream": 4,
+   "dur_by_step_us": [
+    9.279,
+    9.599,
+    9.399,
+    9.559,
+    9.479,
+    9.759
+   ],
+   "dur_median_us": 9.518999999999998,
+   "dur_min_us": 9.279,
+   "dur_max_us": 9.759
+  },
+  "void vllm::minimax_m3_fused_ops::fusedMiniMaxM3QNormRopeKVInsertKernel<c10::BFloat16, unsigned char, (vllm::Fp8KVCacheDataType)1, c10::BFloat16, true, true, true, false>(c10::BFloat16*, c10::BFloat16*, unsigned char*, c10::BFloat16*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, c10::BFloat16 const*, long const*, long const*, long const*, unsigned char*, c10::BFloat16*, float, float, int, int, int, int, int, int, long, long, long, long) [clone .kd]": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4494.8427734375,
+   "dur_us": 4.879,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.879,
+    4.799,
+    4.879,
+    4.759,
+    4.759,
+    4.599
+   ],
+   "dur_median_us": 4.779,
+   "dur_min_us": 4.599,
+   "dur_max_us": 4.879
+  },
+  "_decode_index_score_balanced_kernel.kd": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4499.72265625,
+   "dur_us": 7.719,
+   "stream": 4,
+   "dur_by_step_us": [
+    7.399,
+    7.599,
+    7.719,
+    7.679,
+    7.799,
+    7.359
+   ],
+   "dur_median_us": 7.639,
+   "dur_min_us": 7.359,
+   "dur_max_us": 7.799
+  },
+  "_decode_topk_fused_kernel.kd": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4507.443359375,
+   "dur_us": 4.679,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.679,
+    4.639,
+    4.679,
+    4.519,
+    4.679,
+    4.639
+   ],
+   "dur_median_us": 4.659000000000001,
+   "dur_min_us": 4.519,
+   "dur_max_us": 4.679
+  },
+  "_gqa_sparse_decode_kernel.kd": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4512.123046875,
+   "dur_us": 7.679,
+   "stream": 4,
+   "dur_by_step_us": [
+    7.719,
+    7.879,
+    7.679,
+    7.759,
+    7.479,
+    7.559
+   ],
+   "dur_median_us": 7.699,
+   "dur_min_us": 7.479,
+   "dur_max_us": 7.879
+  },
+  "_merge_topk_attn_out_kernel.kd": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4519.802734375,
+   "dur_us": 4.799,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.719,
+    4.719,
+    4.799,
+    4.679,
+    4.799,
+    4.68
+   ],
+   "dur_median_us": 4.719,
+   "dur_min_us": 4.679,
+   "dur_max_us": 4.799
+  },
+  "_rocm_fp32_router_gemm_kernel.kd": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4550.083984375,
+   "dur_us": 5.279,
+   "stream": 4,
+   "dur_by_step_us": [
+    5.239,
+    5.52,
+    5.279,
+    5.279,
+    5.199,
+    5.479
+   ],
+   "dur_median_us": 5.279,
+   "dur_min_us": 5.199,
+   "dur_max_us": 5.52
+  },
+  "void aiter::grouped_topk_kernel<float, float __vector(4), 1, true, true, false>(float*, float const*, float*, int*, unsigned long, unsigned long, int, int, int, int, float) [clone .kd]": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4555.3642578125,
+   "dur_us": 4.519,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.559,
+    4.439,
+    4.519,
+    4.439,
+    4.439,
+    4.239
+   ],
+   "dur_median_us": 4.439,
+   "dur_min_us": 4.239,
+   "dur_max_us": 4.559
+  },
+  "void aiter::opus_moe_sorting_entry<aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0> >, aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0> >::Kargs>(aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0> >::Kargs) [clone .kd]": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4559.8837890625,
+   "dur_us": 6.679,
+   "stream": 4,
+   "dur_by_step_us": [
+    6.679,
+    6.679,
+    6.679,
+    6.919,
+    6.84,
+    6.959
+   ],
+   "dur_median_us": 6.7595,
+   "dur_min_us": 6.679,
+   "dur_max_us": 6.959
+  },
+  "void at::native::vectorized_elementwise_kernel<8, at::native::FillFunctor<c10::BFloat16>, std::array<char*, 1ul> >(int, at::native::FillFunctor<c10::BFloat16>, std::array<char*, 1ul>) [clone .kd]": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4566.564453125,
+   "dur_us": 4.479,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.399,
+    4.479,
+    4.479,
+    4.359,
+    4.359,
+    4.319
+   ],
+   "dur_median_us": 4.379,
+   "dur_min_us": 4.319,
+   "dur_max_us": 4.479
+  },
+  "void ck_tile::kentry<2, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)1, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)3, ck_tile::moe::MoeSilu>, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)1, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)3, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> > >(ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)1, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)3, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> >) [clone .kd]": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4571.0439453125,
+   "dur_us": 25.839,
+   "stream": 4,
+   "dur_by_step_us": [
+    26.04,
+    21.959,
+    25.839,
+    23.239,
+    26.159,
+    27.119
+   ],
+   "dur_median_us": 25.9395,
+   "dur_min_us": 21.959,
+   "dur_max_us": 27.119
+  },
+  "void aiter::swiglu_act_and_mul_kernel<std::bfloat16_t, std::bfloat16_t, 8>(std::bfloat16_t*, std::bfloat16_t const*, int) [clone .kd]": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4596.8837890625,
+   "dur_us": 4.479,
+   "stream": 4,
+   "dur_by_step_us": [
+    4.679,
+    4.639,
+    4.479,
+    4.559,
+    4.799,
+    4.559
+   ],
+   "dur_median_us": 4.599,
+   "dur_min_us": 4.479,
+   "dur_max_us": 4.799
+  },
+  "void ck_tile::kentry<2, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)0, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)2, ck_tile::moe::MoeSilu>, ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)0, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)2, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> > >(ck_tile::MoeFlatmmKernel<ck_tile::GemmSpatiallyLocalTilePartitioner<ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, 1, 1>, ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<ck_tile::F16xMXF4FlatmmPipelineProblem<std::bfloat16_t, ck_tile::pk_float4_e2m1_t, float, ck_tile::TileGemmShape<ck_tile::sequence<16, 128, 256>, ck_tile::sequence<1, 4, 1>, ck_tile::sequence<16, 16, 32>, false, false>, ck_tile::TileGemmUniversalTraits<false, false, false, false, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::tensor_layout::gemm::ColumnMajor, ck_tile::tensor_layout::gemm::RowMajor, false, false, false, 1, true, 16, (ck_tile::DataCachePrefetchKind)0, (ck_tile::DataCachePrefetchKind)0, false, false>, (ck_tile::GemmPipelineScheduler)0, true, (ck_tile::TailNumber)0, (ck_tile::amd_buffer_coherence_enum)2, false, std::bfloat16_t>, ck_tile::F16xMXF4FlatmmPipelineAgBgCrPolicy>, ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<std::bfloat16_t, std::bfloat16_t, ck_tile::tuple<>, float, std::bfloat16_t, ck_tile::tuple<>, ck_tile::tensor_layout::gemm::RowMajor, ck_tile::element_wise::PassThrough, 16, 128, 1, 4, 16, 16, 32, false, 1, false, 1, 2, false, void, void, false, float, std::bfloat16_t>, void>, (ck_tile::MoeFlatmmKind)2, ck_tile::moe::MoeSilu>::MoeFlatmmKernelArgs<ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<1, 32, ck_tile::e8m0_bexp_t>, ck_tile::FlatmmScalePointer<-1, 0, float> >) [clone .kd]": {
+   "count": 57,
+   "occ_index": 28,
+   "ts_rel_us": 4601.3642578125,
+   "dur_us": 14.799,
+   "stream": 4,
+   "dur_by_step_us": [
+    14.799,
+    13.359,
+    14.799,
+    13.999,
+    13.999,
+    14.599
+   ],
+   "dur_median_us": 14.299,
+   "dur_min_us": 13.359,
+   "dur_max_us": 14.799
+  }
+ },
+ "once_kernels": [
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<16, at::native::FillFunctor<bool>, std::array<char*, 1ul> >(int, at::native::FillFunctor<bool>, std::array<char*, 1ul>) [clone .kd]",
+   "ts_rel_us": 0.0009765625,
+   "dur_us": 4.439,
+   "stream": 4
+  },
+  {
+   "name": "void (anonymous namespace)::elementwise_kernel_with_index<int, at::native::arange_cuda_out(c10::Scalar const&, c10::Scalar const&, c10::Scalar const&, at::Tensor&)::{lambda()#1}::operator()() const::{lambda()#3}::operator()() const::{lambda(long)#1}>(int, at::native::arange_cuda_out(c10::Scalar const&, c10::Scalar const&, c10::Scalar const&, at::Tensor&)::{lambda()#1}::operator()() const::{lambda()#3}::operator()() const::{lambda(long)#1}, function_traits<at::native::arange_cuda_out(c10::Scalar const&, c10::Scalar const&, c10::Scalar const&, at::Tensor&)::{lambda()#1}::operator()() const::{lambda()#3}::operator()() const::{lambda(long)#1}>::result_type*) [clone .kd]",
+   "ts_rel_us": 17.9208984375,
+   "dur_us": 2.719,
+   "stream": 4
+  },
+  {
+   "name": "_prepare_pos_seq_lens_kernel.kd",
+   "ts_rel_us": 38.06640625,
+   "dur_us": 3.079,
+   "stream": 4
+  },
+  {
+   "name": "_combine_sampled_and_draft_tokens_kernel.kd",
+   "ts_rel_us": 41.1611328125,
+   "dur_us": 4.599,
+   "stream": 4
+  },
+  {
+   "name": "_gather_block_tables_kernel.kd",
+   "ts_rel_us": 45.7607421875,
+   "dur_us": 4.679,
+   "stream": 4
+  },
+  {
+   "name": "_compute_slot_mappings_kernel.kd",
+   "ts_rel_us": 50.2255859375,
+   "dur_us": 4.439,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::unrolled_elementwise_kernel<at::native::CUDAFunctor_add<int>, std::array<char*, 3ul>, 4, TrivialOffsetCalculator<2, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithoutCast, at::native::memory::StoreWithoutCast>(int, at::native::CUDAFunctor_add<int>, std::array<char*, 3ul>, TrivialOffsetCalculator<2, unsigned int>, TrivialOffsetCalculator<1, unsigned int>, at::native::memory::LoadWithoutCast, at::native::memory::StoreWithoutCast) [clone .kd]",
+   "ts_rel_us": 54.880859375,
+   "dur_us": 4.239,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<int>, std::array<char*, 3ul> >(int, at::native::CUDAFunctor_add<int>, std::array<char*, 3ul>) [clone .kd]",
+   "ts_rel_us": 59.015625,
+   "dur_us": 4.319,
+   "stream": 4
+  },
+  {
+   "name": "triton_poi_fused_add_bitwise_and_bitwise_not_bitwise_or_ge_lt_mul_sub_0.kd",
+   "ts_rel_us": 72.560546875,
+   "dur_us": 4.519,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::(anonymous namespace)::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, 2, 2, -2>(at::cuda::detail::TensorInfo<c10::BFloat16, unsigned int>, at::cuda::detail::TensorInfo<c10::BFloat16 const, unsigned int>, at::cuda::detail::TensorInfo<long const, unsigned int>, int, int, unsigned int, long) [clone .kd]",
+   "ts_rel_us": 77.0810546875,
+   "dur_us": 7.599,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::elementwise_kernel_manual_unroll<128, 8, at::native::gpu_kernel_impl_nocast<at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1}>(at::TensorIteratorBase&, at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1} const&)::{lambda(int, bool)#1}>(int, at::native::gpu_kernel_impl_nocast<at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1}>(at::TensorIteratorBase&, at::native::(anonymous namespace)::masked_fill_kernel(at::TensorIterator&, c10::Scalar const&)::{lambda()#1}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16, bool)#1} const&)::{lambda(int, bool)#1}) [clone .kd]",
+   "ts_rel_us": 84.6806640625,
+   "dur_us": 5.159,
+   "stream": 4
+  },
+  {
+   "name": "_gemma_rmsnorm_kernel.kd",
+   "ts_rel_us": 100.322265625,
+   "dur_us": 4.359,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::vectorized_gather_kernel<16, long>(char*, char*, long*, int, long, long, long, long, bool) [clone .kd]",
+   "ts_rel_us": 8751.6025390625,
+   "dur_us": 4.479,
+   "stream": 4
+  },
+  {
+   "name": "_gemm_a16_w16_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_32_BLOCK_SIZE_K_256_GROUP_SIZE_M_1_NUM_KSPLIT_1_SPLITK_BLOCK_SIZE_6144_EVEN_K_1_EVEN_MN_0_cache_modifier_CG_activation_NONE_use_activation_0_ADD_BIAS_0_SKIP_REDUCE_0.kd",
+   "ts_rel_us": 8756.0830078125,
+   "dur_us": 129.88,
+   "stream": 4
+  },
+  {
+   "name": "ncclDevKernel_Generic_1(ncclDevKernelArgsStorage<4096ul>) [clone .kd]",
+   "ts_rel_us": 8885.9638671875,
+   "dur_us": 53.84,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::elementwise_kernel_manual_unroll<128, 8, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1}>(at::TensorIteratorBase&, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1} const&)::{lambda(int, bool)#1}>(int, at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1}>(at::TensorIteratorBase&, at::native::direct_copy_kernel_cuda(at::TensorIteratorBase&)::{lambda()#3}::operator()() const::{lambda()#12}::operator()() const::{lambda(c10::BFloat16)#1} const&)::{lambda(int, bool)#1}) [clone .kd]",
+   "ts_rel_us": 8958.1416015625,
+   "dur_us": 7.359,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}>(long, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<8> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}) [clone .kd]",
+   "ts_rel_us": 8965.64453125,
+   "dur_us": 4.199,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}>(long, at::native::gpu_index_kernel<at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1}>(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>, at::native::index_kernel_impl<at::native::OpaqueType<4> >(at::TensorIteratorBase&, c10::ArrayRef<long>, c10::ArrayRef<long>)::{lambda(char*, char const*, long)#1} const&, bool)::{lambda(int)#1}) [clone .kd]",
+   "ts_rel_us": 8969.6923828125,
+   "dur_us": 4.599,
+   "stream": 4
+  },
+  {
+   "name": "_gumbel_sample_kernel.kd",
+   "ts_rel_us": 8974.4453125,
+   "dur_us": 6.439,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::ArgMaxOps<float>, unsigned int, long, 4, 4> >(at::native::ReduceOp<float, at::native::ArgMaxOps<float>, unsigned int, long, 4, 4>) [clone .kd]",
+   "ts_rel_us": 8980.884765625,
+   "dur_us": 7.399,
+   "stream": 4
+  },
+  {
+   "name": "void at::native::_scatter_gather_elementwise_kernel<256, 4, at::native::_cuda_scatter_gather_internal_kernel<false, at::native::OpaqueType<8>, long>::operator()<at::native::TensorAssign>(at::TensorIterator&, long, long, long, at::native::TensorAssign const&)::{lambda(int)#1}>(int, at::native::_cuda_scatter_gather_internal_kernel<false, at::native::OpaqueType<8>, long>::operator()<at::native::TensorAssign>(at::TensorIterator&, long, long, long, at::native::TensorAssign const&)::{lambda(int)#1}) [clone .kd]",
+   "ts_rel_us": 8988.091796875,
+   "dur_us": 4.199,
+   "stream": 4
+  },
+  {
+   "name": "_get_num_sampled_and_rejected_kernel.kd",
+   "ts_rel_us": 8996.681640625,
+   "dur_us": 3.519,
+   "stream": 4
+  },
+  {
+   "name": "_post_update_kernel.kd",
+   "ts_rel_us": 9009.24609375,
+   "dur_us": 4.559,
+   "stream": 4
+  }
+ ],
+ "annotations": {
+  "gpu_exec_us": [
+   [
+    5460436205088.131,
+    8900.165
+   ],
+   [
+    5460436214268.177,
+    8636.2
+   ],
+   [
+    5460436223164.499,
+    8744.243
+   ],
+   [
+    5460436232178.304,
+    8894.244
+   ],
+   [
+    5460436241336.47,
+    8750.203
+   ],
+   [
+    5460436250357.835,
+    8827.564
+   ]
+  ],
+  "cpu_exec_us": [
+   [
+    5460436198156.975,
+    2291.709
+   ],
+   [
+    5460436205387.262,
+    2179.819
+   ],
+   [
+    5460436214610.068,
+    2334.338
+   ],
+   [
+    5460436223465.793,
+    2290.229
+   ],
+   [
+    5460436232496.769,
+    2364.889
+   ],
+   [
+    5460436241628.625,
+    2757.589
+   ]
+  ],
+  "other_gpu_annotations": [
+   "execute_context_0(0)_generation_8(8)",
+   "nccl:_all_gather_base"
+  ],
+  "other_cpu_annotations": [
+   "execute_context_0(0)_generation_8(8)",
+   "nccl:_all_gather_base"
+  ]
+ }
+}
