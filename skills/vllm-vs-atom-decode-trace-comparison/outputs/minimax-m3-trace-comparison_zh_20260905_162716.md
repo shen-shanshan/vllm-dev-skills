@@ -1,6 +1,6 @@
 # vLLM vs ATOM Decode Trace 对比 — MiniMax-M3
 
-> 数据来源：torch profiler Chrome-trace JSON，两份 trace 均采集自 MiniMax-M3、TP4、8k 输入 / 1k 输出、concurrency 8、MI300X（单 rank 捕获）。
+> 数据来源：torch profiler Chrome-trace JSON，两份 trace 均采集自 MiniMax-M3、TP4、8k 输入 / 1k 输出、concurrency 8、MI350X（单 rank 捕获）。
 > 分析方法：从 6 个 decode step 中取中间 step（窗口 2），按「occurrence-index」取每类层的中间层样本进行单层单次对比。
 > 审计线索：`vllm-minimax-m3-tp4-8k1k-conc8_digest.md` / `_slice.json`、`atom-minimax-m3-tp4-8k1k-conc8_digest.md` / `_slice.json`（与本报告同目录）。
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | 引擎版本 | vLLM 0.28.1rc1.dev199+g7c5dc571c（rocprofiler-sdk 1.1） | ATOM（roctracer） |
 | HIP runtime / driver | 70253211 / 70253211 | 70253211 / 70253211 |
-| GPU | 4× MI300X（sm9.5 × 256 SMs，每卡 8 GCD） | 4× MI300X（同上） |
+| GPU | 4× MI350X（sm9.5 × 256 SMs，每卡 8 GCD） | 4× MI350X（同上） |
 | 通信 | world_size 4、backend nccl、pg_size 4、rank 0（单 rank 捕获） | 同上 |
 | Trace 事件（ph X） | 8807（kernel 6590 / cpu_op 1478 / cuda_runtime 714） | 7256（kernel 5832 / cpu_op 1062 / cuda_runtime 277 / gpu_memcpy 72） |
 | Decode step 数 | 6（gpu 通道 `execute_context_*` 注解） | 6（同上） |
