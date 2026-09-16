@@ -1,12 +1,14 @@
 # vLLM DeepSeek-V4.1-Flash 模型技术教程
 # ——重点对比 DeepSeek-V4-Pro 的设计与实现差异
 
-> **文档版本**: 1.0
-> **分析代码版本**: vLLM main 分支（截至 2026-09）
-> **最后更新**: 2026-09-14
+> **文档版本**: 1.1
+> **分析代码版本**: vLLM main 分支（commit `940baac0b6`，截至 2026-09-16）
+> **最后更新**: 2026-09-16
 > **模型系列**: DeepSeek-V4（含 V4-Pro / V4-Flash / V4.1-Flash）
 > **模型类型**: VLM-MoE（MoE + MLA + 稀疏注意力 + 原生视觉）
-> **代码位置**: `vllm/models/deepseek_v4/`（V4 家族）与 `vllm/models/deepseek_v4_1/`（V4.1）
+> **代码位置**: `vllm/models/deepseek_v4/`（V4 家族）与 `vllm/models/deepseek_v41/`（V4.1）
+
+> **v1.1 更新说明**（相对 v1.0，基于截至 2026-09-16 的最新 main）：V4.1 包目录由 `deepseek_v4_1` 重命名为 `deepseek_v41`（#56741）；新增 **NVFP4 压缩 KV 缓存**（288B/状态，即官方推理栈原生 FP4 E2M1 格式）与 **FlashMLA mega attention**（SM100 默认后端，单 kernel 融合 Q RoPE + 稀疏注意力 + 输出逆 RoPE + FP8 cast，PR #56935）；新增 **DeepGEMM 稀疏 indexer logits**（候选池内直接打分，PR #56254）；Single-Pass mHC 以 DeepGEMM `mega_mhc` kernel 落地（`mhc_shifted_post_pre`）；DSpark 上下文 KV 插入融合为 C++ 算子（PR #56441）。
 
 ---
 
@@ -25,7 +27,7 @@
 3. **想看 vLLM 代码**：读 [第六部分](#第六部分-vllm-中的代码实现) 与 [附录 A](#a-关键代码位置索引)。
 4. **想做二次开发**：重点读 5.3 关键计算流程代码分析与 5.4 权重加载与量化。
 
-> **关键洞察**：V4.1-Flash 与 V4-Pro 共享大量基础设施（MLA、mHC、MoE、稀疏注意力框架），但 V4.1 在**注意力拓扑**上做了一次彻底的简化与重构——V4-Pro 的 CSA/HCA 双轨压缩（ratio 4/128 交替）被替换为 V4.1 的"**单一缓存 + 分层复用**"（ratio 0/1/2 + Full/Reindex/Reuse），并把 indexer K 的计算从"每层独立压缩"改为"从主 KV 条目直接投影"。在 vLLM 代码中，这一差异体现为 `deepseek_v4` 与 `deepseek_v4_1` 两个并存的模型目录。
+> **关键洞察**：V4.1-Flash 与 V4-Pro 共享大量基础设施（MLA、mHC、MoE、稀疏注意力框架），但 V4.1 在**注意力拓扑**上做了一次彻底的简化与重构——V4-Pro 的 CSA/HCA 双轨压缩（ratio 4/128 交替）被替换为 V4.1 的"**单一缓存 + 分层复用**"（ratio 0/1/2 + Full/Reindex/Reuse），并把 indexer K 的计算从"每层独立压缩"改为"从主 KV 条目直接投影"。在 vLLM 代码中，这一差异体现为 `deepseek_v4` 与 `deepseek_v41` 两个并存的模型目录。
 
 ---
 
@@ -92,7 +94,7 @@ timeline
 | DeepSeek-V4.1-Flash 技术报告 | [HF PDF](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/main/DeepSeek_V41_Tech_Report.pdf) | CED、CSA2、FP4 KV、Engram、DSpark、45T token 训练 |
 | DeepSeek API 公告 | [api-docs.deepseek.com](https://api-docs.deepseek.com/news/news260910/) | 发布公告与定价、流量迁移 |
 | SemiAnalysis InferenceX | [deepseek-v4](https://inferencex.semianalysis.com/model/deepseek-v4) | V4-Pro 架构与推理性能第三方分析 |
-| vLLM 官方支持 | [vllm models registry](https://github.com/vllm-project/vllm/tree/main/vllm/models/deepseek_v4_1) | 本文档分析的代码本体 |
+| vLLM 官方支持 | [vllm models registry](https://github.com/vllm-project/vllm/tree/main/vllm/models/deepseek_v41) | 本文档分析的代码本体 |
 
 ---
 
@@ -142,7 +144,7 @@ flowchart TB
 
 1. **解码器的全局 KV 不来自本层隐藏状态**：解码器各层的全局 KV 缓存，是**从编码器最后一层（第 20 层）的隐藏状态投影得到**的，而不是每个解码器层自己计算。在 vLLM 代码中，这体现为第 20 层是解码器唯一的 `kv_source` 层（见 2.3.3），它的 compressor 输出被所有后续解码器层复用。
 2. **大多数 prompt token 不需要穿过全部 40 层**：由于解码器层的全局注意力全部走编码器投影出的共享缓存，prefill 时大部分 token 只需经过前 20 层（编码器），prefill 复杂度从 O(NL) 降到约 **O(NL/2)**。这正是官方推理栈中"prefill 只激活 8B、decode 激活全模型 16B"的来源——**输出生成被视为比输入理解更难的任务，计算量向 decode 倾斜**。
-3. **vLLM 当前实现说明**：vLLM 的 `DeepseekV4Model.forward`（`deepseek_v4_1/nvidia/model.py`）目前仍是**标准 40 层统一前向**——每一层处理每一个 token。vLLM 已落地的收益是 CSA2 的 **KV 复用**（解码器层不再各自构建全局缓存）与稀疏注意力本身；"prefill 只跑编码器"的层跳过属于官方推理栈（报告所述）的系统级优化，尚未在 vLLM 中实现。
+3. **vLLM 当前实现说明**：vLLM 的 `DeepseekV4Model.forward`（`deepseek_v41/nvidia/model.py`）目前仍是**标准 40 层统一前向**——每一层处理每一个 token。vLLM 已落地的收益是 CSA2 的 **KV 复用**（解码器层不再各自构建全局缓存）与稀疏注意力本身；"prefill 只跑编码器"的层跳过属于官方推理栈（报告所述）的系统级优化，尚未在 vLLM 中实现。
 
 ## 2.2 核心超参数对比（V4.1-Flash vs V4-Pro）
 
@@ -177,7 +179,7 @@ flowchart TB
 | 视觉 | 无（仅实验版） | 32 层 ViT，patch 14，3×3 unshuffle | V4.1 原生视觉 |
 | `max_position_embeddings` | 1048576（1M） | 1048576（1M） | YaRN factor 16，自 64K 扩展 |
 
-> **关键洞察**：两个模型共享 MLA（MQA，head_dim 512）、DeepSeekMoE（384+1 专家、top-6、noaux_tc）、mHC（4 流 + Sinkhorn）、SWA（窗口 128）这四大基座。真正的代际差异集中在三点：**(1) 层拓扑**（decoder-only 61 层 vs CED 40 层）、**(2) 注意力压缩策略**（CSA/HCA 双轨 vs CSA2 单缓存复用）、**(3) 记忆与投机组件**（V4.1 新增 Engram 与 DSpark）。这解释了为什么 vLLM 中 `deepseek_v4_1` 能大量复用 `deepseek_v4` 的代码（MoE、mHC kernel、SWA cache 等），差异集中在 attention 拓扑与新增模块。
+> **关键洞察**：两个模型共享 MLA（MQA，head_dim 512）、DeepSeekMoE（384+1 专家、top-6、noaux_tc）、mHC（4 流 + Sinkhorn）、SWA（窗口 128）这四大基座。真正的代际差异集中在三点：**(1) 层拓扑**（decoder-only 61 层 vs CED 40 层）、**(2) 注意力压缩策略**（CSA/HCA 双轨 vs CSA2 单缓存复用）、**(3) 记忆与投机组件**（V4.1 新增 Engram 与 DSpark）。这解释了为什么 vLLM 中 `deepseek_v41` 能大量复用 `deepseek_v4` 的代码（MoE、mHC kernel、SWA cache 等），差异集中在 attention 拓扑与新增模块。
 
 ## 2.3 Attention 机制：MLA + CSA2 vs CSA/HCA
 
@@ -213,7 +215,13 @@ MLA 的关键点：
 - **输出低秩化**：`wo_a`（按 `o_groups` 分组做 BMM）+ `wo_b`，两代均如此；
 - 均带 **attention sink**（`attn_sink` 参数，默认 -inf 关闭）与 GPT-J 风格的 partial RoPE。
 
-vLLM 侧两代 MLA 的 KV 缓存布局一致：`fp8_ds_mla`（UE8M0 block-scaled FP8，packed uint8）为默认格式，每 token 行 = 448B NoPE + 128B RoPE + 8B scale = **584 字节**（ratio-1 状态），详见 `DeepseekV4Attention.get_kv_cache_spec`（`deepseek_v4_1/attention.py:930`）。
+vLLM 侧 KV 缓存的物理记录格式是 V4.1 优化最密集的地方，当前支持**三种 packed 记录**（见 2.3.4 详细对比）：
+
+| 记录 | 每 token 字节 | 适用 |
+|------|--------------|------|
+| V4 记录（`fp8_ds_mla`） | 584B（448 fp8 NoPE + 64 bf16 RoPE + 7×UE8M0 + pad），576B 页 | 非 SM100 架构默认 |
+| **V4.1 MXFP8 记录**（`fp8_ds_mla` on SM100） | **528B**（全 512 维 fp8 e4m3 + 每 32 维 1 个 UE8M0 scale：512 数据 + 16 scale），512B TMA stride | Blackwell（SM100）FlashMLA |
+| **V4.1 NVFP4 记录**（`nvfp4_ds_mla`） | **288B**（256B e2m1 对 + 每 16 维 1 个 e4m3 scale：32B） | SM100 mega attention（官方推理栈原生格式） |
 
 ### 2.3.2 V4-Pro：CSA + HCA 双轨压缩
 
@@ -275,10 +283,10 @@ CSA2 取代了 V4 的 CSA+HCA 混合，从**条目大小、序列、层**三个�
 2. **去掉压缩条目上的绝对位置嵌入**；
 3. **indexer K 改为从主 KV 条目投影得到**——不再为索引器单独压缩 hidden states。
 
-第 3 点在 vLLM 代码中体现得非常直接（`deepseek_v4_1/attention.py` 的 `DeepseekV4Indexer` docstring）：
+第 3 点在 vLLM 代码中体现得非常直接（`deepseek_v41/attention.py` 的 `DeepseekV4Indexer` docstring）：
 
 ```python
-# vllm/models/deepseek_v4_1/attention.py
+# vllm/models/deepseek_v41/attention.py
 class DeepseekV4Indexer(nn.Module):
     """DeepSeek V4.1 sparse-attention indexer.
 
@@ -294,7 +302,7 @@ class DeepseekV4Indexer(nn.Module):
 **分层索引器（hierarchical sparse indexer）**：层 20（Full 层）额外把 top-2048 个候选块（每块 8 个压缩位置 = 16,384 个候选）发布到共享的 `candidate_block_buffer`；后续的 Reindex 层（24/28/32/36）**只在候选池内评分**选出自己的 top-512。因此深层索引器的每查询成本**不随上下文长度增长**——这是从 4K 扩到 1M 上下文、单 token 解码 FLOPs 仅增加 ~25% 的关键。该机制在训练时就施加了相同的候选约束（training-aware）。
 
 ```python
-# vllm/models/deepseek_v4/nvidia/model.py（v4.1 的 DeepseekV4Model.__init__）
+# vllm/models/deepseek_v41/nvidia/model.py（DeepseekV4Model.__init__）
 # Two-level candidate filtering: the indexer at
 # candidate_source_layer_id publishes the top candidate blocks of
 # compressed positions here; later ratio-1 indexers (24/28/32/36)
@@ -306,6 +314,8 @@ if candidate_source_layer >= 0 and candidate_topk_blocks > 0:
         vllm_config.scheduler_config.max_num_batched_tokens,
         candidate_topk_blocks, dtype=torch.int32)
 ```
+
+**DeepGEMM 稀疏 logits 路径（v1.1 新增，PR #56254）**：候选消费者层的索引器默认做"全上下文稠密打分 + 候选 mask"；开启 `attention_config.indexer_sparse_logits` 后改用 `SparseMQAIndexer`（`vllm/model_executor/layers/sparse_mqa_indexer.py`），由 DeepGEMM 的 paged sparse MQA-logits kernel **直接只对候选块打分**——每查询成本 O(候选块数)，与上下文长度无关。适用条件：`indexer_kv_dtype="mxfp4"`、SM100 级 GPU、DeepGEMM ≥ 2.8 且带 DeepSelect top-k 扩展（top-k 跑在 kernel 输出的 bf16 logits 上）。配置注释明确其收益边界：**约 32K token 以上的长上下文才划算，短上下文反而更慢**。注意 `SparseMQAIndexer` 按 block stride 寻址分页，因此 indexer K 缓存的页对齐提升为 `lcm(512, page_alignment)`。
 
 CSA2 的层拓扑图：
 
@@ -336,10 +346,10 @@ flowchart TB
     L20 -.->|candidate mask| L36
 ```
 
-**vLLM 中拓扑解析的实现**（`deepseek_v4_1/attention.py:244`）：
+**vLLM 中拓扑解析的实现**（`deepseek_v41/attention.py:244`）：
 
 ```python
-# vllm/models/deepseek_v4_1/attention.py
+# vllm/models/deepseek_v41/attention.py
 # ---- v4.1 sparse-attention topology ----
 # compress_ratios has one entry per layer (MTP layers included):
 # 0 = pure sliding window, 1 = full-length compressed cache,
@@ -362,10 +372,10 @@ if self.compress_ratio > 0:
     self.index_source_layer_id = max(s for s in self.index_source_layers if s <= layer_id)
 ```
 
-`DeepseekV4Compressor`（`deepseek_v4_1/compressor.py`）只支持 ratio 1/2，且明确注释 ratio-4/128 的 CuTe-DSL kernel 是 v4.0 专属：
+`DeepseekV4Compressor`（`deepseek_v41/compressor.py`）只支持 ratio 1/2，且明确注释 ratio-4/128 的 CuTe-DSL kernel 是 v4.0 专属：
 
 ```python
-# vllm/models/deepseek_v4_1/compressor.py
+# vllm/models/deepseek_v41/compressor.py
 class DeepseekCompressor(nn.Module):
     """DeepSeek V4.1 KV/score compressor.
 
@@ -398,16 +408,38 @@ class DeepseekCompressor(nn.Module):
 | vs DeepSeek-V1 | — | 缩小约 **437 倍** |
 | 持久化缓存 | 分层 KV 缓存 + 磁盘 offload | SSD 持久化全局缓存（小时~天级）+ 分布式 host-DRAM SWA 池（分钟级 TTL）+ SWA Bounded Replay |
 
-**vLLM 中的实现现状**：vLLM 当前为两代模型提供的主缓存 dtype 为 `fp8_ds_mla`（UE8M0 block-scaled FP8）或 bf16/plain FP8（`_resolve_dsv4_kv_cache_dtype`，`deepseek_v4_1/attention.py:112`），压缩状态行 584 字节（ratio-1）。**indexer K 缓存**则支持 MXFP4（`dsa_indexer_uses_fp4`，每 32 值一个 UE8M0 scale，128 维 K = 68 字节/状态）或 FP8。官方报告的 890 B/token 是原生 FP4 E2M1 全局缓存系统的指标；vLLM 侧的 FP4 主缓存支持仍在演进中，运行时以 `--kv-cache-dtype` 与后端选择为准。
+**vLLM 实现现状（v1.1 更新）**：官方报告的 FP4 格式已在 vLLM 落地为 **NVFP4 压缩记录**（`nvfp4_ds_mla`）：每个压缩状态 288 字节 = 256B e2m1 数据对（512 维 ÷ 2bit） + 32B e4m3 scale（每 16 维一个：512/16 = 32 个 scale），由 `_rope_quant_insert_nvfp4_kernel`（`deepseek_v41/common/ops/fused_compress_quant_cache.py`）写入。该记录正是 mega attention 模块注释所说的"**the format the reference implementation itself stores**"（官方推理栈原生格式）。SWA 记录保持 fp8 不变。
+
+当前三种 packed 记录的完整对比（`deepseek_v41/attention.py` 中的 `_use_v41_mxfp8_kv_record` 与 `_resolve_dsv4_kv_cache_dtype`）：
+
+```python
+# vllm/models/deepseek_v41/attention.py
+# Which packed fp8_ds_mla record a V4.1 layer writes. FlashMLA decodes
+# DeepSeek's V4.1 record -- all 512 dims (RoPE included) as fp8 e4m3 with one
+# UE8M0 scale per 32 dims, 512 data bytes + 16 scale bytes per token, pages
+# rounded to the kernel's 512 B TMA stride -- only in its SM100 sparse-decode
+# kernels. Every other arch keeps the V4 record: 448 fp8 NoPE + 64 bf16 RoPE
+# plus 7 UE8M0 scales of 64 dims and a pad byte (584 B, 576 B pages).
+def _use_v41_mxfp8_kv_record() -> bool:
+    return current_platform.is_device_capability_family(100)
+```
+
+| 记录格式 | 内容构成 | 每状态/每 token 字节 | 页对齐 | 适用架构 |
+|---------|---------|---------------------|--------|---------|
+| V4 记录 `fp8_ds_mla` | 448B fp8 NoPE + 64B bf16 RoPE + 7×UE8M0(64 维) + 1B pad | 584B | 576B | 非 SM100 |
+| V4.1 MXFP8 记录 | 全 512 维 fp8 e4m3（含 RoPE）+ 16×UE8M0（每 32 维） | 528B | 512B（TMA stride） | SM100 FlashMLA |
+| V4.1 NVFP4 记录 `nvfp4_ds_mla` | 256B e2m1 + 32×e4m3 scale（每 16 维） | **288B** | — | SM100 mega attention |
+
+与 890 字节/token 官方指标的关系：该数字是官方系统级指标（全局 KV + 分层索引器 K 等合计）；vLLM 侧的物理记录大小如上表。**indexer K 缓存**则支持 MXFP4（`dsa_indexer_uses_fp4`，每 32 值一个 UE8M0 scale，128 维 K = 68 字节/状态）或 FP8。运行时以 `--kv-cache-dtype` 与后端选择为准。
 
 ### 2.3.5 SWA 分支与注意力执行
 
 两代模型的稀疏注意力均带 128 窗口的 SWA 分支（`DeepseekV4SWACache`，`vllm/v1/attention/backends/mla/sparse_swa.py`），保证局部信息的新鲜度。V4.1 的部署创新是 **SWA Bounded Replay**：prefill 时若命中持久化的全局缓存，SWA 状态不需要从磁盘读取，而是**只回放最近一个窗口的 token 近似重建**——因此 SWA 缓存可以完全放在分布式 host-DRAM（分钟级 TTL），不必进 SSD。
 
-在 vLLM 中，SWA 与全局稀疏注意力的 metadata 由 `DeepseekV41SparseSWAMetadataBuilder`（`deepseek_v4_1/sparse_mla.py:53`）统一构建，它按 v4.1 的 ratio 语义（0/1/2）重新分类层类型：
+在 vLLM 中，SWA 与全局稀疏注意力的 metadata 由 `DeepseekV41SparseSWAMetadataBuilder`（`deepseek_v41/sparse_mla.py:53`）统一构建，它按 v4.1 的 ratio 语义（0/1/2）重新分类层类型：
 
 ```python
-# vllm/models/deepseek_v4_1/sparse_mla.py
+# vllm/models/deepseek_v41/sparse_mla.py
 # v4.1 per-layer compress ratios: 0 = pure sliding window, 1 = full-length
 # compressed cache, 2 = ratio-2 compressed cache. Ratio-1 and ratio-2 layers
 # both attend over indexer topk indices into a shared compressed cache but
@@ -419,6 +451,8 @@ _V41_LAYER_TYPES: dict[int, str] = {
     2: _LAYER_TYPE_C2A,
 }
 ```
+
+**FlashMLA mega attention（v1.1 新增，PR #56935）**：SM100 上的默认注意力路径。一个 kernel 完成 Q RoPE + 稀疏注意力 + 输出逆 RoPE + FP8 cast，直接写进 `wo_a` 消费的 `QuantizedActivation` 缓冲区——因此该 attention 类声明 `accepts_unnormed_unroped_query`（kernel 自己做 Q 的 RoPE），融合的 KV 插入算子只负责零填充到 kernel 的 head 数；`wq_b` 行与 `wo_a` 列在权重加载时一次性置换为 kernel 的 chunk-interleaved 布局（`permute_q_b_proj` / `permute_wo_a_`，`fused_layout.py`），prefill 与 decode 段写同一输出缓冲区对的不相交 token 区间，整个 step 只需一次 `wo_a` einsum。支持性由 `DeepseekV4MegaAttnAttention.is_available_for` 判定（SM100、TP 后每 wo_a 组 head 数 ≥ WV_GROUP_SIZE、构建含 mega kernel），不满足时回退 FlashMLA。实测（GB300，CUDA Graph，64 头模型）在 TP1 上相对 split-KV 解码路径最高快 **1.45×**，TP2+ 两者接近；小 batch 下有约 2µs 的 padded-head 固定开销。
 
 ## 2.4 FFN / MoE 机制详解
 
@@ -437,7 +471,7 @@ $$\text{MoE}(x) = \text{Shared}(x) + s \cdot \sum_{i \in \text{TopK}(\text{gate}
 vLLM 中 V4.1 直接**继承 V4 的 MoE 类**：
 
 ```python
-# vllm/models/deepseek_v4_1/nvidia/model.py
+# vllm/models/deepseek_v41/nvidia/model.py
 class DeepseekV4MoE(DeepseekV4MoEBase):
     def __init__(self, vllm_config, prefix="", use_sequence_parallel=False):
         config = vllm_config.model_config.hf_config
@@ -460,7 +494,7 @@ class DeepseekV4MoE(DeepseekV4MoEBase):
 
 两代模型都用 **Manifold-Constrained Hyper-Connections（mHC）** 取代普通残差连接：hidden states 被扩展为 `hc_mult=4` 份流（`[T, 4, hidden]`），混合矩阵被投影到 Birkhoff 多面体（双随机矩阵，经 20 次 Sinkhorn-Knopp 迭代）保证谱范数 ≤ 1，从而让超深网络稳定训练。vLLM 中用 TileLang/Triton kernel 实现（`mhc_pre_delayed_tilelang` / `mhc_post_tilelang`，`vllm/model_executor/kernels/mhc/`）。
 
-V4.1 的改进是 **Single-Pass mHC**：将输入混合系数偏移一个块，消除数据依赖，配合融合的 Mega-mHC kernel 将激活内存流量减半。
+V4.1 的改进是 **Single-Pass mHC**：将输入混合系数偏移一个块，消除数据依赖，配合融合的 Mega-mHC kernel 将激活内存流量减半。**该优化已在 vLLM 落地**（v1.1）：`deepseek_v41/nvidia/ops/mega_mhc.py` 提供 `mhc_shifted_post_pre`，在 DeepGEMM 的 `mega_mhc` kernel 可用时（SM100、`hidden_size % 1024 == 0`、`hc_mult == 4`），解码器层的普通子层（非首层、非 Engram 注入层）用**单次 kernel 调用同时完成上一子层的 post 与本子层的 pre**（`fused_post_pre_delayed`），可选地顺带输出草稿模型需要的 aux hidden state（`capture_aux`）。
 
 **两代的收尾差异**：V4-Pro 在最后一层后用**可学习的 `hc_head`** 折叠 4 条流：
 
@@ -477,7 +511,7 @@ hidden_states = hc_head_fused_kernel_tilelang(
 V4.1 **没有** `hc_head`，直接用最后一层 FFN 的 pre-mix 折叠流（`hc_collapse_triton`）：
 
 ```python
-# vllm/models/deepseek_v4_1/nvidia/model.py（DeepseekV4Model.forward 尾部）
+# vllm/models/deepseek_v41/nvidia/model.py（DeepseekV4Model.forward 尾部）
 # Collapse the hc copies with the pre-mix from the last layer's FFN
 # mixes — the mix the reference applies via
 # ``last_layer.hc_pre(h, pre_mix)`` (v4.1 has no learned hc_head).
@@ -502,7 +536,7 @@ Engram 是 V4.1 最具争议也最独特的组件：一个 **n-gram（2/3/4-gram
 | `engram_compressed_vocab_size` | 99,092 | 归一化后的 token 空间 |
 | 存储精度 | FP8（带 scale） | ~196B 参数（FP8） |
 
-**为什么能放得下 196B 参数？** 哈希表的**确定性寻址**（prime-multiplier 哈希）让 embedding 的读取地址可以在计算前预知，从而支持从 host 内存 **RDMA 预取**——不需要常驻 GPU 显存。vLLM 的实现（`deepseek_v4_1/nvidia/engram.py`）支持三种存储策略：
+**为什么能放得下 196B 参数？** 哈希表的**确定性寻址**（prime-multiplier 哈希）让 embedding 的读取地址可以在计算前预知，从而支持从 host 内存 **RDMA 预取**——不需要常驻 GPU 显存。vLLM 的实现（`deepseek_v41/nvidia/engram.py`）支持三种存储策略：
 
 1. **DP 分片 + mmap 共享内存**（`DPSharedEngramStorage`，`/dev/shm` 文件映射）：哈希表的 head 维度按 DP rank 分片，节点内进程共享同一份物理内存；
 2. **CPU offload + 异步预取流**：`prepare_embeddings` 在独立 CUDA stream 上提前查表（`_start_prefetch` / `_finish_prefetch`，配合 `eager_break_during_capture` 把查表放在 CUDA Graph 的 eager 边界）；
@@ -525,21 +559,26 @@ sequenceDiagram
     Note over E: 图像 span token 被 mask（hash 视为 DEAD）<br/>哈希槽与 SWA cache 的 slot 一一对应
 ```
 
-关键实现细节（`deepseek_v4_1/common/engram.py` 模块 docstring + `nvidia/model.py` 注入点）：
+关键实现细节（`deepseek_v41/common/engram.py` 模块 docstring + `nvidia/model.py` 注入点）：
 
 - **压缩词表**：所有 token 先经 NFKC/NFD/去重音/小写/空白归一化映射到 99,092 个压缩 id（"The"/"the"/"THE" 哈希到同一行），再对 2/3/4-gram 做 prime-multiplier 哈希；
 - **跨 chunk 状态**：vLLM 按 chunk 流式处理 token，而位置 p 的 n-gram 需要 p-1..p-3 的 id。`NgramHashState` 在**第一个本地层的 SWA cache 的每个 KV slot** 上维护一个 int32 哈希槽（slot 与 (request, position) 稳定对应，prefix-cache 命中、spec-decode 回滚都能正确重写）；对 chunk 起始（如 P/D 分离、offload 加载的 KV）则依赖 runner 传入的 `lookback_token_ids`；
-- 注入发生在 `DeepseekV4DecoderLayer.forward` 中上一子层 post 与本块 pre 之间，作用于完整 hc 流：
+- 注入发生在 `DeepseekV4DecoderLayer.forward` 中上一子层 post 与本块 pre 之间，作用于完整 hc 流。Engram 注入层走显式的 `mhc_post_tilelang` → Engram → `mhc_pre_delayed_tilelang` 路径（注入也把 post 挡在 pre-norm GEMM 的融合 prologue 之外），而非注入层走融合的 `mhc_shifted_post_pre`：
 
 ```python
-# vllm/models/deepseek_v4_1/nvidia/model.py（DeepseekV4DecoderLayer.forward）
-residual = mhc_post_tilelang(x, residual, post_mix, res_mix)
-if self.engram is not None and engram_hashes is not None:
-    # Engram injection happens between the previous sublayer's
-    # post and this block's pre, on the full hc stream, so the
-    # mix coefficients see the injected stream.
+# vllm/models/deepseek_v41/nvidia/model.py（DeepseekV4DecoderLayer.forward）
+elif self.engram is not None and engram_hashes is not None:
+    # Engram injection happens between the previous sublayer's post
+    # and this block's pre, on the full hc stream, so the mix
+    # coefficients see the injected stream. The injection also keeps
+    # the post out of the pre-norm GEMM's fused prologue.
+    previous_post = mhc_post_tilelang(x, residual, post_mix, res_mix)
     residual = self.engram(
-        residual, engram_hashes[:, self.engram.layer_hash_index], engram_mask)
+        previous_post,
+        engram_hashes[:, self.engram.layer_hash_index],
+        engram_mask,
+    )
+    post_mix, res_mix, x, attn_pre = mhc_pre_delayed_tilelang(...)
 ```
 
 ## 2.7 DSpark 投机解码 vs V4 的 MTP
@@ -555,7 +594,7 @@ if self.engram is not None and engram_hashes is not None:
 | 噪音 token | 无 | `dspark_noise_token_id=128799` |
 | 训练方式 | 与主模型联训 | **独立训练**（冻结主模型），验证长度动态选择 |
 
-vLLM 实现（`deepseek_v4_1/nvidia/dspark.py`）：草稿模型复用主模型的 embedding、hc_mult=4 流、mhc kernel 与 MoE 框架；`DSparkMarkovHead` 提供 `markov_embed(token_ids)` 与 `markov_bias(markov_embed)` 两个接口（`SupportsEagle3` 协议），confidence head 输入为 `[head_hidden + markov_embed]` 输出 sigmoid 接受概率。草稿层还需要把"上下文 KV"插入 SWA 缓存（`_insert_context_kv`，用 dummy Q 复用主 attention 的融合插入算子）。
+vLLM 实现（`deepseek_v41/nvidia/dspark.py`）：草稿模型复用主模型的 embedding、hc_mult=4 流、mhc kernel 与 MoE 框架；`DSparkMarkovHead` 提供 `markov_embed(token_ids)` 与 `markov_bias(markov_embed)` 两个接口（`SupportsEagle3` 协议），confidence head 输入为 `[head_hidden + markov_embed]` 输出 sigmoid 接受概率。草稿层还需要把"上下文 KV"插入 SWA 缓存——**v1.1 更新**（PR #56441）：原 Python 侧按三种缓存 dtype 分派的三分支 `_insert_context_kv` 已收敛为一次融合 C++ 算子调用 `torch.ops._C.fused_deepseek_v4_kv_rope_insert`（RoPE + 量化 + 分页写入一体），跨 V4.1 各缓存记录格式（fp8_ds_mla MXFP8 记录 / bf16 / plain fp8）工作，dspark.py 因此净减 ~60 行。
 
 ## 2.8 视觉编码器（DeepSeek-ViT）
 
@@ -619,10 +658,10 @@ flowchart TB
     M --> Merge[与文本 embedding 合并 -> inputs_embeds]
 ```
 
-代码路径（`deepseek_v4_1/nvidia/vl_model.py`）：
+代码路径（`deepseek_v41/nvidia/vl_model.py`）：
 
 ```python
-# vllm/models/deepseek_v4_1/nvidia/vl_model.py
+# vllm/models/deepseek_v41/nvidia/vl_model.py
 def _build_image_span(self, image_embeds, types):
     """Full image span: aligner rows at IMAGE slots, the learned
     delimiter vectors at IMAGE_START/IMAGE_NEW_LINE/IMAGE_END."""
@@ -667,25 +706,29 @@ flowchart TB
 
 `DeepseekV4Model.forward` 中还有两个值得注意的环节：
 
-1. **Engram 哈希前置计算**：在进入层循环之前，为整个（flatten）batch 一次性计算 n-gram 哈希并 `prepare_embeddings` 预取，所有 Engram 层共享一次 gather（`deepseek_v4_1/nvidia/model.py:562-617`）；profile run（KV 缓存未绑定）时跳过。
+1. **Engram 哈希前置计算**：在进入层循环之前，为整个（flatten）batch 一次性计算 n-gram 哈希并 `prepare_embeddings` 预取，所有 Engram 层共享一次 gather（`deepseek_v41/nvidia/model.py:562-617`）；profile run（KV 缓存未绑定）时跳过。
 2. **PP 中间张量**：跨 pipeline rank 传输 `[T, 4, hidden]` 的 hidden_states 与 float32 的 `pre_mix`（`make_empty_intermediate_tensors`）。
 
 ## 4.2 单层 Transformer 计算流程（mHC 两子层）
 
-V4.1 每层 = mHC pre → Attention → mHC post → mHC pre → MoE，状态在 4 条流之间混合：
+V4.1 每层 = mHC pre → Attention → mHC post/pre → MoE。普通子层用**融合的 Single-Pass kernel**（v1.1），首层与 Engram 注入层用分立的 pre/post：
 
 ```python
-# vllm/models/deepseek_v4_1/nvidia/model.py（DeepseekV4DecoderLayer.forward 核心）
-# --- Attention 子层 ---
-post_mix, res_mix, x, attn_pre = mhc_pre_delayed_tilelang(
-    residual, self.hc_attn_fn, self.hc_attn_scale, self.hc_attn_base,
-    ..., pre_mix=pre_mix, norm_weight=self.attn_norm.weight, ...)
-x = self.attn(positions, x, None)                     # sparse MLA
-residual = mhc_post_tilelang(x, residual, post_mix, res_mix)
-# --- FFN 子层 ---
-post_mix, res_mix, x, ffn_pre = mhc_pre_delayed_tilelang(
-    residual, self.hc_ffn_fn, ..., pre_mix=attn_pre,
-    norm_weight=self.ffn_norm.weight, ...)
+# vllm/models/deepseek_v41/nvidia/model.py（DeepseekV4DecoderLayer.forward 核心）
+# --- 普通层（非首层、非 Engram 注入层）：Single-Pass mHC ---
+# The collapse already reads the post-mapped streams, so the mean
+# aux consumers want comes out of the same kernel.
+residual, post_mix, res_mix, x, attn_pre, aux = mhc_shifted_post_pre(
+    x, residual, post_mix, res_mix,
+    self.hc_attn_fn, self.hc_attn_scale, self.hc_attn_base, ...,
+    pre_mix=pre_mix, norm_weight=self.attn_norm.weight, ...,
+    capture_aux=capture_previous_aux)
+x = self.attn(positions, x, None)                     # sparse MLA（SM100 默认 mega attention）
+# --- FFN 子层同样走融合 kernel ---
+residual, post_mix, res_mix, x, ffn_pre, _ = mhc_shifted_post_pre(
+    x, residual, post_mix, res_mix,
+    self.hc_ffn_fn, self.hc_ffn_scale, self.hc_ffn_base, ...,
+    pre_mix=attn_pre, norm_weight=self.ffn_norm.weight, ...)
 x = self.ffn(x, input_ids)                            # DeepSeekMoE (384+1, top-6)
 ```
 
@@ -693,7 +736,7 @@ x = self.ffn(x, input_ids)                            # DeepSeekMoE (384+1, top-
 
 ## 4.3 稀疏注意力的执行时序（多流重叠）
 
-`DeepseekV4Attention._prepare_and_attn`（`deepseek_v4_1/attention.py:652`）是延迟敏感的 decode 路径核心，利用 3 条 aux CUDA stream 重叠计算：
+`DeepseekV4Attention._prepare_and_attn`（`deepseek_v41/attention.py:652`）是延迟敏感的 decode 路径核心，利用 3 条 aux CUDA stream 重叠计算：
 
 ```mermaid
 sequenceDiagram
@@ -712,7 +755,7 @@ sequenceDiagram
     end
     par 索引器准备 并行 主缓存插入
         D->>D: indexer: wk(latent) -> k_norm -> RoPE -> 量化写 K 缓存<br/>wq_b + fused_indexer_q_rope_quant
-        A0->>A0: compressor.insert_cache（RoPE + 量化 -> 全局压缩缓存）
+        A0->>A0: compressor.insert_cache（RoPE + 量化 -> 全局压缩缓存<br/>fp8_ds_mla / NVFP4 记录）
     end
     D->>D: indexer_op（top-k 打分） + forward_mqa（稀疏 MLA）
 ```
@@ -723,14 +766,18 @@ sequenceDiagram
 
 | 优化 | 机制 | 适用 |
 |------|------|------|
-| Paged KV Cache | 压缩缓存按 `MLAAttentionSpec` 分页（fp8_ds_mla 需 576B 对齐） | 主缓存 + indexer K + SWA |
+| Paged KV Cache | 压缩缓存按 `MLAAttentionSpec` 分页（packed 记录按 TMA stride 对齐） | 主缓存 + indexer K + SWA |
 | Chunked Prefill / Prefix Caching | 压缩缓存与 SWA 缓存均支持前缀复用（Engram 哈希槽随 slot 稳定） | 长上下文 agent 场景 |
 | CUDA Graph | `UNIFORM_BATCH` / `ALWAYS` 支持；indexer/MLA 在 eager break 中执行；DSpark 预取与查表跨 piecewise 段 | decode 加速 |
+| **FlashMLA mega attention** | SM100 单 kernel 融合 Q RoPE + 稀疏注意力 + 逆 RoPE + FP8 cast，直接写 wo_a 输入缓冲区；TP1 上最高 1.45×（#56935） | SM100 decode |
+| **NVFP4 压缩缓存** | 288B/状态的 e2m1 + per-16-dim e4m3 scale，官方推理栈原生格式（#56935） | SM100 mega attention |
+| **DeepGEMM 稀疏 indexer logits** | 候选消费者只对候选块打分，O(候选)/查询；~32K 上下文起收益（#56254） | SM100 + DeepGEMM≥2.8 |
+| **Single-Pass mHC** | DeepGEMM `mega_mhc` 融合 post+pre 单 kernel（#56935 相关） | SM100 |
 | Sequence Parallel | `sp_shard / sp_all_gather / sp_reduce_scatter`，与 EP/MegaMoE 组合 | TP>1 |
 | MegaMoE / FlashInfer MoE | FP4 专家、EP 通信重叠；`make_deepseek_v4_expert_params_mapping` 统一权重映射 | MoE 后端 |
 | Multi-stream GEMM | 3 条 aux stream 重叠投影/压缩/索引 | decode 延迟 |
 | Engram 异步预取 | 独立 stream 查表 + mmap /dev/shm 共享 + CPU offload | 196B 参数不出显存 |
-| DSpark | Eagle3 协议：草稿 5 位/步，confidence 动态验证长度 | 投机解码 |
+| DSpark | Eagle3 协议：草稿 5 位/步，confidence 动态验证长度；上下文 KV 融合 C++ 插入 | 投机解码 |
 
 ---
 
@@ -770,10 +817,10 @@ flowchart TB
 
 ## 6.1 模型注册与硬件隔离入口
 
-vLLM 中 V4.1 的入口 `vllm/models/deepseek_v4_1/__init__.py` 按平台选择实现（nvidia 为默认分支，ROCm/XPU 各自覆盖）：
+vLLM 中 V4.1 的入口 `vllm/models/deepseek_v41/__init__.py` 按平台选择实现（nvidia 为默认分支，ROCm/XPU 各自覆盖）：
 
 ```python
-# vllm/models/deepseek_v4_1/__init__.py
+# vllm/models/deepseek_v41/__init__.py
 """DeepSeek V4.1 hardware-isolated model entry point."""
 
 from vllm.platforms import current_platform
@@ -793,7 +840,7 @@ __all__ = [
 ]
 ```
 
-`DeepseekV41ForCausalLM` 是**多模态包装类**（`deepseek_v4_1/nvidia/vl_model.py`），持有一个 `DeepseekV41LLMForCausalLM` 文本模型 + ViT + aligner；即使纯文本使用，V4.1 checkpoint 也声明 VL 架构（权重映射中直接丢弃 `vision./aligner./image_` 权重）。
+`DeepseekV41ForCausalLM` 是**多模态包装类**（`deepseek_v41/nvidia/vl_model.py`），持有一个 `DeepseekV41LLMForCausalLM` 文本模型 + ViT + aligner；即使纯文本使用，V4.1 checkpoint 也声明 VL 架构（权重映射中直接丢弃 `vision./aligner./image_` 权重）。
 
 ## 6.2 核心模型类层次
 
@@ -832,6 +879,11 @@ classDiagram
         +swa_cache_layer: DeepseekV4SWACache
         +forward_mqa()
     }
+    class DeepseekV4MegaAttnAttention {
+        +accepts_unnormed_unroped_query = True
+        +packed_kv_cache_dtype = nvfp4_ds_mla
+        +permuted wq_b / wo_a 布局
+    }
     class DeepseekV4MoE {
         +gate: GateLinear (bias_vl)
         +experts: 384 routed + 1 shared
@@ -839,7 +891,7 @@ classDiagram
     class DeepseekV4Indexer {
         +wk / k_norm / wq_b / weights_proj
         +k_cache: DeepseekV4IndexerCache
-        +indexer_op: SparseAttnIndexer
+        +indexer_op: SparseAttnIndexer | SparseMQAIndexer
     }
     class DeepseekCompressor {
         +fused_wkv_wgate
@@ -861,6 +913,7 @@ classDiagram
     DeepseekV4DecoderLayer *-- DeepseekV4Attention
     DeepseekV4DecoderLayer *-- DeepseekV4MoE
     DeepseekV4DecoderLayer o-- Engram
+    DeepseekV4Attention <|-- DeepseekV4MegaAttnAttention
     DeepseekV4Attention *-- DeepseekV4Indexer
     DeepseekV4Attention *-- DeepseekCompressor
     DeepseekV4Model ..> DSparkDeepseekV4ForCausalLM : aux hidden states
@@ -868,10 +921,10 @@ classDiagram
 
 ## 6.3 关键计算流程代码分析
 
-**（1）注意力层构造**（`deepseek_v4_1/attention.py:__init__`）：每个 layer 依据 config 拓扑决定是否构建 compressor（仅 kv 源层）、indexer（仅 index 源层）与各自的缓存。非 kv 源层的 `_compressed_kv_cache()` 通过 `static_forward_context` 直接引用其下方最近 kv 源层的缓存张量——**这是 CSA2 "层间共享缓存"的代码落地**：
+**（1）注意力层构造与后端选择**（`deepseek_v41/nvidia/model.py:_select_dsv4_attn_cls`）：每个 layer 依据 config 拓扑决定是否构建 compressor（仅 kv 源层）、indexer（仅 index 源层）与各自的缓存。后端选择顺序：显式指定 > 平台默认——SM12 默认 FlashInfer，**SM100 默认 mega attention**（拓扑允许时，`DeepseekV4MegaAttnAttention.is_available_for` 判定），其余回退 FlashMLA。非 kv 源层的 `_compressed_kv_cache()` 通过 `static_forward_context` 直接引用其下方最近 kv 源层的缓存张量——**这是 CSA2 "层间共享缓存"的代码落地**：
 
 ```python
-# vllm/models/deepseek_v4_1/attention.py
+# vllm/models/deepseek_v41/attention.py
 def _compressed_kv_cache(self) -> torch.Tensor:
     """The compressed-KV cache tensor of this layer's kv source (own
     cache for kv-source layers)."""
@@ -882,14 +935,12 @@ def _compressed_kv_cache(self) -> torch.Tensor:
     return source.kv_cache
 ```
 
-**（2）compressor 前向**（`deepseek_v4_1/compressor.py:246`）：`forward` 保存状态并输出 bf16 latent（ratio-2 时在组边界 token 处才产生有效行），`insert_cache` 随后将 latent 经 RoPE + 量化写入分页缓存。两者被 attention 层调度在不同 stream 上重叠执行。
+**（2）compressor 前向**（`deepseek_v41/compressor.py:246`）：`forward` 保存状态并输出 bf16 latent（ratio-2 时在组边界 token 处才产生有效行），`insert_cache` 随后将 latent 经 RoPE + 量化写入分页缓存（fp8_ds_mla / NVFP4 记录按后端选择）。两者被 attention 层调度在不同 stream 上重叠执行。
 
-**（3）indexer 前向**（`deepseek_v4_1/attention.py:1158`）：`_produce_k` 只在**组边界 token**（ratio 对齐位置）产生 K——`wk(latent)` → `k_norm` → RoPE → MXFP4/FP8 量化写入 K 缓存；Q 侧 `fused_indexer_q_rope_quant` 融合 RoPE 与量化；短上下文（候选数 ≤ topk）时走 `_fill_short_context_topk_indices` Triton 快速路径，直接全选候选。
-
-**（4）短上下文快速路径**（`deepseek_v4_1/attention.py:1170`）：
+**（3）indexer 前向**（`deepseek_v41/attention.py:1158`）：`_produce_k` 只在**组边界 token**（ratio 对齐位置）产生 K——`wk(latent)` → `k_norm` → RoPE → MXFP4/FP8 量化写入 K 缓存；Q 侧 `fused_indexer_q_rope_quant` 融合 RoPE 与量化（`weights_out_dtype` 与打分 kernel 对齐，避免每步 cast）；候选消费者层在 `indexer_sparse_logits` 开启时走 `SparseMQAIndexer` 只对候选块打分；短上下文（候选数 ≤ topk）时走 `_fill_short_context_topk_indices` Triton 快速路径，直接全选候选：
 
 ```python
-# vllm/models/deepseek_v4_1/attention.py（DeepseekV4Indexer.forward）
+# vllm/models/deepseek_v41/attention.py（DeepseekV4Indexer.forward）
 if (indexer_metadata.max_seq_len // self.compress_ratio <= self.topk_tokens
         and not torch.cuda.is_current_stream_capturing()):
     # candidates num smaller than topk, every candidate is selected
@@ -900,10 +951,30 @@ if (indexer_metadata.max_seq_len // self.compress_ratio <= self.topk_tokens
     return None, None, None
 ```
 
-**（5）Engram 查表与预取**（`deepseek_v4_1/nvidia/engram.py`）：
+**（4）mega attention 前向**（`deepseek_v41/nvidia/flash_mla_mega_attn.py`，v1.1 新增）：
 
 ```python
-# vllm/models/deepseek_v4_1/nvidia/engram.py
+# vllm/models/deepseek_v41/nvidia/flash_mla_mega_attn.py
+"""DeepSeek V4.1 attention on FlashMLA's mega-attention kernel (SM100).
+
+One kernel does Q RoPE, sparse attention, the inverse RoPE of the output and
+its FP8 cast, and writes straight into the buffer ``wo_a`` consumes. So the
+layer declares ``accepts_unnormed_unroped_query`` -- the kernel RoPEs Q itself,
+leaving the fused KV insert only the zero-pad to the kernel's head count -- and
+its ``_alloc_attn_out`` / ``_o_proj`` pair speaks QuantizedActivation instead
+of bf16, since the output needs no rotation or quantization here.
+
+``wq_b`` rows and ``wo_a`` columns are permuted once at load so the surrounding
+GEMMs speak the kernel's chunk-interleaved layouts directly. A step's prefill
+and decode segments write disjoint token ranges of one output buffer pair, so
+a single ``wo_a`` einsum covers the whole step.
+"""
+```
+
+**（5）Engram 查表与预取**（`deepseek_v41/nvidia/engram.py`）：
+
+```python
+# vllm/models/deepseek_v41/nvidia/engram.py
 class Engram(BaseEngram):
     """NVIDIA Engram with asynchronous offload and node-local DP lookup."""
     def prepare_embeddings(self, hash_ids: torch.Tensor) -> None:
@@ -922,27 +993,31 @@ class Engram(BaseEngram):
             self.embed_tokens.lookup(hash_ids, rows, background=True)
 ```
 
-**（6）DSpark 草稿前向**（`deepseek_v4_1/nvidia/dspark.py:188`）：草稿模型复用 hc 流（`inputs_embeds.unsqueeze(-2).repeat(1, self.hc_mult, 1)`），3 个草稿层跑完 5 个位置后经 Markov head 建模位置间依赖、confidence head 输出接受概率。
+**（6）DSpark 草稿前向**（`deepseek_v41/nvidia/dspark.py:188`）：草稿模型复用 hc 流（`inputs_embeds.unsqueeze(-2).repeat(1, self.hc_mult, 1)`），3 个草稿层跑完 5 个位置后经 Markov head 建模位置间依赖、confidence head 输出接受概率；上下文 KV 经融合算子 `fused_deepseek_v4_kv_rope_insert` 一次性插入。
 
 ## 6.4 权重加载与量化
 
-V4.1 的量化体系（`deepseek_v4_1/quant_config.py`）：
+V4.1 的量化体系（`deepseek_v41/quant_config.py`）：
 
 - **量化方法名** `deepseek_v4_fp8`（`QuantizationMethods`），继承 `Fp8Config`；
 - **专家权重**：`expert_dtype=fp4` → MXFP4（`Mxfp4MoEMethod`，scale 名为 `w{1,2,3}_weight_scale` 无 `_inv` 后缀）；`fp8` → block-FP8（`w{13,2}_weight_scale_inv`）；
 - **线性层**：32×32 block MXFP8（UE8M0 scale）走 `ModelOptLinearMethod`（`weight_scale`），普通 block-FP8 走 `weight_scale_inv`——`_linear_scale_param_name` 按 `[32,32] + fp4` 判定；
 - **E8M0 字节序陷阱**：checkpoint 中 E8M0 scale 存为 `float8_e8m0fnu` 而 MoE 参数为 uint8，直接 `copy_()` 会做数值转换（如 2⁻⁷ → 0）破坏原始指数字节，加载器需先 `view(torch.uint8)`；
 - **权重映射**：`_make_deepseek_v4_weights_mapper` 处理 checkpoint → vLLM 命名（`layers.` → `model.layers.`、`embed.weight` → `embed_tokens.weight`、`.ffn.gate.bias` → `.ffn.gate.e_score_correction_bias` 等），并丢弃 `vision./aligner./image_` 与 `mtp.` 权重（VL 包装类中 DSpark 头不加载）；
-- **Engram FP8 表**：`engram.embed.scale` 显式路由到 `engram.embed_tokens.weight_scale_inv`。
+- **Engram FP8 表**：`engram.embed.scale` 显式路由到 `engram.embed_tokens.weight_scale_inv`；
+- **mega attention 布局置换**（v1.1 新增）：`finalize_mega_attn_weights` 在加载完成后把 `wq_b` 行与 `wo_a` 列一次性置换为 kernel 的 chunk-interleaved 布局。
 
 ## 6.5 平台后端
 
 | 平台 | 目录 | 特点 |
 |------|------|------|
-| NVIDIA | `nvidia/` | FlashMLA / FlashInfer（SM120）稀疏 MLA 后端、MegaMoE/FI-MoE、CuTe-DSL 算子（o_proj、indexer Q、dequant-gather） |
-| AMD (ROCm) | `amd/` | aiter 后端（`ROCM_FLASHMLA_SPARSE_DSV4`）、ROCM 专属 Q 量化路径 |
+| NVIDIA (SM100) | `nvidia/` | **mega attention**（默认，NVFP4 压缩缓存）+ FlashMLA / FlashInfer（SM120）稀疏 MLA 后端、MegaMoE/FI-MoE、DeepGEMM 稀疏 indexer logits、CuTe-DSL 算子 |
+| NVIDIA (其他) | `nvidia/` | FlashMLA（fp8_ds_mla V4 记录）/ FlashInfer 后端 |
+| AMD (ROCm) | `amd/` | aiter 后端（`ROCM_FLASHMLA_SPARSE_DSV4`）、ROCm 专属 Q 量化路径、CSA 多流重叠 |
 | CPU | `cpu/`（仅 deepseek_v4） | CPU 版 compressor / MLA / sparse 算子 |
 | XPU | `xpu/` | XPU 稀疏算子 + VL stub（V4.1 视觉暂不支持） |
+
+vLLM 后端枚举（V4.1）：`FLASHMLA_SPARSE_DSV41`、`FLASHMLA_MEGA_ATTN_DSV41`（v1.1 新增）、`FLASHINFER_MLA_SPARSE_DSV41`、`ROCM_FLASHMLA_SPARSE_DSV4`；indexer 后端：`DeepseekV41IndexerBackend`（稠密打分）与 `DeepseekV41SparseIndexerBackend`（DeepGEMM 稀疏 logits，v1.1 新增，`vllm/v1/attention/backends/mla/sparse_indexer.py`）。
 
 ---
 
@@ -952,22 +1027,30 @@ V4.1 的量化体系（`deepseek_v4_1/quant_config.py`）：
 
 | 组件 | 文件路径 | 关键类/函数 |
 |------|---------|------------|
-| V4.1 入口（硬件分派） | `vllm/models/deepseek_v4_1/__init__.py` | `DeepseekV41ForCausalLM` |
-| V4.1 多模态包装 | `vllm/models/deepseek_v4_1/nvidia/vl_model.py` | `DeepseekV41ForCausalLM` |
-| V4.1 文本模型 | `vllm/models/deepseek_v4_1/nvidia/model.py` | `DeepseekV41LLMForCausalLM` / `DeepseekV4Model` / `DeepseekV4DecoderLayer` / `DeepseekV4MoE` |
-| V4.1 注意力（拓扑解析） | `vllm/models/deepseek_v4_1/attention.py` | `DeepseekV4Attention` / `DeepseekV4Indexer` / `DeepseekV4IndexerCache` |
-| V4.1 压缩器 | `vllm/models/deepseek_v4_1/compressor.py` | `DeepseekCompressor` / `CompressorStateCache` |
-| V4.1 稀疏 MLA 后端 | `vllm/models/deepseek_v4_1/sparse_mla.py` | `DeepseekV41SparseSWAMetadataBuilder` / `DeepseekV4SparseMLABackend` |
-| V4.1 FlashMLA / FlashInfer 实现 | `vllm/models/deepseek_v4_1/nvidia/flashmla.py` / `flashinfer_sparse.py` | `DeepseekV4FlashMLAAttention` / `DeepseekV4FlashInferSM120Attention` |
-| Engram（公共逻辑） | `vllm/models/deepseek_v4_1/common/engram.py` | `EngramLayout` / `NgramHashState` / `build_compressed_token_map` |
-| Engram（NVIDIA 存储/预取） | `vllm/models/deepseek_v4_1/nvidia/engram.py` | `Engram` / `ParallelEngramEmbedding` / `DPSharedEngramStorage` |
-| DSpark | `vllm/models/deepseek_v4_1/nvidia/dspark.py` | `DSparkDeepseekV4ForCausalLM` / `DSparkMarkovHead` / `DSparkConfidenceHead` |
-| 量化配置 | `vllm/models/deepseek_v4_1/quant_config.py` | `DeepseekV4FP8Config`（`deepseek_v4_fp8`） |
+| V4.1 入口（硬件分派） | `vllm/models/deepseek_v41/__init__.py` | `DeepseekV41ForCausalLM` |
+| V4.1 多模态包装 | `vllm/models/deepseek_v41/nvidia/vl_model.py` | `DeepseekV41ForCausalLM` |
+| V4.1 文本模型 | `vllm/models/deepseek_v41/nvidia/model.py` | `DeepseekV41LLMForCausalLM` / `DeepseekV4Model` / `DeepseekV4DecoderLayer` / `DeepseekV4MoE` / `_select_dsv4_attn_cls` |
+| V4.1 注意力（拓扑解析） | `vllm/models/deepseek_v41/attention.py` | `DeepseekV4Attention` / `DeepseekV4Indexer` / `DeepseekV4IndexerCache` / `_use_v41_mxfp8_kv_record` |
+| V4.1 mega attention | `vllm/models/deepseek_v41/nvidia/flash_mla_mega_attn.py` | `DeepseekV4MegaAttnAttention` / `is_flashmla_mega_attn_supported` |
+| V4.1 压缩器 | `vllm/models/deepseek_v41/compressor.py` | `DeepseekCompressor` / `CompressorStateCache` |
+| V4.1 稀疏 MLA 后端 | `vllm/models/deepseek_v41/sparse_mla.py` | `DeepseekV41SparseSWAMetadataBuilder` / `DeepseekV4SparseMLABackend` / `FlashMLAMegaAttnBackend` |
+| V4.1 FlashMLA / FlashInfer 实现 | `vllm/models/deepseek_v41/nvidia/flashmla.py` / `flashinfer_sparse.py` | `DeepseekV4FlashMLAAttention` / `DeepseekV4FlashInferSM120Attention` |
+| DeepGEMM 稀疏 indexer 层 | `vllm/model_executor/layers/sparse_mqa_indexer.py` | `SparseMQAIndexer` |
+| DeepGEMM 稀疏 indexer 后端 | `vllm/v1/attention/backends/mla/sparse_indexer.py` | `DeepseekV41SparseIndexerBackend` |
+| DeepGEMM 工具 | `vllm/utils/deep_gemm.py` | `fp8_einsum` / `mega_mhc` / `is_deep_gemm_supported` |
+| Single-Pass mHC kernel | `vllm/models/deepseek_v41/nvidia/ops/mega_mhc.py` | `mhc_shifted_post_pre` / `is_mega_mhc_supported` |
+| mega attention 布局置换 | `vllm/models/deepseek_v41/common/ops/fused_layout.py` | `permute_wq_b_` / `permute_wo_a_` |
+| Engram（公共逻辑） | `vllm/models/deepseek_v41/common/engram.py` | `EngramLayout` / `NgramHashState` / `build_compressed_token_map` |
+| Engram（NVIDIA 存储/预取） | `vllm/models/deepseek_v41/nvidia/engram.py` | `Engram` / `ParallelEngramEmbedding` / `DPSharedEngramStorage` |
+| DSpark | `vllm/models/deepseek_v41/nvidia/dspark.py` | `DSparkDeepseekV4ForCausalLM` / `DSparkMarkovHead` / `DSparkConfidenceHead` |
+| 量化配置 | `vllm/models/deepseek_v41/quant_config.py` | `DeepseekV4FP8Config`（`deepseek_v4_fp8`） |
+| 压缩/缓存融合算子 | `vllm/models/deepseek_v41/common/ops/fused_compress_quant_cache.py` | `fused_save_compress_norm` / `rope_quant_insert` / `_rope_quant_insert_nvfp4_kernel` |
 | ViT / Aligner | `vllm/models/deepseek_v4/common/vision.py` | `DeepseekV4ViT` / `DeepseekV4Aligner` |
-| 多模态预处理 | `vllm/models/deepseek_v4_1/common/mm_preprocess.py` | `DeepseekV4VLMultiModalProcessor` |
+| 多模态预处理 | `vllm/models/deepseek_v41/common/mm_preprocess.py` | `DeepseekV4VLMultiModalProcessor` |
 | mHC kernel | `vllm/model_executor/kernels/mhc/` | `mhc_pre_delayed_tilelang` / `mhc_post_tilelang` / `hc_collapse_triton` |
 | SWA 缓存 / 稀疏 metadata | `vllm/v1/attention/backends/mla/sparse_swa.py` | `DeepseekV4SWACache` / `DeepseekSparseSWAMetadataBuilder` |
 | 索引器后端 | `vllm/v1/attention/backends/mla/indexer.py` | `DeepseekV41IndexerBackend` |
+| 注意力配置 | `vllm/config/attention.py` | `AttentionConfig`（`indexer_kv_dtype` / `indexer_sparse_logits` / `backend`） |
 | V4-Pro 对应实现 | `vllm/models/deepseek_v4/`（`nvidia/model.py`、`attention.py`、`compressor.py`） | `DeepseekV4ForCausalLM` / CSA(4)+HCA(128) / `hc_head` |
 
 ## B. 术语表
@@ -980,12 +1063,16 @@ V4.1 的量化体系（`deepseek_v4_1/quant_config.py`）：
 | 多头潜在注意力 | MLA | KV 单头 512 维、Q/O 低秩化的注意力 |
 | 滑动窗口注意力 | SWA | 128 token 窗口的局部注意力分支 |
 | Lightning Indexer | — | 对压缩序列做 top-k 选择的轻量索引器 |
+| Mega attention | — | FlashMLA 单 kernel 融合注意力（Q RoPE + 稀疏注意力 + 逆 RoPE + FP8 cast），SM100 |
 | 流形约束超连接 | mHC | 4 流 + Sinkhorn 投影的残差替代方案 |
+| 单遍 mHC | Single-Pass mHC | 融合 post+pre 的 mHC kernel（DeepGEMM `mega_mhc`） |
 | 记忆痕迹 / 条件记忆 | Engram | n-gram 哈希查表注入的 ~196B 参数记忆模块 |
 | 投机解码 | DSpark | 3 块 × 5 draft 的投机解码（Markov + confidence head） |
 | 多令牌预测 | MTP | V4 的单层 1-draft 投机模块 |
 | 双随机矩阵 | Birkhoff polytope | mHC 混合矩阵的约束空间 |
 | 像素反洗牌 | Pixel-Unshuffle | 3×3 空间折叠，视觉 token 降至 1/9 |
+| NVFP4 | NVFP4 (E2M1) | e2m1 数据 + 每 16 维 e4m3 scale 的 4-bit 压缩记录（288B/状态） |
+| MXFP8 | MXFP8 (UE8M0) | 每 32 维一个 UE8M0 scale 的 FP8 记录（528B/token） |
 
 ## C. 参考资料
 
@@ -1007,11 +1094,16 @@ V4.1 的量化体系（`deepseek_v4_1/quant_config.py`）：
 - [InfoQ：参数几乎翻倍，推理反而更省：DeepSeek V4.1-Flash 重构 KV Cache](https://www.infoq.cn/news/sbaJrAa8VTIRKIPCpKlo)
 - [Zhihu：DeepSeek-V4.1-Flash 技术报告全文翻译](https://zhuanlan.zhihu.com/p/2081402603120718567)
 
-**代码**：
+**代码与关键 PR**：
 
-- [vLLM: vllm/models/deepseek_v4_1/](https://github.com/vllm-project/vllm/tree/main/vllm/models/deepseek_v4_1)
+- [vLLM: vllm/models/deepseek_v41/](https://github.com/vllm-project/vllm/tree/main/vllm/models/deepseek_v41)
 - [vLLM: vllm/models/deepseek_v4/](https://github.com/vllm-project/vllm/tree/main/vllm/models/deepseek_v4)
 - [vLLM: sparse_swa attention backend](https://github.com/vllm-project/vllm/tree/main/vllm/v1/attention/backends/mla)
+- [PR #56935: FlashMLA mega attention and the NVFP4 compressed KV cache](https://github.com/vllm-project/vllm/pull/56935)
+- [PR #56893: Store the whole KV in MXFP8 (FlashMLA V4.1 record)](https://github.com/vllm-project/vllm/pull/56893)
+- [PR #56254: Wire DeepGEMM sparse MQA logits into the DeepSeek V4.1 indexer](https://github.com/vllm-project/vllm/pull/56254)
+- [PR #56441: DSpark KV-only context insertion across V4.1 cache formats](https://github.com/vllm-project/vllm/pull/56441)
+- [PR #56741: Normalize DeepSeek V4.1 model package naming](https://github.com/vllm-project/vllm/pull/56741)
 - [LLM Architecture Gallery](https://sebastianraschka.com/llm-architecture-gallery/)
 
-> **免责声明**：本文档中的 benchmark 数据部分为 DeepSeek 官方自报值（独立评测如 Vals AI 的结果可能显著不同，已在文中标注）；890 字节/token 等系统指标来自官方技术报告，其精确构成以报告附录为准；vLLM 代码分析基于 2026-09 main 分支快照，后续版本可能调整（例如原生 FP4 主缓存的落地）。
+> **免责声明**：本文档中的 benchmark 数据部分为 DeepSeek 官方自报值（独立评测如 Vals AI 的结果可能显著不同，已在文中标注）；890 字节/token 等系统指标来自官方技术报告，其精确构成以报告附录为准；vLLM 代码分析基于 2026-09-16 main 分支（commit `940baac0b6`），后续版本可能继续调整。
