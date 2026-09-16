@@ -8,7 +8,7 @@
 
 ## 1. 动机 (Motivation)
 
-`max_num_seqs` 目前身兼两职：既决定 model runner 的 per-request 缓冲区与 CUDA Graph 捕获档位（执行容量），又限制调度器从 WAITING 准入 RUNNING 的请求数（准入上限）。想在保持大容量图捕获的同时运行更小的 decode batch（典型 ROCm 部署诉求——hipGraph 捕获成本高，为小 batch 调小 `max_num_seqs` 需重新捕获并缩小静态缓冲区），当前无法实现。本 PR 新增可选参数 `--max-num-active-seqs`，只降低准入上限，runner/图容量仍按 `max_num_seqs` 配置；默认 `None` 时行为与现状完全一致。作者同时明确区分了它与 `--max-num-queued-reqs`（API 层跨 DP rank 的排队上限，超限 503 拒绝）——本参数只在单 engine 内限制 WAITING → RUNNING 的准入时机，不拒绝请求。
+`max_num_seqs` 目前身兼两职：既决定 model runner 的 per-request 缓冲区与 CUDA Graph 捕获档位（执行容量），又限制调度器从 WAITING 准入 RUNNING 的请求数（准入上限）。想在保持大容量图捕获的同时运行更小的 decode batch（ROCm 部署诉求：为小 batch 调小 `max_num_seqs` 需改变捕获档位、缩小静态缓冲区，各轮调优实验执行环境不一致且容量被永久缩小），当前无法实现。本 PR 新增可选参数 `--max-num-active-seqs`，只降低准入上限，runner/图容量仍按 `max_num_seqs` 配置；默认 `None` 时行为与现状完全一致。作者同时明确区分了它与 `--max-num-queued-reqs`（API 层跨 DP rank 的排队上限，超限 503 拒绝）——本参数只在单 engine 内限制 WAITING → RUNNING 的准入时机，不拒绝请求。
 
 ## 2. 代码改动总结 (Change Summary)
 
@@ -38,6 +38,11 @@
 - **问题**：head commit `063722a` 的 CI 检查中 DCO 为 `action_required`——commit 缺少 `Signed-off-by`。
 - **影响**：vLLM 强制要求 DCO，当前状态无法合入。
 - **行动**：作者应当对 commit 补充签名并推送更新。
+
+**📝【注释/文档】PR 描述 "without recapturing graphs" 措辞有误导性** `[已验证]`
+
+- **问题**：CUDA Graph 在**每次引擎启动时都会重新捕获**（`capture_model()`，档位由 `max_num_seqs` 派生，见 `vllm/config/vllm.py:2157`）。改 `max_num_active_seqs` 重启同样要付完整捕获时间，该参数并不省启动成本；其真实含义只是"捕获的图集内容与 buffer/KV 布局无需改变"。同理，cap 生效期间 RUNNING 无法超过 cap——大容量不是自动可用的突发余量，而是"改 flag 即可释放"的储备。
+- **行动**：建议作者修正描述措辞，动机部分强调真实收益：调优实验的执行环境一致性（干净 A/B 对比）与配置语义解耦（容量 vs 策略），而非节省捕获时间。
 
 **📝【注释/文档】新参数无任何文档**
 

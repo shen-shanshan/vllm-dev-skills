@@ -99,7 +99,7 @@ V1 调度器每个 step 从 WAITING 队列选取请求准入 RUNNING，准入上
 
 ### 4.2 CUDA Graph 捕获与 batch size 的关系
 
-vLLM 在启动时按 `cudagraph_capture_sizes`（默认 1..max_num_seqs 等档位）捕获 CUDA Graph。图捕获（尤其 ROCm 的 hipGraph）耗时显著。如果为了小 decode batch 调小 `max_num_seqs`，需要重新捕获更小的图集合、缩小缓冲区，成本高且浪费硬件能力。本 PR 让图捕获仍按大容量进行，而准入单独受限——decode batch 小时图照常回放，batch 大时（如临时 burst）容量也仍在。
+vLLM 在**每次引擎启动时**都会按 `cudagraph_capture_sizes` 捕获 CUDA Graph（档位由 `max_num_seqs` 派生：`[1, 2, 4] + range(8, 256, 8) + ...`，`max_num_seqs=128` 约 50 张图，`=16` 约 7 张）。注意：捕获在每次启动都发生，本 PR **并不能省去启动时的捕获时间**——改 `max_num_active_seqs` 重启同样重新捕获全套图。解耦的真正收益在于：调准入上限时捕获的图集内容与 buffer/KV 布局完全不变，各轮实验执行环境一致、可做干净的性能对比；而调 `max_num_seqs` 每轮实验都会改变捕获档位与静态缓冲区，性能对比被环境差异污染，且容量被永久缩小。另外注意 cap 生效期间 RUNNING 无法超过 cap，大容量只是"改 flag 即可释放"的储备，并非自动可用的突发余量。
 
 ### 4.3 与 `max_num_queued_reqs` 的区别
 
