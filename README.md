@@ -31,7 +31,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
 | [vllm-vs-atom-decode-trace-comparison](./skills/vllm-vs-atom-decode-trace-comparison/SKILL.md) | Performance Optimization | Compare decode-phase kernel implementations of vLLM vs ATOM from torch-profiler traces, with per-layer-type comparison tables and a vLLM optimization TODO list. | ⭐️⭐️⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
-| [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | Code Review | Review AMD/ROCm-related PRs from vllm (aiter/mori/ROCm kernels) and generate a concise Chinese review report with severity-sorted, type-categorized findings. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | Code Review | Review AMD/ROCm-related PRs from vllm (aiter/mori/ROCm kernels) and generate a single combined Chinese report: a detailed PR summary (with Mermaid diagrams, technical principles, discussion highlights, and risk table) followed by severity-sorted, type-categorized ROCm review findings, a verdict, and copy-paste English comments with file + diff line numbers ready for GitHub PR review. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
 | [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | Technical Writing | Write or complete Chinese vLLM technical blog posts in the author's established style, with concise architecture, flow, and sequence diagrams. | ⭐️⭐️⭐️⭐️ |
 
@@ -242,7 +242,7 @@ https://github.com/vllm-project/vllm/pull/29304
 /vllm-rocm-pr-review
 ```
 
-Output: [pr-29304-review](./skills/vllm-rocm-pr-review/outputs/pr-29304-review.md).
+Output: [pr-29304-review](./skills/vllm-rocm-pr-review/outputs/pr-29304-review.md). 新版报告为单文件两大部分：§1–6 PR 详细总结（整合自 vllm-pr-summary，含 Mermaid 图、技术原理、讨论亮点、风险表），§7–8 ROCm review 意见（按严重程度排序的 findings + verdict），§9 为可直接复制到 GitHub PR review 的英文评论（含文件与 diff 行号）；样式示例见 [example-report.md](./skills/vllm-rocm-pr-review/references/example-report.md)。
 
 **📚 vllm-multimodal-open-issue-analyzer**
 

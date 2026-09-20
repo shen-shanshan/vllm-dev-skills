@@ -1,6 +1,6 @@
 # 示例报告（样式锚点）
 
-> 本文件是 vllm-rocm-pr-review 的样式参考：与 outputs/pr-29304-review.md 内容一致，展示了报告的标准结构——动机 / 精简改动总结 / 按严重程度排序并按类型分类的 Review 意见（Problem/Impact/Action + [已验证]/[推测] 标注）/ 现有讨论 / 结论。
+> 本文件是 vllm-rocm-pr-review 的样式参考：以 outputs/pr-29304-review.md 为底稿扩展出整合后的两段式结构——第一部分（§1–6）PR 详细总结（总结 / 背景与动机 / 代码修改分析含 Mermaid / 技术原理 / 讨论亮点 / 风险表），第二部分（§7–8）ROCm review 意见（按严重程度排序并按类型分类的 findings：Problem/Impact/Action + [已验证]/[推测] 标注 / 结论），末尾 §9 为可直接复制到 GitHub PR review 的英文评论（文件 + diff 行号，本节行号为示意；实际报告从 `files[].patch` 的 hunk 头推算）。
 > 写报告前先读本文件，保证结构、finding 格式与语气一致。
 
 ---
@@ -10,12 +10,21 @@
 > **Author**: @inkcherry | **State**: MERGED (2026-01-09) | **Labels**: documentation, rocm, frontend, ready, ci/build, v1, kv-connector
 > **Branch**: `upstream_mori_` → `main` | **Changes**: +3369 -3 lines across 10 files
 > **ROCm 相关性**: 完全相关（moriio KV connector，AMD ROCm 专属）
+> 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
 
-## 1. 动机 (Motivation)
+---
 
-vLLM 的 PD（prefill-decode）分离推理此前在 ROCm 上没有高性能的 KV 传输后端。本 PR 基于 AMD 的通信库 [MORI](https://github.com/ROCm/mori)（MORI-IO）引入 `MoRIIOConnector`，支持两种传输模式：PULL（READ，串行交互：prefill 完成后 decode 拉取）与 PUSH（WRITE，并行交互：producer 逐层非阻塞推送），并提供一个统一的 proxy 示例（`moriio_toy_proxy_server.py`）与 xPyD 并行策略支持（TP→TP、DP→DP）。RDMA 直接读写 GPU 显存（GPUDirect），目标是消除 PD 分离中 KV 传输的开销瓶颈。
+## 1. 总结 (Summary)
 
-## 2. 代码改动总结 (Change Summary)
+本 PR 为 vLLM 的 PD（prefill-decode）分离推理在 ROCm 上引入首个生产级 KV 传输后端：基于 AMD 通信库 MORI 的 `MoRIIOConnector`，支持 PULL（READ）与 PUSH（WRITE）两种传输模式及 xPyD 并行策略（TP→TP、DP→DP），通过 RDMA/GPUDirect 直连 GPU 显存消除 KV 传输瓶颈。同时提供统一 proxy 示例、mock 单测与文档。核心价值：补齐 ROCm 平台 PD 分离缺失的高性能 KV 传输能力。
+
+## 2. 背景与动机 (Background & Motivation)
+
+vLLM 的 PD 分离推理需要把 prefill 集群算好的 KV cache 高效转交 decode 集群继续逐 token 生成，KV 传输是系统瓶颈之一。ROCm 平台此前没有专用的 KV 传输后端。本 PR 基于 AMD 的通信库 [MORI](https://github.com/ROCm/mori)（MORI-IO）引入 `MoRIIOConnector`，支持两种传输模式：PULL（READ，串行交互：prefill 完成后 decode 拉取）与 PUSH（WRITE，并行交互：producer 逐层非阻塞推送），并提供统一的 proxy 示例（`moriio_toy_proxy_server.py`）与 xPyD 并行策略支持（TP→TP、DP→DP）。RDMA 直接读写 GPU 显存（GPUDirect），目标是消除 PD 分离中 KV 传输的开销瓶颈。
+
+## 3. 代码修改分析 (Code Change Analysis)
+
+### 3.1 修改的模块
 
 | 模块 | 改动 |
 |------|------|
@@ -27,9 +36,69 @@ vLLM 的 PD（prefill-decode）分离推理此前在 ROCm 上没有高性能的 
 | `tests/v1/kv_connector/unit/test_moriio_connector.py`（新增 545 行） | 单测（mock 驱动） |
 | `docs/getting_started/installation/gpu.rocm.inc.md` (+17) | 安装说明 |
 
-核心流程（PUSH 模式）：proxy 将请求路由到 producer → prefill 完成后 scheduler 侧 `build_connector_meta` 组装传输元数据 → worker 侧经 ZMQ 握手交换 KV 布局与 mori engine 元数据 → `MoRIIOWriter` 后台线程逐层执行 RDMA 写 → 完成后 ZMQ notify 通知 consumer 释放/使用 block。
+### 3.2 架构 / 流程图
 
-## 3. Review 意见 (Findings)
+PUSH 模式（数据面 RDMA + 控制面 ZMQ）：
+
+```mermaid
+sequenceDiagram
+    participant P as Proxy
+    participant Prod as Prefill Engine (Producer)
+    participant S as MoRIIOConnectorScheduler
+    participant W as MoRIIOConnectorWorker
+    participant C as Decode Engine (Consumer)
+
+    P->>Prod: 路由请求（携带 kv_transfer 参数）
+    Prod->>S: prefill 完成 → 组装传输元数据
+    S->>W: build_connector_meta / kv_transfer_params
+    W->>C: ZMQ 握手（交换 KV 布局与 mori engine 元数据）
+    C-->>W: 确认 ready
+    loop 逐层非阻塞
+        W->>C: RDMA write KV cache（GPUDirect）
+    end
+    W->>C: ZMQ notify → consumer 释放 / 使用 block
+```
+
+### 3.3 关键实现细节
+
+- `moriio_connector.py`：Connector / Scheduler / Worker 三件套——producer 侧 `save_kv_layer` 逐层推送，consumer 侧加载远端 KV。
+- `moriio_engine.py`：`MoRIIOWriter` / `MoRIIOWrapper` 封装 mori.io API（`EngineDesc`、`RdmaBackendConfig`、`PollCqMode` 等），后台线程执行 RDMA 写。
+- `moriio_common.py`：`MoRIIOConfig`（从 vllm config 生成）、传输元数据、ZMQ 侧信道工具（握手 / notify / ping）。
+- 新增 4 个 env var 控制读模式、QP 数量、批大小与 worker 数（均已注册进 `envs.py`）。
+- `factory.py` 按 connector 名注册 `"MoRIIOConnector"`；`Dockerfile.rocm_base` 从源码构建 mori。
+
+## 4. 涉及的技术原理 (Technical Principles)
+
+- **PD（prefill-decode）分离**：prefill 集群计算完 prompt 的 KV cache 后，将请求转交 decode 集群继续生成；跨集群 KV 传输延迟直接影响首 token 时间。
+- **vLLM KV connector 抽象**：`kv_transfer/kv_connector/v1` 定义 Connector/Scheduler/Worker 接口，producer 侧 save、consumer 侧 load；PULL（consumer 主动拉）与 PUSH（producer 主动推）是两种同步模式。
+- **RDMA + GPUDirect**：网卡直接读写 GPU 显存，KV 数据不经过 CPU 内存拷贝，传输吞吐与延迟由网络决定。
+- **mori.io（AMD 通信库）**：面向 ROCm 的高性能传输库；本 PR 通过其 engine/session 抽象管理 QP（QP per transfer）。
+- **ZMQ 侧信道**：控制面（握手、完成通知）走 TCP/ZMQ，数据面走 RDMA——控制与数据分离，避免大块 KV 阻塞控制消息。
+
+## 5. 评论区讨论亮点 (Discussion Highlights)
+
+- **@tjtanaa**（maintainer）：要求 env var 全部注册进 `envs.py`（已落实）；要求补充单测（已落实）；要求清理 `use_flashinfer` 死代码（已清理并加 TODO）。
+- **@KuntaiDu**：connector 单文件过长（1515 行），要求拆分（作者回应已拆为 Connector/Scheduler/Worker 三类，后续 main 又拆出 `moriio_layout.py`）。
+- **@kouroshHakha**：询问是否测过 ray executor 后端——作者承认未测试。
+- **@rasmith**：实测报告 decode 服务 hang（与本文 ⚠️ 忙等 finding 可能相关，建议作者对照排查）。
+- **@ChuanLi1101**：指出 ZMQ socket 操作缺 timeout 可能 hang（作者回应为异步通知线程，不会阻塞主线程，但承认存在优化空间）。
+- **@gshtras / @tjtanaa**：`Dockerfile.rocm_base` 的改动需要传播到 `rocm/vllm-dev:base` 镜像，并影响 CI 测试队列。
+- gemini bot 提出的 `__del__` 清理、`assert 0` 兜底、broad `except: pass` 等问题作者均已修复。
+
+## 6. 风险与潜在问题 (Risk Analysis)
+
+| 风险 | 严重程度 | 说明 |
+|------|---------|------|
+| 同机多 DP + TP>1 端口路由冲突 | High | 见 §7 🔴【正确性】端口偏移计算 |
+| 测试覆盖：单测全部 mock，真实集成路径无 CI 兜底 | High | 见 §7 ⚠️【测试】；合并后 AMD 用户成为实际测试者 |
+| mori 依赖无版本 pin，API 漂移 | Medium | 见 §7 ⚠️【依赖管理】 |
+| moriio API 线程安全边界不清 | Medium | 见 §7 ⚠️【并发】 |
+| 与 `SamplingParams` 内部结构强耦合 | Medium | 见 §7 ⚠️【设计】kv_transfer_params |
+| CUDA 平台 import guard 依赖 mori 可选性 | Low | 非 ROCm 平台安装时 connector 需正确降级 |
+
+---
+
+## 7. Review 意见 (Findings)
 
 | 类型 | 🔴 | ⚠️ | 📝 |
 |------|----|----|----|
@@ -117,18 +186,36 @@ vLLM 的 PD（prefill-decode）分离推理此前在 ROCm 上没有高性能的 
 - **问题**: `ConnectionRefusedError`/`OSError` 分支只递增 `retry_count` 但不检查上限，只有兜底 `Exception` 分支在达到 `MAX_PING_RETRIES` 后抛 `RuntimeError`；且 ZMQ DEALER 的 `connect` 在 peer 不存在时通常不抛 `ConnectionRefusedError`，该分支可能永远不触发。
 - **行动**: 建议作者统一重试与退出逻辑（如用单调时间窗口判断），并说明 proxy 不可达时的预期行为。
 
-## 4. 现有讨论 (Existing Discussion)
-
-- **@tjtanaa**（maintainer）：要求 env var 全部注册进 `envs.py`（已落实）；要求补充单测（已落实）；要求清理 `use_flashinfer` 死代码（已清理并加 TODO）。
-- **@KuntaiDu**：connector 单文件过长（1515 行），要求拆分（作者回应已拆为 Connector/Scheduler/Worker 三类，后续 main 又拆出 `moriio_layout.py`）。
-- **@kouroshHakha**：询问是否测过 ray executor 后端——作者承认未测试。
-- **@rasmith**：实测报告 decode 服务 hang（与本文 ⚠️ 忙等 finding 可能相关，建议作者对照排查）。
-- **@ChuanLi1101**：指出 ZMQ socket 操作缺 timeout 可能 hang（作者回应为异步通知线程，不会阻塞主线程，但承认存在优化空间）。
-- **@gshtras / @tjtanaa**：`Dockerfile.rocm_base` 的改动需要传播到 `rocm/vllm-dev:base` 镜像，并影响 CI 测试队列。
-- gemini bot 提出的 `__del__` 清理、`assert 0` 兜底、broad `except: pass` 等问题作者均已修复。
-
-## 5. 结论 (Verdict)
+## 8. 结论 (Verdict)
 
 **⚠️ NEEDS WORK**（追溯性 review，PR 已合并）
 
 作为 vLLM ROCm PD 分离的首个生产级 KV 传输后端，本 PR 的架构设计（PUSH/PULL 双模式、xPyD、分层非阻塞传输）合理且价值明确，与 reviewer 的互动质量高、反馈落实快。但代码存在一个明确的端口路由 bug（🔴）、一处忙等设计缺陷（⚠️）以及多处潜伏正确性隐患，且测试完全基于 mock、真实集成路径无 CI 兜底，合并后 main 分支仍持续修复相关问题（`get_port_offset` 仅部分修复）。若在合并前 review，建议阻塞至端口偏移修复、忙等改为事件驱动、并补一条真实 mori 的最小 e2e 用例。
+
+## 9. 英文 Review 评论 (Copy-Paste English Comments)
+
+以下评论可直接复制到 GitHub PR review 的对应文件/行位置（行号为示意，实际报告按 diff hunk 头推算新文件行号）：
+
+**C1** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_common.py:102-108` — 🔴 blocking
+
+```text
+The `tp_size` parameter of `get_port_offset()` is never passed by any of the 4 call sites, so the formula degenerates to `dp_rank + tp_rank`. With DP >= 2 and TP >= 2 on the same machine, (dp=1, tp=0) and (dp=0, tp=1) compute the same handshake/notify port, so ZMQ messages can be routed to the wrong engine (or bind conflicts). Could you pass `tp_size` explicitly at all call sites (the formula appears intended to be `dp_rank * tp_size + tp_rank`), or drop the dead parameter and document the offset semantics?
+```
+
+**C2** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:420-434` — ⚠️ comment
+
+```text
+The `while True:` loop in `save_kv_layer` busy-spins with no sleep or Event while `_ready_requests` is empty, and can spin forever if this path is called for a step with nothing to save (`remote_engine_id` stays `None`, so `None not in write_ready_flags` is always true). Consider returning early when `reqs_to_save` is empty and using a `threading.Event` instead of busy-waiting — this may be related to the decode-server hang @rasmith reported.
+```
+
+**C3** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:180-186` — ⚠️ comment
+
+```text
+`self.local_kv_cache_size.append(cache.nelement() * cache.element_size())` — `cache` here is the loop variable leaked from the previous `for cache in cache_list` loop, not the current layer's `kv_cache`. It happens to be correct while all layers share the same shape, but with mixed attention or per-layer shape differences the recorded sizes are all wrong, leading to incorrect transfer lengths (RDMA out-of-bounds or misaligned data). Should this be `kv_cache.nelement() * kv_cache.element_size()`?
+```
+
+**C4** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:495-502` — ⚠️ comment
+
+```text
+`status_list[-1].Succeeded()` only checks the last transfer in `_recving_transfers`; if an earlier layer's RDMA fails, the request is still marked done and the producer releases the blocks, so the consumer silently decodes with an incomplete KV cache. Could you check `all(s.Succeeded() for s in status_list)` and confirm the retry path when a transfer fails?
+```
