@@ -190,22 +190,30 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Proj["Latent Projections"]
-        H[Hidden States<br/>[T, hidden]]
-        QA["fused_wqa_wkv<br/>-> [T, q_lora_rank + head_dim]"]
-        QB["wq_b<br/>q_lora -> n_heads x 512"]
+        H["Hidden States<br/>[T, hidden]"]
+        QA["fused_wqa_wkv<br/>→ [T, q_lora_rank + head_dim]"]
+        QB["wq_b<br/>q_lora → n_heads × 512"]
     end
+
     subgraph Attn["Attention (MQA, head_dim 512)"]
-        Q[Q: n_heads x 512<br/>448 NoPE + 64 RoPE]
-        KV["KV: 1 head x 512<br/>kv_norm -> SWA cache / compressor"]
-        S[Sparse Top-K Selection]
+        Q["Q: n_heads × 512<br/>448 NoPE + 64 RoPE"]
+        KV["KV: 1 head × 512<br/>kv_norm → SWA cache / compressor"]
+        S["Sparse Top-K Selection"]
     end
+
     subgraph Out["Output Low-rank"]
-        OA["wo_a: heads -> o_groups x o_lora_rank"]
-        OB["wo_b: o_lora -> hidden"]
+        OA["wo_a: heads → o_groups × o_lora_rank"]
+        OB["wo_b: o_lora → hidden"]
     end
-    H --> QA --> QB --> Q
+
+    H --> QA
+    QA --> QB
+    QB --> Q
     QA --> KV
-    Q & KV --> S --> OA --> OB
+    Q --> S
+    KV --> S
+    S --> OA
+    OA --> OB
 ```
 
 MLA 的关键点：
