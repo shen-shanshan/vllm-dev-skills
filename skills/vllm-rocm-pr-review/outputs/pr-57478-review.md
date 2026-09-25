@@ -31,21 +31,21 @@ DeepSeek V4.1 系列模型的 router gate 是每个 token 必经的窄 GEMM（M=
 
 ```mermaid
 flowchart TD
-    A[rocm_fused_router_gate] --> B{_validate_inputs<br/>gfx950 + BF16 + 7168x384<br/>M ≤ 1536}
-    B -->|M == 0| C[返回空张量]
-    B -->|通过| D{M ≤ 2 ?}
-    D -->|是| E[Kernel 1a: GEMV<br/>每 (row, expert) 一个 program<br/>FP32 逐元素点积]
-    D -->|否| F{选 tile 配置<br/>block_m/n/k 按 M 分档}
-    F --> G[M > 768 ?]
-    G -->|是| H[Kernel 1b: split-K MFMA32 GEMM<br/>BN128/BK64 + XCD swizzle 启动序]
-    G -->|否| I[Kernel 1b: split-K MFMA16 GEMM<br/>BN64/BK128, 常规 3D grid]
-    E --> J[partial_logits: S, M, N FP32]
+    A["rocm_fused_router_gate"] --> B{"_validate_inputs<br/>gfx950 + BF16 + 7168x384<br/>M ≤ 1536"}
+    B -->|"M == 0"| C["返回空张量"]
+    B -->|"通过"| D{"M ≤ 2 ?"}
+    D -->|"是"| E["Kernel 1a: GEMV<br/>每 (row, expert) 一个 program<br/>FP32 逐元素点积"]
+    D -->|"否"| F["选 tile 配置<br/>block_m/n/k 按 M 分档"]
+    F --> G{"M > 768 ?"}
+    G -->|"是"| H["Kernel 1b: split-K MFMA32 GEMM<br/>BN128/BK64 + XCD swizzle 启动序"]
+    G -->|"否"| I["Kernel 1b: split-K MFMA16 GEMM<br/>BN64/BK128，常规 3D grid"]
+    E --> J["partial_logits: S, M, N FP32"]
     H --> J
     I --> J
-    J --> K{M ≥ 128 且 topk ∈ 6,8 ?}
-    K -->|是| L[Kernel 2a: Gluon 单波选择器<br/>64 线程, TOPK 次全阵列 max<br/>partial 归约+打分+bias+rank]
-    K -->|否| M[Kernel 2b: Triton packed-key topk<br/>BLOCK_TOPK=next_pow2 topk<br/>topk=1 走 tl.max 特例]
-    L --> N[weights, ids: M, topk]
+    J --> K{"M ≥ 128 且 topk ∈ {6, 8} ?"}
+    K -->|"是"| L["Kernel 2a: Gluon 单波选择器<br/>64 线程，TOPK 次全阵列 max<br/>partial 归约 + 打分 + bias + rank"]
+    K -->|"否"| M["Kernel 2b: Triton packed-key topk<br/>BLOCK_TOPK = next_pow2(topk)<br/>topk = 1 走 tl.max 特例"]
+    L --> N["weights, ids: M, topk"]
     M --> N
 ```
 
@@ -53,15 +53,15 @@ flowchart TD
 
 ```mermaid
 graph LR
-    P[partial_logits<br/>S×N FP32] --> R[sum over S splits]
-    R --> S[sqrtsoftplus<br/>compensated log1p]
-    S --> T[+ correction_bias]
-    T --> U[ranked<br/>-inf mask / -0.0 归一]
-    U --> V[bitcast FP32→uint32<br/>单调变换 + 64-bit key<br/>高位=score 低位=逆 expert ID]
-    V --> W[topk max / Gluon 迭代 max]
-    W --> X[gather 原始 scores]
-    X --> Y[renormalize + scale ×1.5]
-    Y --> Z[store weights fp32 / ids int32|int64]
+    P["partial_logits<br/>S × N FP32"] --> R["sum over S splits"]
+    R --> S["sqrtsoftplus<br/>compensated log1p"]
+    S --> T["+ correction_bias"]
+    T --> U["ranked<br/>-inf mask / -0.0 归一"]
+    U --> V["bitcast FP32 → uint32<br/>单调变换 + 64-bit key<br/>高位 = score，低位 = 逆 expert ID"]
+    V --> W["topk max / Gluon 迭代 max"]
+    W --> X["gather 原始 scores"]
+    X --> Y["renormalize + scale × 1.5"]
+    Y --> Z["store weights fp32 / ids int32 或 int64"]
 ```
 
 ### 3.3 关键实现细节
