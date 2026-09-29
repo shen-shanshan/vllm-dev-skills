@@ -12,3 +12,7 @@
 ---
 
 我想了解 vllm 中 DSpark 的设计与实现。DSpark 和 MTP、Spec Decode 有什么区别？
+
+---
+
+使用 attention dp=8、expert tp=8 部署 DeepSeek-V4-Pro 推理服务时，ATOM 在 prefill 阶段实现了基于 dual-batch-overlap 的通算融合优化，我想详细了解下相关实现的细节。

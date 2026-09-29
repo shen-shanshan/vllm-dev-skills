@@ -1,0 +1,98 @@
+{
+  "derived": {
+    "conc": "56",
+    "framework": "vllm",
+    "gpu_type": "mi355x",
+    "model_id": "deepseek-ai/DeepSeek-V4-Pro-0813",
+    "model_prefix": "dsv4",
+    "precision": "fp4",
+    "result_filename": "local_dsv4_fp4_mi355x_vllm_agentic_override_tp8_c56",
+    "served_model_name": "deepseek-ai/DeepSeek-V4-Pro-0813"
+  },
+  "merged": {
+    "benchmark": {
+      "command": "bash /infmax-workspace/benchmarks/srt_agentic.sh",
+      "env": {
+        "AIPERF_HTTP_TCP_USER_TIMEOUT": "900000",
+        "AIPERF_REQUIRED_SERVER_METRIC_PREFIX": "vllm:",
+        "CONC": "56",
+        "MODEL": "deepseek-ai/DeepSeek-V4-Pro-0813"
+      },
+      "type": "custom"
+    },
+    "engine": {
+      "connector": null,
+      "type": "vllm"
+    },
+    "frontend": {
+      "enable_multiple_frontends": false,
+      "type": "vllm"
+    },
+    "health_check": {
+      "interval_seconds": 10,
+      "max_attempts": 1080
+    },
+    "model": {
+      "container": "vllm/vllm-openai-rocm:nightly-e9757321527ca1ecd514c07c1418dd2c53da3d19",
+      "path": "hf:deepseek-ai/DeepSeek-V4-Pro-0813",
+      "precision": "fp4"
+    },
+    "name": "dsv4-fp4-mi355x-vllm-agentic",
+    "observability": {
+      "enabled": false,
+      "tachometer": {
+        "enabled": false
+      }
+    },
+    "resources": {
+      "gpu_type": "mi355x",
+      "gpus_per_node": 8
+    },
+    "roles": {
+      "agg": {
+        "args": {
+          "async-scheduling": true,
+          "compilation-config": "{\"mode\":3,\"cudagraph_mode\":\"FULL_AND_PIECEWISE\"}",
+          "data-parallel-size": 1,
+          "distributed-executor-backend": "mp",
+          "enable-auto-tool-choice": true,
+          "enable-prefix-caching": true,
+          "gpu-memory-utilization": 0.86,
+          "kv-cache-dtype": "fp8",
+          "max-num-batched-tokens": 8192,
+          "max-num-seqs": 112,
+          "moe-backend": "aiter",
+          "no-disable-hybrid-kv-cache-manager": true,
+          "reasoning-parser": "deepseek_v4",
+          "revision": "72e1d3230f6c080a530b0a1d46f8eb4602340597",
+          "served-model-name": "deepseek-ai/DeepSeek-V4-Pro-0813",
+          "speculative-config": "{\"method\": \"dspark\", \"num_speculative_tokens\": 6, \"draft_sample_method\": \"probabilistic\"}",
+          "tensor-parallel-size": 8,
+          "tokenizer-mode": "deepseek_v4",
+          "tokenizer-revision": "72e1d3230f6c080a530b0a1d46f8eb4602340597",
+          "tool-call-parser": "deepseek_v4",
+          "trust-remote-code": true
+        },
+        "env": {
+          "OMP_NUM_THREADS": "1",
+          "SETUP_PIP_PACKAGES": "Pillow fastapi uvicorn",
+          "VLLM_ENGINE_READY_TIMEOUT_S": "10800",
+          "VLLM_PREFIX_CACHE_RETENTION_INTERVAL": "32768",
+          "VLLM_ROCM_QUICK_REDUCE_QUANTIZATION": "INT4",
+          "VLLM_ROCM_USE_AITER": "1",
+          "VLLM_ROCM_USE_AITER_FUSION_SHARED_EXPERTS": "0",
+          "VLLM_ROCM_USE_AITER_MOE": "1",
+          "VLLM_USE_V2_MODEL_RUNNER": "1"
+        },
+        "gpus": 8,
+        "nodes": 1,
+        "workers": 1
+      }
+    },
+    "schema": 2,
+    "setup_script": "pip-runtime-deps.sh"
+  },
+  "override": "override_tp8_c56",
+  "profile": "off",
+  "recipe": "/Users/shanshan-shen/Documents/GitHub/InferenceX/inferencex-e2e/benchmarks/single_node/srt-slurm-recipes/dsv4/vllm/mi355x-fp4-mtp/agentic.yaml"
+}

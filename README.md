@@ -30,6 +30,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Contribution | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️ |
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
 | [vllm-vs-atom-decode-trace-comparison](./skills/vllm-vs-atom-decode-trace-comparison/SKILL.md) | Performance Optimization | Compare decode-phase kernel implementations of vLLM vs ATOM from torch-profiler traces, with per-layer-type comparison tables and a vLLM optimization TODO list. | ⭐️⭐️⭐️⭐️ |
+| [infx-bench-script-generator](./skills/infx-bench-script-generator/SKILL.md) | Performance Optimization | Generate local bash scripts (docker run / server start / AgentX client replay) to run an InferenceX srt-slurm recipe benchmark without Slurm, with optional torch profiler prefill/decode step capture. | ⭐️⭐️⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | Code Review | Review AMD/ROCm-related PRs from vllm (aiter/mori/ROCm kernels) and generate a single combined Chinese report: a detailed PR summary (with Mermaid diagrams, technical principles, discussion highlights, and risk table) followed by severity-sorted, type-categorized ROCm review findings, a verdict, and copy-paste English comments with file + diff line numbers ready for GitHub PR review. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
@@ -271,6 +272,17 @@ Scenario 2 — complete an existing Markdown draft:
 ```
 
 Output: New articles are saved under [`./skills/vllm-technical-blog-writer/outputs/<article-slug>/`](./skills/vllm-technical-blog-writer/outputs/), with referenced images stored in the article's `images/` directory. Existing drafts are updated in place.
+
+**📚 infx-bench-script-generator**
+
+Prompt:
+
+```text
+我想在本地服务器上跑 dsv4/vllm/mi355x-fp4-mtp/agentic.yaml 的 override_dep8_c64 配置，并且需要用 torch profiler 采集一个完整的 prefill step，所有测试结果放到 /home/shashen/vllm/dsv4_benchmark 目录下，请帮我生成对应的测试脚本。
+/infx-bench-script-generator
+```
+
+Output: 每个 `<recipe>_<override>` 组合一个文件夹，包含 `01_docker_run.sh`（host 起容器）、`02_start_server.sh`（容器内起 server，可选 profiler 配置）、`03_run_client.sh`（容器内跑 AgentX replay）以及 `variant.json`/`variant.env`，示例见 [dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](./skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64/).
 
 ## 💡 Tricks
 

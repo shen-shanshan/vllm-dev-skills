@@ -33,3 +33,29 @@
 【注意事项】：
 1.将最后输出的报告保存到当前 skill 目录下的 outputs 目录中（比如：xxx/vllm-vs-atom-decode-trace-comparison/outputs/xxx.md）。
 2.该 skill 需要能够处理并分析基于 vllm / atom 运行的各种大模型，而不是只针对某一种模型的 skill。
+
+---
+
+请帮我创建一个 skill，名叫 infx-bench-script-generator，该 skill 的主要功能如下：
+
+用户输入：
+1.某个 xxx.yaml（如：dsv4/vllm/mi355x-fp4-mtp/agentic.yaml）
+2.想要跑哪个 override 配置（如：override_tp8_c56）
+3.是否需要采集 torch profiler trace（如果需要采集，用户需要说明：是想采集一个完整的 prefill step 还是一个 decode step，然后你根据 yaml 配置在 server 脚本中生成对应的 profiler 配置，默认不采集）
+4.模型权重存放路径（防止重复下载，如果用户未提供，则在 server 脚本中下载）
+5.InferenceX 仓库路径（防止重复 clone，如果用户未提供，则在 client 脚本中 clone）
+6.trace 数据集存放路径（防止重复下载，如果用户未提供，则在 client 脚本中下载）
+7.测试结果存放目录（如果用户未提供，则使用 inferencex 脚本默认值）
+
+用户输入示例：
+我想在本地服务器上跑 dsv4/vllm/mi355x-fp4-mtp/agentic.yaml 的 override_dep8_c64 配置，并且需要用 torch profiler 采集一个完整的 prefill step，所有测试结果放到 /home/shashen/vllm/dsv4_benchmark 目录下，请帮我生成对应的测试脚本。
+
+输出内容：
+1.一份本地起 docker 容器的 shell 脚本（环境变量的设置放到对应的 server/client 脚本中，不要在这里通过 -e 设置，防止混淆）
+2.一份本地起 server 的 shell 脚本（在 1 中的 docker 中执行）
+3.一份本地起 client 的 shell 脚本（在 1 中的 docker 中执行）
+
+注意事项：
+1.本 skill 的输出内容放到当前 skill 的 `./outputs` 目录下，其中每个 xxx.yaml override 配置一个文件夹，用于存放上面生成的脚本。
+2.本次创建的 skill 相关文件需要放到本机的 `/Users/shanshan-shen/Documents/GitHub/vllm-dev-skills/skills/infx-bench-script-generator` 目录下，然后再通过 `ln -sfn /Users/shanshan-shen/Documents/GitHub/vllm-dev-skills/skills/infx-bench-script-generator ~/.claude/skills/infx-bench-script-generator` 链接到 claude 可识别的 skill 目录中。
+3.最后，将这个 skill 更新到 `/Users/shanshan-shen/Documents/GitHub/vllm-dev-skills/README.md` 文档中。
