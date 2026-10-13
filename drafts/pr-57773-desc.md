@@ -4,15 +4,28 @@ This PR enables prefill dual-batch-overlap (DBO) for DeepSeek-V4 on ROCm in data
 
 Today `--enable-dbo` splits a step into two ubatches and runs them as a two-thread ping-pong on a compute stream and a comm stream. However, only the DeepEP-HT prepare/finalize moves its collectives to the comm stream. The naive DP/EP path (`allgather_reducescatter`, used by DP deployments without `--enable-expert-parallel`) runs its MoE all-gather (dispatch) and reduce-scatter (combine) synchronously on the compute stream. Both ubatches therefore serialize, and DBO gives no benefit in prefill. On ROCm this path was also blocked by the microbatching config check.
 
-This PR adds a ROCm DBO-aware naive DP/EP prepare/finalize that hands each collective to the comm stream, using the same compute/comm handoff as DeepEP-HT. While one ubatch's all-gather/reduce-scatter is in flight, the peer ubatch runs attention/MoE compute. It also fixes several DBO correctness issues that DeepSeek-V4 hits on this path.
+This PR makes the naive DP/EP prepare/finalize hand each collective to the comm stream, using the same compute/comm handoff as DeepEP-HT. While one ubatch's all-gather/reduce-scatter is in flight, the peer ubatch runs attention/MoE compute. It also fixes several DBO correctness issues that DeepSeek-V4 hits on this path.
 
 ### Key Changes
 
 **MoE prepare/finalize (DBO comm overlap)**
-- **`MoEPrepareAndFinalizeNaiveDPEPModularROCmDBO`** (`fused_moe/prepare_finalize/naive_dp_ep_rocm.py`, new): Overrides `_comm_region()`. Under an active DBO context it yields the CPU to the peer ubatch, switches to the comm stream for the collective, and syncs back to the compute stream on exit. Overlap is skipped during cudagraph capture, so captured graphs keep every collective on the capture stream.
-- **`MoEPrepareAndFinalizeNaiveDPEPModular`** (`naive_dp_ep.py`): `dispatch()` / `combine_into_output()` now run inside a `_comm_region()` hook, which is a no-op `nullcontext` in the base class. `make_moe_prepare_and_finalize_naive_dp_ep()` returns the ROCm subclass for the modular path on ROCm. Other platforms are unchanged.
-- **`FusedMoEPrepareAndFinalize.supports_dbo()`** (`modular_kernel.py`): New capability, defaulting to `supports_async()`, so existing implementations behave exactly as before. The synchronous `_prepare` / `_finalize` paths now assert `not dbo_enabled() or supports_dbo()`. The ROCm subclass returns `True` and keeps `supports_async()` as `False`. This avoids overloading `supports_async()`, which also drives MK-internal shared-expert overlap on every forward.
+- **`MoEPrepareAndFinalizeNaiveDPEPModular`** (`fused_moe/prepare_finalize/naive_dp_ep.py`): `dispatch()` / `combine_into_output()` now run inside a new `_comm_region()` context. Under an active DBO context, it yields the CPU to the peer ubatch, switches to the comm stream for the collective, and syncs back to the compute stream on exit. Outside DBO, and during cudagraph capture, it does nothing: the collective stays on the calling stream, so non-DBO behavior is unchanged on every platform. The class reports `supports_dbo()` only on ROCm, the only platform where this path has been validated.
+- **`FusedMoEPrepareAndFinalize.supports_dbo()`** (`modular_kernel.py`): New capability, defaulting to `supports_async()`, so existing implementations behave exactly as before. The synchronous `_prepare` / `_finalize` paths now assert `not dbo_enabled() or supports_dbo()`. The naive DP/EP class keeps `supports_async()` as `False`. This avoids overloading `supports_async()`, which also drives MK-internal shared-expert overlap on every forward.
 - **`VllmConfig`** (`config/vllm.py`): Allows `allgather_reducescatter` with microbatching on ROCm.
+
+> [!NOTE]
+> **`supports_dbo()` vs. `dbo_enabled()`**
+>
+> - `supports_dbo()` is a static **capability** of the prepare/finalize class: *can* it run correctly under DBO? It does not depend on the current step. For the naive DP/EP class it is `current_platform.is_rocm()`. It is used only as a guard in the modular kernel: `assert not dbo_enabled() or supports_dbo()`.
+> - `dbo_enabled()` is per-thread **runtime state**: is the calling thread *currently* inside a ubatch context? It is True only inside the ubatch threads of a step that was actually split. It is used in `_comm_region()` to decide, per call, whether to hand the collective to the comm stream.
+>
+> | Platform | Step | `supports_dbo()` | `dbo_enabled()` | Behavior |
+> |---|---|---|---|---|
+> | ROCm | not split (below threshold, a DP rank opted out, or DBO off) | True | False | Collective stays on the calling stream (unchanged) |
+> | ROCm | split prefill | True | True | Collective runs on the comm stream, overlapped with the peer ubatch |
+> | Others | any | False | False | Unchanged. Microbatching with `allgather_reducescatter` is still rejected at config time. |
+>
+> Neither replaces the other. With only `dbo_enabled()`, a synchronous prepare/finalize that never handled DBO could silently run under it. With only `supports_dbo()`, `_comm_region()` could not tell a split step from a normal one. Previously the PR overloaded `supports_async()` to return `dbo_enabled()`, which mixed the two concepts. It also changed MK-internal shared-expert scheduling per thread, because `can_overlap_shared_experts` reads `supports_async()`.
 
 **Ubatching fixes**
 - **`UBatchWrapper._run_ubatches`** (`v1/worker/gpu_ubatch_wrapper.py`): Eager ubatch threads now call `torch.accelerator.set_device_index(self.device)`, as `_capture_ubatches` already did. A new thread starts on device 0. Without this call, each thread's first `current_stream()` created a stream on GPU 0 and waited on it, so every DP rank put work on GPU 0. That slowed rank 0, and every rank then waited on rank 0 at each MoE collective. This was the main cause of the earlier ~30% regression with DBO.
@@ -24,7 +37,7 @@ This PR adds a ROCm DBO-aware naive DP/EP prepare/finalize that hands each colle
 - **`DeepseekV4Model.forward`** (`models/deepseek_v4/amd/model.py`): Writes `_mtp_hidden_buffer` at the current ubatch's token offset. Previously both ubatch threads wrote from row 0, so the MTP drafter read misaligned hidden states for the step.
 
 **Tests**
-- `tests/kernels/moe/test_naive_dp_ep_rocm_dbo.py`: Covers `_comm_region` handoff, the no-op without DBO, skip during graph capture, compute-stream restore on error, `supports_dbo()` vs. `supports_async()`, and factory selection on ROCm vs. other platforms.
+- `tests/kernels/moe/test_naive_dp_ep_dbo.py`: Covers `_comm_region` handoff, the no-op without DBO, skip during graph capture, compute-stream restore on error, `supports_dbo()` being ROCm-only while `supports_async()` stays `False`, and the default `supports_dbo()` contract.
 - `tests/v1/worker/test_ubatch_offsets.py`: Covers per-thread ubatch token offsets and Python-int ubatch slice bounds.
 
 ### Trace Comparison (Conc=64, Prefill)
@@ -42,7 +55,7 @@ This PR (DBO enabled, **9.25%** faster per layer):
 Unit tests:
 
 ```bash
-pytest tests/kernels/moe/test_naive_dp_ep_rocm_dbo.py tests/v1/worker/test_ubatch_offsets.py -v
+pytest tests/kernels/moe/test_naive_dp_ep_dbo.py tests/v1/worker/test_ubatch_offsets.py -v
 ```
 
 Benchmark with SA InferenceX `8k1k` (with `OSL=1`) and `agentic` workloads on 8x MI355X, using the server launch command below. Main runs use the same command without the three `--*dbo*` flags.
@@ -104,7 +117,7 @@ lm_eval \
 
 ### Unit Tests
 
-All tests in `tests/kernels/moe/test_naive_dp_ep_rocm_dbo.py` and `tests/v1/worker/test_ubatch_offsets.py` pass.
+All tests in `tests/kernels/moe/test_naive_dp_ep_dbo.py` and `tests/v1/worker/test_ubatch_offsets.py` pass.
 
 ### Benchmark
 
