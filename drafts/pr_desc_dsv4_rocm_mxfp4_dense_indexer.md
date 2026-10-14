@@ -50,19 +50,19 @@ A new `DeepseekV4RocmMxfp4IndexerBackend` subclasses `DeepseekV4IndexerBackend`,
 
 ### Keeping CUDA untouched
 
-Shared V4 code only gains extract-method / ClassVar hooks. The code inside them is moved verbatim, and the ROCm subclasses override the hooks:
+Shared V4 code only gains extract-method hooks. The code inside them is moved verbatim, and the ROCm subclasses override the hooks:
 
 | Hook | Location | Default (all platforms) | ROCm MXFP4 override |
 |---|---|---|---|
-| `DeepseekV4Attention._indexer_cls()` | `deepseek_v4/attention.py` | `DeepseekV4Indexer` | `DeepseekV4RocmMxfp4Indexer` when `dsa_indexer_uses_fp4()` |
-| `DeepseekV4Indexer.cache_cls / compressor_cls / attn_cls` | `deepseek_v4/attention.py` | `DeepseekV4IndexerCache` / `DeepseekCompressor` / `SparseAttnIndexer` | ROCm cache (new backend) / ROCm compressor / `RocmSparseAttnIndexer` |
+| `DeepseekV4Attention._get_indexer_cls()` | `deepseek_v4/attention.py` | `DeepseekV4Indexer` | `DeepseekV4RocmMxfp4Indexer` when `dsa_indexer_uses_fp4()` |
+| `DeepseekV4Indexer._get_cache_cls() / _get_compressor_cls() / _get_attn_cls()` | `deepseek_v4/attention.py` | `DeepseekV4IndexerCache` / `DeepseekCompressor` / `SparseAttnIndexer` | ROCm cache (new backend) / ROCm compressor / `RocmSparseAttnIndexer` |
 | `DeepseekV4Indexer._q_rope_quant()` | `deepseek_v4/attention.py` | `fused_indexer_q_rope_quant` | aiter `q_rope_mxfp4_quant` |
 | `DeepseekV4Indexer._register_q_quant_warmup()` | `deepseek_v4/attention.py` | existing Triton Q-kernel warmup | no-op (the PTX kernel never runs) |
 | `DeepseekCompressor._compress_norm_rope_store()` | `deepseek_v4/compressor.py` | existing cutedsl / two-stage / Triton dispatch | pooling kernel + aiter cache op |
-| `DeepseekCompressor._register_store_warmup()` | `deepseek_v4/compressor.py` | existing warmups | no-op (the PTX kernel never runs) |
 
 ### Other changes
 
+- `FusedKVCompressNormRopeInsertIndexerTritonKernel.get_warmup_keys()` returns no keys on ROCm with an MXFP4 indexer cache. The warmup is a process-wide singleton that every non-CUDA compressor registers, including V4's head-512 attention compressors, so without this guard the PTX MXFP4 variant was compiled at startup and failed (`error: unknown asm constraint 'f'`). ROCm never runs that kernel: it writes the cache with aiter's op.
 - `dsa_indexer_uses_fp4()`: the ROCm branch now accepts `deepseek_v4` as well as `deepseek_v41`. The CDNA4 and aiter checks are unchanged, and the CUDA branch is untouched.
 - `_aiter_indexer_cache_ops`, `rocm_mxfp4_indexer_k_store` and `rocm_mxfp4_indexer_q_quant` move from `models/deepseek_v41/amd/rocm.py` to `v1/attention/ops/rocm_paged_mxfp4_indexer.py`, so V4 and V4.1 share them. They are still importable from the old module.
 
@@ -70,11 +70,11 @@ Shared V4 code only gains extract-method / ClassVar hooks. The code inside them 
 
 | File | Change |
 |---|---|
-| `vllm/models/deepseek_v4/amd/mxfp4_indexer.py` (new) | pooling kernel, ROCm compressor / indexer cache / indexer subclasses |
-| `vllm/models/deepseek_v4/amd/rocm.py` | `_indexer_cls` override on `DeepseekV4ROCMAiterMLAAttention` |
+| `vllm/models/deepseek_v4/amd/rocm.py` | pooling kernel; ROCm compressor / indexer cache / indexer subclasses; `_get_indexer_cls` override on `DeepseekV4ROCMAiterMLAAttention` |
 | `vllm/models/deepseek_v4/attention.py`, `compressor.py` | hooks only (verbatim moves) |
 | `vllm/v1/attention/backends/mla/rocm_paged_mxfp4_indexer.py` | `DeepseekV4RocmMxfp4IndexerBackend` |
 | `vllm/v1/attention/backends/mla/indexer.py` | ROCm gate accepts `deepseek_v4` |
+| `vllm/models/deepseek_v4/common/ops/fused_compress_quant_cache.py` | skip the PTX MXFP4 warmup keys on ROCm |
 | `vllm/v1/attention/ops/rocm_paged_mxfp4_indexer.py`, `vllm/models/deepseek_v41/amd/rocm.py` | shared helper move |
 | `tests/kernels/attention/test_rocm_dsv4_mxfp4_indexer.py` (new) | K-writer tests at V4-Pro shapes |
 
