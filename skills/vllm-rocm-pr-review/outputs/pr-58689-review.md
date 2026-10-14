@@ -48,12 +48,12 @@ graph LR
     subgraph 改动前
         E1["枚举 ROCM_FLASHMLA_SPARSE_DSV4"] --> V4B["deepseek_v4.amd.rocm<br/>DeepseekV4ROCMAiterMLASparseBackend<br/>get_name = DSV4"]
         V41B_old["deepseek_v41.amd.rocm<br/>DeepseekV4ROCMAiterMLASparseBackend（同名！）<br/>get_name = DSV4"]
-        E1 -. V4.1 模型也接受此选择器 .-> V41B_old
+        E1 -.->|"V4.1 模型也接受此选择器"| V41B_old
     end
     subgraph 改动后
         E2["枚举 ROCM_FLASHMLA_SPARSE_DSV4"] --> V4B2["deepseek_v4.amd.rocm<br/>DeepseekV4ROCMAiterMLASparseBackend<br/>get_name = DSV4"]
         E3["新枚举 ROCM_FLASHMLA_SPARSE_DSV41"] --> V41B["deepseek_v41.amd.rocm<br/>DeepseekV41ROCMAiterMLASparseBackend<br/>get_name = DSV41"]
-        E2 -. V4.1 兼容别名 .-> V41B
+        E2 -.->|"V4.1 兼容别名"| V41B
     end
 ```
 
@@ -63,10 +63,10 @@ graph LR
 flowchart TD
     A["DeepseekV4DecoderLayer.__init__（deepseek_v41/amd/model.py）"] --> B["_select_dsv4_attn_cls(vllm_config)"]
     B --> C{"attention_config.backend"}
-    C -->|None| OK["返回 DeepseekV41ROCMAiterMLAAttention"]
-    C -->|ROCM_FLASHMLA_SPARSE_DSV4（legacy）| OK
-    C -->|ROCM_FLASHMLA_SPARSE_DSV41（canonical）| OK
-    C -->|其他| ERR["ValueError: use ROCM_FLASHMLA_SPARSE_DSV41"]
+    C -->|"None"| OK["返回 DeepseekV41ROCMAiterMLAAttention"]
+    C -->|"ROCM_FLASHMLA_SPARSE_DSV4（legacy）"| OK
+    C -->|"ROCM_FLASHMLA_SPARSE_DSV41（canonical）"| OK
+    C -->|"其他"| ERR["ValueError: use ROCM_FLASHMLA_SPARSE_DSV41"]
     OK --> D["backend_cls = DeepseekV41ROCMAiterMLASparseBackend<br/>get_name() = 'ROCM_FLASHMLA_SPARSE_DSV41'"]
     OK --> E["swa_backend_cls = DeepseekV41ROCMAiterSparseSWABackend<br/>→ DeepseekV41ROCMAiterSparseSWAMetadataBuilder"]
     D --> F["deepseek_v41/attention.py：get_name() ∈ 名单<br/>→ 启用 _COMBINE_TOPK_SWA_INDICES_KERNEL"]
