@@ -151,7 +151,7 @@ state_cache 形状: [num_blocks, block_size, 2 * STATE_WIDTH]   (fp32)
 
 对 batch 中的每个 token：**如果它刚好是一组的最后一个**（position = 3, 7, 11, …），就从 `state_cache` 中取出它前面 8 个 token 的 kv/score，做 softmax 池化，输出一行 128 维的 bf16 向量。其他 token 什么都不做。
 
-调用处（`rocm.py:1771`）之后紧接着调用 aiter 的 `rocm_mxfp4_indexer_k_store`，完成 RMSNorm、RoPE、MXFP4 量化和写入 KV cache。docstring 里的 "stopping before the norm" 指的就是：**原本 CUDA 路径上是一个大融合 kernel，ROCm 路径把它拆成"Triton 做池化"和"aiter 做 norm/rope/量化/写 cache"两步**，因为 aiter 那种预先 shuffle 过的 MXFP4 页面布局只有 aiter 自己的算子能正确写入。
+调用处（`rocm.py:1771`）之后紧接着调用 aiter 的 `rocm_mxfp4_indexer_k_store`，完成 RMSNorm、RoPE、MXFP4 量化和写入 KV cache。docstring 里的 "stopping before the norm" 指的就是：**原本 CUDA 路径上是一个大融合 kernel，ROCm 路径把它拆成"Triton 做池化"和"aiter 做 norm/rope/量化/写 cache"两步**，因为 aiter 那种预先 shuffle 过的 MXFP4 页面布局只有 aiter 自己的算子能正确写入。（什么是 preshuffle、为什么需要它，详见[第六部分](#第六部分aiter-的-preshuffle-mxfp4-页面布局)。）
 
 ---
 
@@ -452,3 +452,120 @@ python /home/shashen/vllm/vllm-dev-skills/triton/triton_learn_compress_pool.py
 5. 进阶：在 kernel 里用 `tl.device_print("pos", pos)` 打印块的内容，或者设置环境变量 `TRITON_INTERPRET=1` 用 CPU 解释模式执行，这样可以在 kernel 中打断点、打印中间值，调试很方便。
 
 如果想继续深入，推荐按这个顺序读 Triton 官方教程：01-vector-add → 02-fused-softmax → 03-matrix-multiplication。第 2 篇讲的正是本例用到的"按行 softmax"，第 3 篇会引入 `tl.dot` 和分块循环，那是写 GEMM 和 attention 类算子的基础。
+
+---
+
+## 第六部分：aiter 的 preshuffle MXFP4 页面布局
+
+第二部分提到，ROCm 路径把"写 cache"交给 aiter，"因为 aiter 那种预先 shuffle 过的 MXFP4 页面布局只有 aiter 自己的算子能正确写入"。这一节解释这句话。
+
+一句话概括：**preshuffle 就是在写入 KV cache 的时候，直接按照读取方（矩阵核心）需要的寄存器顺序摆放字节**。这样读取方每次读都不用再重排，能直接把数据送进矩阵乘指令。
+
+> 下面用到的布局参数是在本机（MI350X）直接调用 aiter 的 `cache_format()` 查到的，字节排布的例子也是用 aiter 写入 kernel 里的地址公式实际算出来的。
+> 相关代码：vLLM 侧 `vllm/vllm/v1/attention/ops/rocm_paged_mxfp4_indexer.py`（`RocmPagedMxfp4CacheLayout`、`rocm_paged_mxfp4_cache_layout`、`rocm_mxfp4_indexer_k_store`）；aiter 侧（安装在 `/usr/local/lib/python3.12/dist-packages/aiter/ops/triton/`）`attention/pa_mqa_logits_mxfp4.py`（读取方及 `cache_format`）、`_triton_kernels/fusions/k_norm_rope_mxfp4_cache.py`（写入方）。
+
+### 6.1 背景：这块 cache 是给谁读的
+
+`_compress_pool_kernel` 输出的 bf16 向量会交给 aiter 的 `k_norm_rope_mxfp4_cache`。这个算子依次做 RMSNorm、RoPE 和 MXFP4 量化，然后写进 **indexer 的 K cache**。
+
+读这块 cache 的是 aiter 的 `pa_mqa_logits_mxfp4`（paged MQA logits）kernel。每个 decode step，indexer 要拿当前 query 和**整个上下文所有压缩 token 的 K** 做点积打分，再选出 top-k。所以这块 cache：
+- **每个 token 只写一次**（在它所在的组结束时写）；
+- **之后每个 step 都要整页整页地读**，上下文越长，读的量越大。
+
+这种读多写一次的模式，是 preshuffle 划算的前提。
+
+### 6.2 MXFP4 一个 token 占多少字节
+
+MXFP4 是 4-bit 浮点，每 32 个元素共享一个 e8m0 缩放因子（scale），也就是一个 8-bit 的 2 的幂。head_dim=128 时：
+- 数值部分：128 个 fp4 = **64 字节**
+- scale 部分：128/32 = **4 字节**
+
+`_kv_view` 里的断言 `width == head_dim // 2 + head_dim // 32` 算的就是这个 64 + 4。
+
+### 6.3 普通布局和 preshuffle 布局
+
+**普通布局（token-major）**：token 0 的 64 字节，接着 token 1 的 64 字节……也就是写入 kernel 中 `else` 分支的 `value_off = pos * TOKEN_BYTES + byte`。
+
+**preshuffle 布局**：参数来自 aiter 的 `cache_format(64 heads, 128, page)`，本机返回的是 `n_per_tile=32, d_per_tile=16, scale_lanes=2`。具体做法：
+1. 把一页按每 32 个 token 分成一组；
+2. 把每个 token 的 64 字节切成 4 段，每段 16 字节；
+3. 组内先放 **32 个 token 的第 0 段**，再放 32 个 token 的第 1 段，以此类推。这就是 docstring 里写的 `[chunk, token, byte]` 顺序。
+
+写入方 `_triton_kernels/fusions/k_norm_rope_mxfp4_cache.py:94` 里的地址公式：
+```python
+value_off = (group * (N_PER_TILE * TOKEN_BYTES)               # 第几组 32 token
+             + byte // D_PER_TILE * (N_PER_TILE * D_PER_TILE)  # 第几段 -> 跳 32*16=512 字节
+             + lane * D_PER_TILE                               # 组内第几个 token -> 跳 16 字节
+             + byte % D_PER_TILE)                              # 段内偏移
+```
+用这个公式实际算出来的排布如下：
+```
+offset     0..  15 : token  0 的第 0 段
+offset    16..  31 : token  1 的第 0 段
+   ...
+offset   496.. 511 : token 31 的第 0 段
+offset   512.. 527 : token  0 的第 1 段      ← 32 个 token 的第 0 段放完，才轮到第 1 段
+   ...
+offset  1024..1039 : token  0 的第 2 段
+offset  1536..1551 : token  0 的第 3 段
+```
+scale 也做类似的重排，按 `[scale % 2, token, scale // 2]` 摆放，目的是让每个线程需要的那 2 个 scale 字节挨在一起。
+
+这其实就是一次**转置**：从 token 在外层、字节在内层，变成段在外层、token 在内层。
+
+可以用下面这段 Python 自己验证这个排布：
+```python
+N_PER_TILE, D_PER_TILE, TOKEN_BYTES = 32, 16, 64   # head=128 -> 64 字节 fp4
+def value_off(pos, byte):
+    g, lane = divmod(pos, N_PER_TILE)
+    return (g * N_PER_TILE * TOKEN_BYTES + byte // D_PER_TILE * N_PER_TILE * D_PER_TILE
+            + lane * D_PER_TILE + byte % D_PER_TILE)
+m = {value_off(p, b): (p, b // 16) for p in range(32) for b in range(TOKEN_BYTES)}
+for off in [0, 16, 32, 496, 512, 528, 1008, 1024, 1536]:
+    p, c = m[off]
+    print(f"offset {off:5d}..{off+15:5d}: token {p:2d} 的第 {c} 段")
+```
+
+### 6.4 为什么要这样排：矩阵核心要求的寄存器布局
+
+打分本质上是矩阵乘 `Q · Kᵀ`。在 AMD gfx950（MI350 系列）上，它由 **MFMA 矩阵核心指令**执行，aiter 用的是 32×32×64 这一档。MFMA 的规则是：
+
+> 一个 wavefront 有 64 个线程（lane），**每个 lane 必须在寄存器里准备好特定的一小块操作数**，然后 64 个 lane 一起发出一条 MFMA 指令。
+
+对 K 这个操作数来说，lane `l` 负责 token `l % 32`，每个 lane 一次正好拿 **16 字节**（32 个 fp4）。代码里对应的常量是 `K_WIDTH = 16`，也就是 `d_per_tile`。32 个 token 对应 `n_per_tile = 32`，它就是 MFMA 的 N 维（`mfma_nonk_dim`）。
+
+所以，**preshuffle 布局里每 512 字节的一行，恰好就是一条 MFMA 指令所需的全部 K 数据，并且按 lane 顺序排好了**。64 个 lane 各读连续的 16 字节，组成一次完全合并的宽向量加载，读进来直接就是 MFMA 要的寄存器布局。
+
+如果是普通布局会怎样？lane 0 要的 16 字节在 offset 0，lane 1 要的在 offset 64，lane 2 在 128……相邻 lane 之间隔了 64 字节，是跨步访存。这时 kernel 只能：
+1. 先把整块数据按原样读进 **LDS**（片上共享内存）；
+2. 用一次 barrier 同步；
+3. 再按 MFMA 需要的顺序从 LDS 读到寄存器（相当于在片上做转置）。
+
+aiter 对两条路径写得很清楚（`pa_mqa_logits_mxfp4.py`）：
+```
+preshuffle: The cache is stored in dot-operand order (see cache_format),
+            which reads it straight into the matrix core.
+            If False it is read token-major and staged through LDS
+```
+`_select_config` 里两条路径的配置也完全不同：preshuffle 走 **"Register path"**，只用 `num_warps=1`，原因是"with no KV tile in LDS a second warp has no producer/consumer to help with"；非 preshuffle 走 **"LDS path, for an unshuffled cache"**。
+
+### 6.5 收益和代价
+
+| | 普通布局 | preshuffle 布局 |
+|---|---|---|
+| 读取（每个 step，整个上下文） | HBM → LDS → 转置 → 寄存器，还要 barrier | HBM → 寄存器，直接喂给 MFMA |
+| 写入（每个 token 一次） | 连续写 64 字节 | 分 4 段，每段 16 字节，写到 4 个位置 |
+
+转置的成本从**每个 step 每次读**转移到了**每个 token 只写一次**。写入本来就是每个 token 一个 program 的零散写，多拆成几段几乎没有额外成本；而读取是 decode 阶段的热路径，省掉 LDS 中转对长上下文的收益很大。
+
+同样的思路在 vLLM 的 ROCm 路径里很常见，只不过作用在**权重**上：`deepseek_v4/amd/model.py` 中的 `shuffle_weight(..., layout=(16, 16))` 和 `gemm_a8w8_blockscale_bpreshuffle`，就是在**加载模型时**把 GEMM 权重一次性重排成 MFMA 需要的顺序。权重只需重排一次，KV cache 则在每次写入时重排。
+
+### 6.6 为什么 vLLM 自己的 Triton kernel 不直接写？
+
+原版 CUDA 路径是一个大融合 kernel，一路做完压缩、norm、rope、量化，最后写 cache。ROCm 版把它拆开，**写 cache 这一步交给 aiter**，原因是：
+
+1. **布局由读取方定义**：shuffle 参数取决于读取 kernel 选择的 MFMA 指令形状，比如 `mfma_nonk_dim` 会根据 head 数和 head_dim 在 16 和 32 之间切换。scale 的排列方式也是读取 kernel 决定的（`SCALE_MODE_WIDE`）。
+2. **写入和读取必须严格一致**，错一个字节，打分结果就是错的，而且不会报错。所以让 aiter 自己的写入算子和读取算子成对维护最安全。vLLM 这边只通过 `rocm_paged_mxfp4_cache_layout()` 读取一次 `cache_format()`，并检查它是不是 vLLM 能理解的格式。注释原话是 "the only place vLLM reads it, so a change there cannot reach the writer unchecked"。
+3. **对 page_size 有约束**：一个 32-token 的 shuffle 组不能跨页，所以 page_size 必须是 32 的倍数。本机实测 `cache_format(64, 128, 16)` 会报错 "page_size 16 must be a multiple of the MFMA N (32) or a shuffle group straddles two pages"。
+
+所以 `_compress_pool_kernel` 只做到池化为止：它只负责布局无关的计算，输出普通的 `[num_tokens, 128]` bf16 张量，和布局相关的部分全部交给 aiter。
