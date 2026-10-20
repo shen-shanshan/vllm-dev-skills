@@ -24,6 +24,7 @@
 - [8. 风险、坑与开放问题](#8-风险坑与开放问题)
 - [9. 附录：术语表 / 关键文件 / 关键环境变量 / 参考资料](#9-附录)
 - [10. 存储介质基础：HBM / DRAM / SSD / NVMe](#10-存储介质基础hbm--dram--ssd--nvme)
+- [11. 附录：名词速查（通信 / 互连 / 存储 / 系统）](#11-附录名词速查通信--互连--存储--系统)
 
 ---
 
@@ -884,3 +885,85 @@ flowchart TB
 | **GDS / hipFile** | GPU Direct Storage：NVMe 与 GPU 之间 P2P DMA，跳过 host DRAM 中转 |
 | **GPUDirect RDMA** | 网卡直接读写 GPU 显存，跨节点传 KV 不经过 host |
 | **CXL** | 新兴的内存扩展互连（可把额外 DRAM 挂在 PCIe/CXL 上），可视为未来介于 DRAM 和 SSD 之间的一层；UMBP 当前未涉及 |
+
+---
+
+## 11. 附录：名词速查（通信 / 互连 / 存储 / 系统）
+
+> 本节收录正文中出现的底层名词，按类别分组，每个名词一句话说明它**是什么**，再补一句它**在 UMBP / KV cache 里的作用**。数字只是数量级参考。
+
+### 11.1 全景：这些名词各在哪一层
+
+```mermaid
+flowchart TB
+    subgraph SW["软件 / 进程间通信"]
+      UDS["UDS"] --- GRPC["gRPC"]
+      MEMFD["memfd"] --- GIPC["GPU IPC"]
+      ETCD["etcd"]
+    end
+    subgraph XFER["数据搬运方式"]
+      ZC["零拷贝"] --- RDMA["RDMA"]
+      SDMA["SDMA"] --- GDS["hipFile (GDS)"]
+      SPDK["SPDK"]
+    end
+    subgraph LINK["物理互连 / 设备"]
+      PCIE["PCIe"] --- XGMI["XGMI"]
+      NVL["NVLink"] --- NIC["ionic / mlx5 (RDMA 网卡驱动)"]
+    end
+    subgraph HW["计算与内存拓扑"]
+      CU["CU (计算单元)"] --- NUMA["NUMA"]
+    end
+    SW --> XFER --> LINK --> HW
+```
+
+### 11.2 进程间通信与 RPC
+
+| 名词 | 是什么 | 在 UMBP 里 |
+|---|---|---|
+| **UDS**（Unix Domain Socket） | 同一台机器上进程之间通信用的 socket，地址是文件路径（如 `/run/umbp/x.sock`），不经过网络协议栈，比 TCP 回环更快，可以用文件权限控制谁能连。它还有一个独特能力：通过 `SCM_RIGHTS` 把**文件描述符（fd）**传给另一个进程 | standalone 模式用两条 UDS：一条跑 gRPC 控制面（`.grpc.sock`），一条专门传 fd（`.fd.sock`） |
+| **gRPC** | Google 开源的 RPC 框架：用 Protobuf 定义接口和消息（`.proto` 文件），底层基于 HTTP/2，可以跑在 TCP 或 UDS 上 | 所有控制面都用它：master 服务（`umbp.proto`）、节点间服务（`umbp_peer.proto`）、standalone 服务（`umbp_standalone.proto`）。KV 数据字节**不走** gRPC |
+| **memfd**（`memfd_create`） | Linux 系统调用，创建一个**匿名的、只存在于内存中的文件**，返回一个 fd。对它 `mmap(MAP_SHARED)` 就得到一块共享内存。把 fd 传给别的进程，对方再 `mmap` 一次，两个进程就看到同一块物理内存。没有文件名，所以不会在 `/dev/shm` 里冲突或残留 | standalone 模式下，worker 的 host KV buffer 用 memfd 分配；fd 通过 UDS 交给 server，之后 server 直接读写这块内存 |
+| **GPU IPC**（`hipIpcGetMemHandle` / `hipIpcOpenMemHandle`） | 让一个进程把自己的 GPU 显存分配导出成一个"句柄"，另一个进程打开这个句柄后就能直接访问同一块显存。相当于显存版的 memfd | standalone 模式下支持 GPU buffer：server 打开 worker 的显存句柄，按 `loc=GPU` 注册后直接读写 vLLM 的 KV cache |
+| **etcd** | 基于 Raft 共识协议的分布式强一致 KV 存储，常用来做服务发现、配置中心和选主（Kubernetes 的元数据就存在 etcd 里） | UMBP **不用** etcd。正文提到它是因为 Mooncake 的 master HA 依赖 etcd；UMBP 选择"顾问式 master + 可选 Redis/Dragonfly"来实现无状态 master |
+
+### 11.3 数据搬运方式
+
+| 名词 | 是什么 | 在 UMBP 里 |
+|---|---|---|
+| **零拷贝（Zero-copy）** | 数据从源头直接搬到最终目的地，中间不经过额外的缓冲区拷贝（比如不先拷进内核或 staging buffer，再拷一次）。前提通常是**事先注册（pin）好内存**，让 DMA 引擎或网卡能直接访问 | `RegisterMemory` 一次性注册 vLLM 的 KV buffer，之后 RDMA、hipMemcpy、GDS 都直接读写它；没注册的 host buffer 会走 bounce 池（多一次拷贝），没注册的 GPU buffer 在远端路径上会被直接拒绝 |
+| **RDMA**（Remote Direct Memory Access） | 网卡直接读写**远端机器的内存**，不经过对端 CPU 和内核，延迟低（微秒级）、CPU 开销极小。需要事先注册内存区域（MR）、建立 QP（队列对）。常见实现有 InfiniBand 和 RoCE（以太网上的 RDMA）。如果网卡能直接访问 GPU 显存，就叫 **GPUDirect RDMA** | 跨节点搬运 KV 的主力：`MoriIoEngine` 基于 MORI-IO，把对端 peer 的 page 当作远端 MR 直接读写 |
+| **SDMA**（System DMA） | AMD GPU 上专门做数据拷贝的硬件引擎，和执行 kernel 的计算单元相互独立。用它做 host↔GPU、GPU↔GPU 拷贝时不占计算资源，可以和计算并行 | MORI 的节点内传输可以用 SDMA（PD benchmark 脚本里的 `MORI_ENABLE_SDMA` 开关）；`hipMemcpy` 在底层通常也由 SDMA 执行 |
+| **SPDK**（Storage Performance Development Kit） | Intel 开源的用户态存储库：绕过内核，在用户态用轮询方式直接驱动 NVMe 盘，延迟和 CPU 开销都很低。代价是**独占设备**（这块盘对内核文件系统不可见），并且要占用专门的轮询 CPU 核 | SSD 后端的一个选项（`ssd_backend=spdk`）；`spdk_proxy` 守护进程让多个进程通过共享内存环形队列共用同一块盘 |
+| **hipFile（GDS）** | GDS = GPU Direct Storage：让 NVMe 盘和 GPU 显存之间直接做 P2P DMA，不经过 host 内存中转。NVIDIA 的实现叫 cuFile，AMD 的实现叫 **hipFile** | `GdsEngine` 用 hipFile 把 SSD 上的 KV 直接读进 GPU（prefill 加载路径），运行时 dlopen 加载，找不到这个库就回退到经 host staging 的路径 |
+
+### 11.4 物理互连与网卡
+
+| 名词 | 是什么 | 在 UMBP 里 |
+|---|---|---|
+| **PCIe**（PCI Express） | CPU 连接外设的通用高速总线，GPU、NVMe 盘、网卡都挂在上面。带宽按代际和通道数计算：Gen5 x16 单向约 64 GB/s，Gen4 x4（一块 NVMe 盘）约 7 GB/s | host 内存 ↔ GPU、SSD ↔ CPU、网卡 ↔ 内存都要过 PCIe，**常常是 KV 卸载和加载的真正瓶颈** |
+| **XGMI**（AMD Infinity Fabric 的 GPU 间链路） | AMD GPU 之间的高速直连，节点内 8 张 MI300X/MI355X 两两全连接，带宽远高于 PCIe（每张 GPU 聚合可达数百 GB/s） | MORI-IO 的后端类型之一（`XGMI`），用于节点内 GPU↔GPU 传输；MORI-EP 的 all-to-all 也依赖它 |
+| **NVLink** | NVIDIA GPU 之间的高速直连（配合 NVSwitch 可以全互联），地位相当于 AMD 的 XGMI | 不属于 AMD 栈；出现在对比里，是因为 Mooncake Transfer Engine 等方案支持 NVLink 传输 |
+| **ionic** | AMD Pensando（如 Pollara 400 AI NIC）RDMA 网卡的 Linux 驱动名，设备名形如 `ionic_0…ionic_7` | AMD 集群上的 RDMA 网卡，PD benchmark 里写的是 `NCCL_IB_HCA=ionic_0,...` |
+| **mlx5** | NVIDIA（原 Mellanox）ConnectX 系列 RDMA 网卡的驱动名，设备名形如 `mlx5_0` | 另一种常见的 RDMA 网卡；benchmark 里 `MORI_RDMA_DEVICES=^mlx5_8` 表示排除某一张（通常是管理网口） |
+
+### 11.5 计算与内存拓扑
+
+| 名词 | 是什么 | 在 UMBP 里 |
+|---|---|---|
+| **CU**（Compute Unit，计算单元） | AMD GPU 的基本计算单元，相当于 NVIDIA 的 SM。每个 CU 有若干 SIMD 单元、寄存器堆和 LDS（片上共享内存），kernel 的线程块（workgroup）就调度在 CU 上执行。MI300X 有 304 个 CU，MI355X 有 256 个 | 模型计算在 CU 上跑；拷贝如果交给 SDMA / RDMA / GDS 这类专用引擎，就不和计算抢 CU，这是 layer-wise 加载能和计算重叠的硬件基础。UMBP 的 device gather kernel 会占用少量 CU |
+| **NUMA**（Non-Uniform Memory Access） | 多 CPU 插槽的服务器上，每个 CPU 有一部分"本地"内存，访问另一个插槽的内存要跨互连，延迟更高、带宽更低。GPU 和网卡也挂在某个具体的插槽下 | `UMBP_DRAM_NUMA_NODE=0,1` 把 DRAM 池按 NUMA 节点拆成多块，写入时优先用离发起写入的 GPU 最近的那一块，减少跨插槽流量 |
+
+### 11.6 这些名词串起来：一次 KV 加载会经过什么
+
+```mermaid
+flowchart LR
+    A["vLLM 请求命中 prefix"] --> B{"KV 在哪?"}
+    B -- "本机 standalone server 的 DRAM" --> C["UDS gRPC 发起请求<br/>(地址是 memfd / GPU IPC 映射的偏移)"]
+    C --> C2["server 直接写入 worker 的 buffer<br/>(hipMemcpy/SDMA, 过 PCIe)"]
+    B -- "远端节点的 DRAM" --> D["master 路由 (gRPC)"]
+    D --> D2["RDMA 网卡 (ionic/mlx5) 直接写入注册过的 GPU buffer<br/>(GPUDirect RDMA, 零拷贝)"]
+    B -- "本机 NVMe SSD" --> E["hipFile (GDS): NVMe → GPU P2P DMA<br/>或 io_uring/SPDK → DRAM staging → GPU"]
+    C2 --> F["数据在 HBM 中, CU 开始 attention 计算"]
+    D2 --> F
+    E --> F
+```
