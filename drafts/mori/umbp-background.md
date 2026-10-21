@@ -25,6 +25,8 @@
 - [9. 附录：术语表 / 关键文件 / 关键环境变量 / 参考资料](#9-附录)
 - [10. 存储介质基础：HBM / DRAM / SSD / NVMe](#10-存储介质基础hbm--dram--ssd--nvme)
 - [11. 附录：名词速查（通信 / 互连 / 存储 / 系统）](#11-附录名词速查通信--互连--存储--系统)
+- [12. SGLang 中 UMBP 对 DeepSeek-V4-Pro 的支持现状](#12-sglang-中-umbp-对-deepseek-v4-pro-的支持现状)
+- [13. vLLM 中 DeepSeek-V4-Pro 的 hybrid KV cache 是怎么存放的](#13-vllm-中-deepseek-v4-pro-的-hybrid-kv-cache-是怎么存放的)
 
 ---
 
@@ -967,3 +969,206 @@ flowchart LR
     D2 --> F
     E --> F
 ```
+
+---
+
+## 12. SGLang 中 UMBP 对 DeepSeek-V4-Pro 的支持现状
+
+> 调研时间：2026-10-21。本地没有 SGLang 源码，结论来自 GitHub PR/Issue 页面和本地 mori 仓库（HEAD `e6ddd2a`），**未实际运行验证**。
+
+**结论：支持，但要看接入方式。** 走"HiCache + standalone UMBP"这条路，DeepSeek-V4-Pro 已有官方 recipe；走新的 "Unified Cache External Linker"（GPU 直连 UMBP）这条路，公开验证的只有 DeepSeek-V4-Flash。
+
+### 12.1 SGLang 接入 UMBP 的两条路径
+
+```mermaid
+flowchart LR
+    subgraph A["路径 1：HiCache 存储后端"]
+      GA["GPU KV (L1)"] --> HA["Host 内存池 (L2)"] --> UA["UMBP standalone server (L3)"]
+    end
+    subgraph B["路径 2：Unified Cache External Linker"]
+      GB["GPU KV (Unified Radix Tree)"] -- "layer-wise + ranged I/O<br/>GPU buffer 直接注册" --> UB["UMBP"]
+    end
+```
+
+两条路径**互斥**：SGLang 不允许同时开 HiCache 和 linker。
+
+| | 路径 1：HiCache + standalone UMBP | 路径 2：External Linker（`--enable-unified-cache-external-linker --unified-cache-external-linker-backend mori`） |
+|---|---|---|
+| 引入 PR | [#37578](https://github.com/sgl-project/sglang/pull/37578)（2026-09-05 合入）中的 standalone 部分 | 同一个 PR [#37578](https://github.com/sgl-project/sglang/pull/37578) |
+| DSV4-Pro | ✅ 有官方 recipe：[#41024](https://github.com/sgl-project/sglang/pull/41024)（2026-09-24 合入），MI355X PD 的所有 prefill 角色默认开启 standalone UMBP | ⚠️ PR 里只在 **DSV4-Flash**（TP8，8×MI355X）上验证过：GSM8K 94.5%，cache 100% 来自 UMBP，并在 5 个 DSV4 pool 上确认了 ranged put/get |
+| mori 依赖 | PR 里 pin 的 mori 版本即可 | 需要 ranged I/O API（ROCm/mori#540）。PR 合入时这个依赖还没进 mori，所以当时官方镜像跑不了 linker；**本地 mori 显示 #540 已于 2026-09-07 合入**（`5ca9a9e`），需要确认镜像里 pin 的 mori 版本是否更新 |
+
+### 12.2 DSV4-Pro recipe 的关键配置（#41024）
+
+- `UMBP_STANDALONE_ADDRESS=unix:///tmp/umbp_sa/sa.grpc.sock`
+- `--hicache-storage-backend-extra-config '{"standalone_startup_timeout_ms":120000}'`
+- prefill 角色额外加 `--optimistic-prefill-attempts 2` 和 `--enable-cache-report`
+- **只有 prefill 用 UMBP**，decode 不用 offload tier
+- standalone UMBP server 必须**事先单独启动**
+- 这个 PR 只改了文档，没有附性能数据；它是把之前在 InferenceX agentic 测试里验证过的配置搬进 cookbook
+
+### 12.3 DSV4 特有的限制：KV 有多个 pool
+
+DSV4 的 KV 不是一个统一的 pool。按 mori 里的 benchmark 注释，DSV4-Pro 由 `compress_ratios` 拆成 c4（每层 37,440 B）、c4_indexer（8,448 B）、c128（1,728 B），再加上 SWA。
+
+- 按 SGLang 的 HiCache 设计（[#23639](https://github.com/sgl-project/sglang/issues/23639)，已关闭，随 v0.5.12 发布），**只 offload 压缩 KV（c4 / c4_indexer / c128），不 offload SWA**。从下层加载回来之后，要重放前缀里剩下的 SWA 部分来重建滑窗。
+- 这些 pool 每层只有几 KB，属于小碎片传输。mori 专门按 DSV4-Pro 的这组尺寸调过本地拷贝阈值，ranged 测试工具也内置了 DSV4-Pro 的 pool 布局。这说明 **mori 侧把 DSV4-Pro 当作主要的优化目标**。
+- linker 的已知限制：Unified-KV 暂不支持；UMBP L3 的 key 加了前缀，旧对象升级后会先 miss 一次。
+
+### 12.4 对 vLLM 集成的启示
+
+1. DSV4 这类多 pool、混合注意力的模型，正好是 RFC 里推迟到后续阶段的 "hybrid / heterogeneous KV groups"。SGLang 的做法（只 offload 压缩 KV，SWA 靠重放）可以直接参考。
+2. 要发挥 UMBP 的优势，ranged I/O 和逐层加载几乎是必需的：每层的数据太小，必须按 pool 拼成对象。
+3. SGLang 把 linker 做成了替代 host tier 的形态，而不是叠加在 host tier 之上，这和 RFC 里 `UMBPStoreConnector` 直接从 GPU 读写 UMBP 的思路一致。
+
+---
+
+## 13. vLLM 中 DeepSeek-V4-Pro 的 hybrid KV cache 是怎么存放的
+
+> 依据：`/shared/models/deepseek-ai/DeepSeek-V4-Pro/config.json`，以及 vLLM 源码 `vllm/models/deepseek_v4/{attention,compressor,sparse_mla}.py`、`vllm/v1/attention/backends/mla/sparse_swa.py`、`vllm/v1/core/kv_cache_planning.py`、`vllm/v1/kv_cache_interface.py`（main 2026-10-20）。页大小等字节数按 fp8_ds_mla 推算，以运行时打印的 `kv_cache_config` 为准。
+
+### 13.1 先看模型：每层有 3 种"记忆"
+
+DeepSeek-V4-Pro 的关键配置：
+
+| 配置 | 值 | 含义 |
+|---|---|---|
+| `num_hidden_layers` | 61（另有 1 层 MTP） | |
+| `compress_ratios` | 31 层是 128，30 层是 4，MTP 层是 0 | 每层把多少个 token 压缩成 1 条 KV |
+| `sliding_window` | 128 | 每层都保留最近 128 个原始 token 的 KV |
+| `head_dim` | 512（448 NoPE + 64 RoPE） | 单头 latent（`num_key_value_heads = 1`，属于 MLA 类） |
+| `index_topk` / `index_head_dim` | 1024 / 128 | C4 层用 indexer 从压缩 KV 里选 top-1024 条 |
+
+可以把它理解为：每层 attention 同时看"近处的原文"和"远处的摘要"。
+
+```mermaid
+flowchart LR
+    Q["当前 token 的 query"] --> SWA["滑窗 SWA<br/>最近 128 个原始 token 的 KV<br/>(每层都有)"]
+    Q --> C4["C4 层 (30 层)：每 4 个 token 压成 1 条<br/>indexer 打分后只看 top-1024 条<br/>(稀疏 / CSA)"]
+    Q --> C128["C128 层 (31 层)：每 128 个 token 压成 1 条<br/>全部都看<br/>(重压缩 / HCA)"]
+```
+
+- 第 0、1 层以及之后所有奇数层是 C128 层，偶数层（从第 2 层起）是 C4 层，交替排列。
+- 有 indexer 的只有 C4 层。indexer 自己也存一份更小的"压缩 key"（每条 128 维 fp8 + scale = 132 B），用来给 C4 条目打分。
+- MTP 层的 ratio 是 0，在 vLLM 里只有滑窗。
+
+### 13.2 compressor state 是什么
+
+压缩是**流式**进行的：凑满 `ratio` 个 token 才能产出 1 条压缩 KV。还没凑满的那几个 token 的中间结果需要先暂存，**这个暂存区就是 compressor state**。
+
+```mermaid
+flowchart LR
+    subgraph T["C4 层的 token 流"]
+      t0["t0"] --- t1["t1"] --- t2["t2"] --- t3["t3"] --- t4["t4"] --- t5["t5"] --- t6["t6"]
+    end
+    t3 --> E0["凑满 4 个：产出压缩条目 #0<br/>(C4 KV cache)"]
+    t4 -.-> S["t4 ~ t6 还没凑满：<br/>暂存在 compressor state"]
+```
+
+- 存的内容：每个 token 经 `fused_wkv_wgate` 投影得到 **kv 值和 gate 打分**（`state_dim = 2 × coff × head_dim`，fp32）。凑满后按 gate 做加权池化，生成一条压缩 KV。
+- **C4 有重叠**：`coff = 2`，每条压缩 KV 实际池化 8 个 token，与前一条重叠 4 个，所以它的 state 窗口是 8。C128 没有重叠，state 窗口是 128。
+- 在 vLLM 里，state 被当作一种窗口很小的"滑窗 cache"（`CompressorStateCache` → `SlidingWindowMLASpec`）：
+  - C4：block 4 token，每 token 8 KB；
+  - C128：block 8 token，每 token 4 KB。
+- 每个有压缩的层还会有第二份 state：indexer 自带一个 compressor（head_dim 128），它的 state 也单独存放。
+
+#### 窗口（window）和 block 是两个不同的数
+
+| | C4 state | C128 state |
+|---|---|---|
+| **窗口**（state 最多要保留最近多少个 token） | **8**（压 4 个，再加上与前一条重叠的 4 个） | **128**（凑满 128 个才压一次，最多积压 127 个） |
+| 每个 token 存多少 | `2 × 2 × 512` 个 fp32，即 8192 B | `2 × 1 × 512` 个 fp32，即 4096 B |
+| **block**（分页分配的粒度，每页装几个 token） | 4 个 token，一页 4 × 8 KB = 32 KB | 8 个 token，一页 8 × 4 KB = 32 KB |
+| 一个窗口要几页 | 8 / 4 = 2 页 | 128 / 8 = 16 页 |
+
+- **窗口**由算法决定：要生成下一条压缩 KV，最多需要回看多少个原始 token 的中间结果。
+- **block** 由显存布局决定：`CompressorStateCache` 的注释说明，state 和 KV 共用同一块物理显存，所以每页大小要和 KV 页（约 32～37 KB）差不多。C4 state 每 token 8 KB，4 个 token 一页；C128 state 每 token 4 KB，8 个 token 一页，两者都正好 32 KB。
+- 类比：窗口是"要记住最近几行"，block 是"一页纸写几行"。C128 要记 128 行、每页写 8 行，所以占 16 页。滑窗 cache 也一样：窗口 128 个 token，block 是 64 个 token。
+
+所以，"滑窗 cache"和"compressor state"都只跟**最近的少量 token**有关。真正随上下文线性增长、值得长期保存的，只有**压缩 KV**（C4 latent、C4 indexer、C128 latent）。
+
+### 13.3 一个 block 为什么是 256 个 token
+
+vLLM 里的 "block" 是逻辑上的 token 数。DSV4 压缩 KV 的 block 是 256 token，原因有三层：
+
+1. **kernel 只支持 256**：DSV4 sparse MLA backend 的 `get_supported_kernel_block_sizes()` 直接返回 `[256]`（`sparse_mla.py:60`），indexer 也一样，SWA backend 的 `get_preferred_block_size()` 也返回 256。
+2. **能被 4 和 128 整除**：256 个 token 正好对应 64 条 C4 条目、2 条 C128 条目，压缩条目永远不会跨 block。block 边界同时也是两种压缩的组边界，所以在边界上 compressor state 是"干净"的，这也是 SWA replay 能从 256 对齐的命中点重建 state 的前提。
+3. **页大小合适并且对齐**：一条压缩条目是 584 B（448 B fp8 NoPE + 128 B bf16 RoPE + 8 B scale）。
+   - C4 页 = 64 × 584 = 37376 B，按 576 B 对齐后是 37440 B，大约 36 KB。
+   - C128 页只有 2 × 584 = 1168 B，补齐到 1728 B。
+   - indexer 页 = 64 × 132 = 8448 B，补齐到 8640 B。
+
+注意 **"256 token"并不等于"256 条 KV"**：在 C4 层里，256 个 token 只占 64 条；在 C128 层里只占 2 条（`tokens_per_state` 分别是 4 和 128）。
+
+以第 k 个 block，也就是 token 位置 `[256k, 256k + 256)` 为例：
+
+```mermaid
+flowchart TB
+    subgraph TOK["一个 256-token 的逻辑 block：位置 256k ... 256k+255"]
+      direction LR
+      a["t0..t3"] --- b["t4..t7"] --- c["..."] --- d["t252..t255"]
+    end
+    subgraph C4P["C4 层的这一页：64 条压缩 KV（每条 584 B）"]
+      direction LR
+      e0["#0 ← t0..t3"] --- e1["#1 ← t4..t7"] --- e2["..."] --- e63["#63 ← t252..t255"]
+    end
+    subgraph C128P["C128 层的这一页：2 条压缩 KV"]
+      direction LR
+      f0["#0 ← t0..t127"] --- f1["#1 ← t128..t255"]
+    end
+    TOK --> C4P
+    TOK --> C128P
+```
+
+- C4：256 / 4 = 64，每 4 个 token 对应 1 条压缩 KV（池化时会额外回看前 4 个 token，但每 4 个 token 只产出 1 条）。所以一页存 64 条：64 × 584 B ≈ 37 KB。
+- C128：256 / 128 = 2，前 128 个 token 产出 1 条，后 128 个 token 再产出 1 条。所以一页只有 2 条：2 × 584 B，补齐后约 1.7 KB。
+- 页的"行数"是条目数（64 或 2），block 的"token 数"始终是 256。scheduler 和 prefix cache 只认 token 数，所以这些层可以共用一张 256-token 的 block table。
+- 256 同时是 4 和 128 的整数倍，所以每个 block 边界都正好是一条 C4 和一条 C128 的结束点：边界之前的 token 都已经被压缩完，compressor 里没有积压。
+
+各类 cache 汇总（每层、每 block）：
+
+| cache | spec 类型 | block（token） | 每 block 条目数 | 页大小（约） | 能否进 prefix cache |
+|---|---|---|---|---|---|
+| C4 latent | `MLAAttentionSpec`（tokens_per_state=4） | 256 | 64 | 37 KB | ✅ |
+| C128 latent | `MLAAttentionSpec`（tokens_per_state=128） | 256 | 2 | 1.7 KB | ✅ |
+| C4 indexer key | `MLAAttentionSpec`（indexer） | 256 | 64 | 8.6 KB | ✅ |
+| 滑窗 SWA | `SlidingWindowMLASpec`（window 128） | 64 | 64 | 37 KB | 默认 ✅；开启 bounded replay 后 ❌ |
+| C4 compressor state | `SlidingWindowMLASpec`（window 8） | 4 | 4 | 32 KB | 默认 ✅；`rebuilt_by_replay` 后 ❌ |
+| C128 compressor state | `SlidingWindowMLASpec`（window 128） | 8 | 8 | 32 KB | 默认 ✅；`rebuilt_by_replay` 后 ❌ |
+
+### 13.4 vLLM 如何把这些拼到同一块显存里：hybrid + 打包布局
+
+- **hybrid KV cache manager（HMA）**：block 大小或类型不同的层分属不同的 **KV cache group**。每个 group 有自己的 block table 和淘汰规则：full attention 一直保留，滑窗只保留窗口内的 block。
+  - 分组逻辑在 `kv_cache_planning._get_packed_kv_cache_groups`：block 大小相同、类型相同的层放进同一个桶（`UniformTypeKVCacheSpecs`），大致得到四类 group：
+    - ① 256-token 压缩 KV（C4、C128、indexer 混合，按"C128 层 + C4 层"的重复模式切成若干组）；
+    - ② 64-token 滑窗；
+    - ③ 4-token C4 state；
+    - ④ 8-token C128 state。
+- **block-outermost 打包布局（BLHNC/BLNHC）**：所有 group 共用一个显存池。池里的每一个物理 "block 行"，在同一个 group 内依次排放该 group **所有层**的一页，并做了对齐填充，让各 group 的一行大小接近。
+  - 某个 group 的 block_id 选中的就是这样一行。
+  - 不同 group 各自从同一个池里分配行，所以显存可以在 group 之间流动。
+
+```mermaid
+flowchart TB
+    subgraph POOL["GPU 上的 KV 显存池（每行是一个物理 block，大小相同）"]
+      R0["行 #0：g0 的 [L0 C128 页 | L2 C4 页 | L2 indexer 页 | L3 C128 页 | ...]"]
+      R1["行 #1：g1(SWA) 的 [L0 SWA 页 | L1 SWA 页 | ...]"]
+      R2["行 #2：g2(C4 state) 的 [L2 state 页 | L4 state 页 | ...]"]
+      R3["行 #3：g0 的另一个 block ..."]
+    end
+    BT0["group0 block table<br/>(256 token / block)"] --> R0
+    BT0 --> R3
+    BT1["SWA group block table<br/>(64 token / block)"] --> R1
+    BT2["C4 state group block table<br/>(4 token / block)"] --> R2
+```
+
+- prefix cache 的哈希粒度（`hash_block_size`）是所有可 cache group 的 block 大小的最大公约数。默认情况下有 4-token 的 state group，所以粒度是 **4 token**。
+
+### 13.5 这和 UMBP 方案的关系
+
+- **默认全存**：如果每个 group 都交给 UMBP，一个 128K token 的请求会产生数万个只有几十 KB 的小对象（4/8-token 的 state 块，64-token 的滑窗块），而且它们只对"最近一个窗口"有用。
+- **按 SGLang 的做法**（见 §12）：只把 ①（256-token 压缩 KV）交给 UMBP。滑窗和 compressor state 退出 prefix cache；命中之后，由 scheduler 把命中点往回退 128 个 token 重算（SWA bounded replay），重算过程中把它们重建出来：
+  - 滑窗：重算最后 128 个 token，滑窗 KV 自然就重新写满了；
+  - compressor state：命中点是 256 对齐的，那里压缩组刚好结束；往回 128 个 token 足够覆盖 C4 的 8-token 重叠和 C128 未满的组；
+  - 重算时这些 token 对**压缩 KV 的写入会被跳过**（slot 被 pad 掉），保证从 UMBP 恢复的压缩 KV 不会被覆盖。
+- 代价：重算的 token 只能看到从 `replay_start` 开始的滑窗，所以重建出来的滑窗 KV 是近似值；压缩 KV 和 top-k 稀疏上下文仍然精确。
