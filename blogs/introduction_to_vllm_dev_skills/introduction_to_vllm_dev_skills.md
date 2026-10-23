@@ -8,11 +8,11 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-![](./images/star_history_20261023.png)
+> NOTE：本文将会随项目演进持续更新（last update：2026/10/23）。
 
 ## 二、项目介绍
 
-这个仓库按 vLLM 的开发生命周期对 Skill 进行分类，整体情况如下表所示（推荐度为我个人的使用体感，⭐️ 越多表示用得越多、效果越稳定）：
+这个仓库按 vLLM 的开发生命周期对 Skill 进行分类，整体情况如下表所示（推荐度为我个人的使用体感，⭐️ 越多表示用得越多、效果越好）：
 
 | Skill | 分类 | 用途 | 推荐度 |
 | :--- | :--- | :--- | :--- |
@@ -237,10 +237,14 @@ https://github.com/vllm-project/vllm/pull/35963
 - 支持 GitHub Pages，提供更好的阅读体验；
 - 尝试使用 [archify](https://github.com/tt-a1i/archify) 为技术博客绘制更好的架构图。
 
-欢迎感兴趣的朋友 Star、Fork，也欢迎提 Issue 或 PR 贡献新的 Skill！
-
-## 参考资料
+## 七、参考资料
 
 - [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills)
 - [Agent Skills](https://agentskills.io/home#why-agent-skills)
 - [Extend Claude with skills](https://code.claude.com/docs/en/skills)
+
+---
+
+欢迎感兴趣的朋友 Star、Fork，也欢迎提 Issue 或 PR 贡献新的 Skill！
+
+![](./images/star_history_20261023.png)
