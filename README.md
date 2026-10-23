@@ -12,8 +12,6 @@
 
 ## 📌 Overview
 
-![](./assets/front_cover_20260611.png)
-
 A curated collection of Claude Code agent skills that accelerate the entire vLLM development lifecycle — from understanding codebases and triaging issues to designing features, contributing changes, and analyzing performance. Each skill encapsulates a specific development task as a reusable, composable workflow, enabling vLLM developers and community contributors to work more efficiently with AI-assisted tooling.
 
 ## 🚀 Skills
