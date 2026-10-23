@@ -12,29 +12,28 @@
 
 ## 📌 Overview
 
-![](./assets/ai-summary-20260611.png)
+![](./assets/front_cover_20260611.png)
 
 A curated collection of Claude Code agent skills that accelerate the entire vLLM development lifecycle — from understanding codebases and triaging issues to designing features, contributing changes, and analyzing performance. Each skill encapsulates a specific development task as a reusable, composable workflow, enabling vLLM developers and community contributors to work more efficiently with AI-assisted tooling.
 
 ## 🚀 Skills
-<!-- | | | | | -->
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
-| [vllm-dev-task-discovery](./skills/vllm-dev-task-discovery/SKILL.md) | Demand Discovery | Analyze contribution opportunities in the vLLM repository for community developers. | ⭐️⭐️⭐️ |
+| [vllm-dev-task-discovery](./skills/vllm-dev-task-discovery/SKILL.md) | Demand Discovery | Analyze contribution opportunities in the vLLM repository for community developers. | ⭐️ |
 | [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-model-tutorial](./skills/vllm-model-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM models. | ⭐️⭐️⭐️⭐️⭐️ |
-| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️⭐️⭐️⭐️ |
+| [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️ |
 | [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️ |
-| [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Contribution | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️⭐️⭐️⭐️ |
-| [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Contribution | Generate unit tests or end-to-end tests for vllm. | ⭐️⭐️⭐️ |
+| [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Contribution | Generate a vLLM-style PR description from a GitHub PR's code changes. | ⭐️ |
+| [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Contribution | Generate unit tests or end-to-end tests for vllm. | ⭐️ |
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
-| [vllm-vs-atom-decode-trace-comparison](./skills/vllm-vs-atom-decode-trace-comparison/SKILL.md) | Performance Optimization | Compare decode-phase kernel implementations of vLLM vs ATOM from torch-profiler traces, with per-layer-type comparison tables and a vLLM optimization TODO list. | ⭐️⭐️⭐️⭐️ |
-| [infx-bench-script-generator](./skills/infx-bench-script-generator/SKILL.md) | Performance Optimization | Generate local bash scripts (docker run / server start / AgentX client replay) to run an InferenceX srt-slurm recipe benchmark without Slurm, with optional torch profiler prefill/decode step capture. | ⭐️⭐️⭐️⭐️ |
-| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-vs-atom-decode-trace-comparison](./skills/vllm-vs-atom-decode-trace-comparison/SKILL.md) | Performance Optimization | Compare decode-phase kernel implementations of vLLM vs ATOM from torch-profiler traces, with per-layer-type comparison tables and a vLLM optimization TODO list. | ⭐️⭐️ |
+| [infx-bench-script-generator](./skills/infx-bench-script-generator/SKILL.md) | Performance Optimization | Generate local bash scripts (docker run / server start / AgentX client replay) to run an InferenceX srt-slurm recipe benchmark without Slurm, with optional torch profiler prefill/decode step capture. | ⭐️⭐️⭐️ |
+| [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
 | [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | Code Review | Review AMD/ROCm-related PRs from vllm (aiter/mori/ROCm kernels) and generate a single combined Chinese report: a detailed PR summary (with Mermaid diagrams, technical principles, discussion highlights, and risk table) followed by severity-sorted, type-categorized ROCm review findings, a verdict, and copy-paste English comments with file + diff line numbers ready for GitHub PR review. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
-| [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | Technical Writing | Write or complete Chinese vLLM technical blog posts in the author's established style, with concise architecture, flow, and sequence diagrams. | ⭐️⭐️⭐️⭐️ |
+| [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | Technical Writing | Write or complete Chinese vLLM technical blog posts in the author's established style, with concise architecture, flow, and sequence diagrams. | ⭐️⭐️ |
 
 ## 📖 Usages
 
@@ -284,43 +283,30 @@ Prompt:
 
 Output: 每个 `<recipe>_<override>` 组合一个文件夹，包含 `01_docker_run.sh`（host 起容器）、`02_start_server.sh`（容器内起 server，可选 profiler 配置）、`03_run_client.sh`（容器内跑 AgentX replay）以及 `variant.json`/`variant.env`，示例见 [dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](./skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64/).
 
-## 💡 Tricks
+## 💡 AI-Native E2E Workflows with Multi-Skills
 
-_Coming soon..._
+Coming soon...
 
 ## 🛠️ Configuration
 
-通过符号链接将该项目的 `skills` 目录链接到 `~/.claude/skills/` 下：
-
 ```bash
-ln -sfn /path/to/skill-directory ~/.claude/skills/skill-name
+# Manually soft-link single skill to claude-code's official skill dir.
+ln -sfn /path/to/vllm-dev-skills/skills/skill-name ~/.claude/skills/skill-name
 
-# 示例（新增一个叫 vllm-new-skill 的 skill）：
-ln -sfn /Users/shanshan-shen/Documents/GitHub/vllm-dev-skills/skills/vllm-new-skill ~/.claude/skills/vllm-new-skill
-```
-
-参数说明：
-
-- `-s`：创建符号链接；
-- `-f`：如果目标已存在则覆盖（方便更新）；
-- `-n`：如果目标是已有目录的符号链接，覆盖它而不是跟进到目录内部。
-
-批量链接该目录下所有新增 skill 的命令：
-
-```bash
-for dir in /Users/shanshan-shen/Documents/GitHub/vllm-dev-skills/skills/*/; do
+# Manually soft-link all skills to claude-code's official skill dir.
+for dir in /path/to/vllm-dev-skills/skills/*/; do
   name=$(basename "$dir")
   ln -sfn "$dir" ~/.claude/skills/"$name"
 done
 ```
 
-> [!TIP]
->
-> - [Agent Skills](https://agentskills.io/home#why-agent-skills)
-> - [Extend Claude with skills](https://code.claude.com/docs/en/skills)
-> - [Configure Claude Code in VSCode](https://api.lingyaai.cn/model_intro/Claude-Code.html)
-> - [Configure Claude Code CLI with Claude HUD](https://github.com/jarrodwatts/claude-hud)
-> - [Awesome DeepSeek Agent](https://github.com/deepseek-ai/awesome-deepseek-agent)
+## 📖 References
+
+- [Agent Skills](https://agentskills.io/home#why-agent-skills)
+- [Extend Claude with skills](https://code.claude.com/docs/en/skills)
+- [Configure Claude Code in VSCode](https://api.lingyaai.cn/model_intro/Claude-Code.html)
+- [Configure Claude Code CLI with Claude HUD](https://github.com/jarrodwatts/claude-hud)
+- [Awesome DeepSeek Agent](https://github.com/deepseek-ai/awesome-deepseek-agent)
 
 ## ©️ Citation
 
