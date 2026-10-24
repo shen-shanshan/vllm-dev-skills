@@ -130,7 +130,27 @@ Finish with the blind-spot question: *is there any correctness risk, resource ha
 
 Save to `/Users/shanshan-shen/.claude/skills/vllm-rocm-pr-review/outputs/pr-<NUMBER>-review.md`. Chinese (Simplified) unless the user requests English. One file, two parts separated by `---`. Target ≤ ~750 lines: Part A ~250–400, Part B ~150–300, §9 ~40–60. 3–10 findings (fewer on the non-ROCm path).
 
+**Front matter (required)**: the file must start with the YAML block below — the Pingboard dashboard reads it to show the verdict and to tell whether the PR has changed since the review. Plain `key: value` lines only, no nesting or quotes.
+
+| Key | Value |
+|-----|-------|
+| `pr` | PR number |
+| `repo` | `vllm-project/vllm` |
+| `head_sha` | full 40-char SHA of the PR head that was reviewed — `pr.head.sha` in the Step 1 JSON |
+| `verdict` | `block` / `needs-work` / `lgtm` — must match §8 (🔴 / ⚠️ / ✅) |
+| `reviewed_at` | when the report was written, ISO 8601 UTC (`date -u +%Y-%m-%dT%H:%M:%SZ`) |
+| `skill` | `vllm-rocm-pr-review` |
+
 ```markdown
+---
+pr: <NUMBER>
+repo: vllm-project/vllm
+head_sha: <40-char head SHA>
+verdict: block | needs-work | lgtm
+reviewed_at: YYYY-MM-DDTHH:MM:SSZ
+skill: vllm-rocm-pr-review
+---
+
 # PR #<NUMBER>: <Title>
 
 > **Author**: @author | **State**: OPEN/MERGED/CLOSED | **Date**: YYYY-MM-DD
@@ -224,6 +244,13 @@ Verdict rules: 🔴 BLOCK requires at least one finding with a concrete triggeri
 - Non-ROCm path: derive from the HK findings (usually fewer comments), same format.
 
 Also give the user a one-line summary in chat with the output path.
+
+Optionally remind the user that the report shows up in the Pingboard dashboard (PR detail → AI Review) once it is pushed to `shen-shanshan/vllm-dev-skills`:
+
+```bash
+cd <vllm-dev-skills checkout> && git add skills/vllm-rocm-pr-review/outputs/pr-<NUMBER>-review.md \
+  && git commit -m "Add ROCm review for vllm PR #<NUMBER>" && git push
+```
 
 ## Updating the Skill (一键更新)
 
