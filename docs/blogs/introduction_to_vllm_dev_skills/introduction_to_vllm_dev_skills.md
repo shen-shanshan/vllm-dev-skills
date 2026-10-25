@@ -6,9 +6,9 @@
 
 随着 Coding Agent 越来越普及，在参与 vLLM 社区开发的过程中，我开始尝试使用 Claude Code 来辅助日常工作：读代码、写测试、做 Code Review、分析 Issue 等，发现效果还不错。相比于纯“古法编程”，我的工作效率确实提升了不少。
 
-因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
+因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（last update：2026/10/23）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/10/25）。
 
 ## 二、项目介绍
 
@@ -24,8 +24,8 @@
 | `vllm-pr-desc-generator` | 代码贡献 | 根据 PR 代码改动生成 PR 描述 | ⭐️ |
 | `vllm-test-generator` | 代码贡献 | 生成单元测试与端到端测试 | ⭐️ |
 | `vllm-benchmark-result-analysis` | 性能优化 | 对比修改前后的 Serving Benchmark 结果 | ⭐️⭐️ |
-| `vllm-vs-atom-decode-trace-comparison` | 性能优化 | 基于 profiler trace 对比 vLLM 与 ATOM 的 decode kernel 实现 | ⭐️⭐️ |
-| `infx-bench-script-generator` | 性能优化 | 生成在本地服务器上跑 InferenceX benchmark 的脚本 | ⭐️⭐️⭐️ |
+| `vllm-vs-atom-decode-trace-comparison` | 性能优化 | 基于 Profiler Trace 对比 vLLM 与 ATOM 的 Decode Kernel 实现 | ⭐️⭐️ |
+| `infx-bench-script-generator` | 性能优化 | 生成在本地服务器上跑 InferenceX Benchmark 的脚本 | ⭐️⭐️⭐️ |
 | `vllm-pr-summary` | 代码 Review | 生成 PR 分析报告 | ⭐️⭐️⭐️⭐️ |
 | `vllm-rocm-pr-review` | 代码 Review | Review AMD/ROCm 相关 PR，并生成可直接贴到 GitHub 的评论 | ⭐️⭐️⭐️⭐️⭐️ |
 | `vllm-multimodal-open-issue-analyzer` | Issue 分析 | 搜集并整理多模态相关的 Open Issue | ⭐️ |
@@ -41,7 +41,7 @@
 
 **Skill 效果**：输入一个模块、特性或模型方向（如“多模态”），该 Skill 会从 Open Issue、近期 PR、GitHub Discussion、代码中的 TODO/FIXME、Roadmap 标签以及 Maintainer 的活跃情况中收集信息，整理出一份结构化的任务清单。每个任务都会标注难度、所需的前置知识、相关的 Maintainer/Contributor，以及紧急程度和重要程度。
 
-输出样例：[vllm_dev_task_multimodal_20260611](https://github.com/shen-shanshan/vllm-dev-skills/blob/main/skills/vllm-dev-task-discovery/outputs/vllm_dev_task_multimodal_20260611.md)。
+输出样例：[vllm_dev_task_multimodal_20260611](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-dev-task-discovery/outputs/vllm_dev_task_multimodal_20260611.md)。
 
 ### 2.2 代码学习
 
@@ -51,7 +51,7 @@
 
 **Skill 效果**：输入一个 Feature 名称（如 `Chunked Prefill`、`Prefix Caching`），该 Skill 会生成一篇包含以下内容的中文深度解析文档：
 
-- **背景与动机**：为什么要有这个功能？解决了什么问题？
+- **背景与动机**：为什么要有这个功能？解决了什么问题；
 - **核心数据结构与类**：附带 Mermaid 类图；
 - **执行流程**：从 API 调用到底层实现的完整调用链，附带 Mermaid 流程图；
 - **关键代码走读**：逐段解释核心实现逻辑；
@@ -59,7 +59,7 @@
 
 这个 Skill 目前是我使用频率最高的一个，尤其在接手一个不熟悉的 Feature 时，能节省大量阅读时间。
 
-输出样例：[disaggregated_encoder_epd](https://github.com/shen-shanshan/vllm-dev-skills/blob/main/skills/vllm-feature-tutorial/outputs/disaggregated_encoder_epd.md)。
+输出样例：[disaggregated_encoder_epd](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-feature-tutorial/outputs/disaggregated_encoder_epd.md)。
 
 **`vllm-model-tutorial`：从模型结构到 vLLM 实现，一次讲清楚。**
 
@@ -71,7 +71,7 @@
 - vLLM 中的代码实现分析；
 - 相关技术原理的讲解，如 MoE、MLA、Gated Attention、ViT、DiT 等。
 
-输出样例：[deepseek_ocr](https://github.com/shen-shanshan/vllm-dev-skills/blob/main/skills/vllm-model-tutorial/outputs/deepseek_ocr.md)。
+输出样例：[deepseek_ocr](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-model-tutorial/outputs/deepseek_ocr.md)。
 
 ### 2.3 变更提案
 
@@ -121,29 +121,29 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 - 计算百分比变化，标注改善/退步；
 - 生成一份 Markdown 报告，包含完整的指标对比表和关键变化摘要。
 
-**`vllm-vs-atom-decode-trace-comparison`：vLLM 为什么比 ATOM 慢？用 trace 说话。**
+**`vllm-vs-atom-decode-trace-comparison`：vLLM 为什么比 ATOM 慢？用 Trace 说话。**
 
-**适用场景**：在 AMD GPU 上，同一个模型、同一套配置，[ATOM](https://github.com/ROCm/ATOM) 的 decode 性能比 vLLM 更好，需要定位差距具体出在哪些 kernel 上。
+**适用场景**：在 AMD GPU 上，同一个模型、同一套配置，[ATOM](https://github.com/ROCm/ATOM) 的 Decode 性能比 vLLM 更好，需要定位差距具体出在哪些 Kernel 上。
 
-**Skill 输入**：模型名 + 两个引擎各自导出的 torch profiler trace（Chrome-trace JSON）+ 报告语言（中文/英文/双语）。
+**Skill 输入**：模型名 + 两个引擎各自导出的 Torch Profiler Trace（Chrome-Trace JSON）+ 报告语言（中文/英文/双语）。
 
-**Skill 效果**：先用脚本从两份 trace 中各切出一个 decode step，再对每种层类型（如 Attention 层、MoE 层）各取一层作为样本，最后为每种层类型生成一张对比表：两个引擎各用了哪些 kernel、是融合实现还是拆开实现、是否用了多流、量化方式有什么差异、耗时差多少。在此基础上，它只针对 ATOM 明显更快的算子整理出一份 vLLM 的优化 TODO 清单，并按预期收益排序。
+**Skill 效果**：先用脚本从两份 Trace 中各切出一个 Decode Step，再对每种层类型（如 Attention 层、MoE 层）各取一层作为样本，最后为每种层类型生成一张对比表：两个引擎各用了哪些 Kernel、是融合实现还是拆开实现、是否用了多流、量化方式有什么差异、耗时差多少。在此基础上，它只针对 ATOM 明显更快的算子整理出一份 vLLM 的优化 TODO 清单，并按预期收益排序。
 
-输出样例：[minimax-m3-trace-comparison_zh_20260905_162716](https://github.com/shen-shanshan/vllm-dev-skills/blob/main/skills/vllm-vs-atom-decode-trace-comparison/outputs/minimax-m3-trace-comparison_zh_20260905_162716.md)。
+输出样例：[minimax-m3-trace-comparison_zh_20260905_162716](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-vs-atom-decode-trace-comparison/outputs/minimax-m3-trace-comparison_zh_20260905_162716.md)。
 
-**`infx-bench-script-generator`：不依赖 Slurm，在本地复现 InferenceX benchmark。**
+**`infx-bench-script-generator`：不依赖 Slurm，在本地复现 InferenceX Benchmark。**
 
-[InferenceX](https://github.com/SemiAnalysisAI/InferenceX) 的 benchmark recipe 默认通过 Slurm 来调度。如果只想在一台本地 GPU 服务器上复现某个 recipe + override 配置（比如 `dsv4/vllm/mi355x-fp4-mtp/agentic.yaml` 的 `override_dep8_c64`），手动拼启动参数和环境变量很容易出错。
+[InferenceX](https://github.com/SemiAnalysisAI/InferenceX) 的 Benchmark Recipe 默认通过 Slurm 来调度。如果只想在一台本地 GPU 服务器上复现某个 Recipe + Override 配置（比如 `dsv4/vllm/mi355x-fp4-mtp/agentic.yaml` 的 `override_dep8_c64`），手动拼启动参数和环境变量很容易出错。
 
-这个 Skill 会读取 recipe 和对应的 override，通过脚本确定性地生成三份 bash 脚本：
+这个 Skill 会读取 Recipe 和对应的 Override，通过脚本确定性地生成三份 Bash 脚本：
 
-1. `01_docker_run.sh`：在 host 上启动容器；
-2. `02_start_server.sh`：在容器内启动 vLLM server；
-3. `03_run_client.sh`：在容器内运行 AgentX trace replay 客户端。
+1. `01_docker_run.sh`：在 Host 上启动容器；
+2. `02_start_server.sh`：在容器内启动 vLLM Server；
+3. `03_run_client.sh`：在容器内运行 AgentX Trace Replay 客户端。
 
-模型权重、InferenceX 仓库、trace 数据集和结果目录都可以指定为 host 路径。另外，还可以通过 `vllm serve --profiler-config` 用 torch profiler 采集一个完整的 prefill 或 decode step，采集到的 trace 正好可以交给上面的 `vllm-vs-atom-decode-trace-comparison` 去分析。
+模型权重、InferenceX 仓库、Trace 数据集和结果目录都可以指定为 Host 路径。另外，还可以通过 `vllm serve --profiler-config` 用 Torch Profiler 采集一个完整的 Prefill 或 Decode Step，采集到的 Trace 正好可以交给上面的 `vllm-vs-atom-decode-trace-comparison` 去分析。
 
-输出样例：[dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](https://github.com/shen-shanshan/vllm-dev-skills/tree/main/skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64)。
+输出样例：[dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](https://github.com/shen-shanshan/vllm-dev-skills/tree/master/skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64)。
 
 ### 2.6 代码 Review
 
@@ -160,17 +160,19 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 **`vllm-rocm-pr-review`：面向 AMD/ROCm PR 的 Review 助手。**
 
-这个 Skill 专门用来 Review 与 AMD/ROCm 相关的 PR（如 aiter、mori、ROCm kernel 等改动）。它会把 `vllm-pr-summary` 的 PR 总结和 ROCm 视角的 Review 意见合并成一份中文报告，报告分为三部分：
+这个 Skill 专门用来 Review 与 AMD/ROCm 相关的 PR（如 AITER、MORI、ROCm Kernel 等改动）。它会把 `vllm-pr-summary` 的 PR 总结和 ROCm 视角的 Review 意见合并成一份中文报告，报告分为三部分：
 
 1. **PR 详细总结**：背景与动机、代码改动分析（含 Mermaid 图）、技术原理、讨论要点和风险表；
 2. **ROCm Review 意见**：按严重程度排序、按类型分类的问题清单，以及最终的 Review 结论；
-3. **英文 Review 评论**：标注了文件和 diff 行号，可以直接复制到 GitHub 的 PR Review 中。
+3. **英文 Review 评论**：标注了文件和 Diff 行号，可以直接复制到 GitHub 的 PR Review 中。
 
-输出样例：[pr-29304-review](https://github.com/shen-shanshan/vllm-dev-skills/blob/main/skills/vllm-rocm-pr-review/outputs/pr-29304-review.md)。
+此外，报告开头会带一段 YAML Front Matter，记录 PR 编号、被 Review 的 Head Commit SHA、Review 结论（`block` / `needs-work` / `lgtm`）和 Review 时间。报告推送到仓库后，Pingboard Dashboard 会读取这些字段，在 PR 详情页展示 AI Review 的结论，并据此判断 PR 在 Review 之后是否又有了新的改动。
+
+输出样例：[pr-29304-review](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-rocm-pr-review/outputs/pr-29304-review.md)。
 
 ### 2.7 Issue 分析
 
-**`vllm-multimodal-open-issue-analyzer`：多模态相关待处理 issue 搜集与整理。**
+**`vllm-multimodal-open-issue-analyzer`：多模态相关待处理 Issue 搜集与整理。**
 
 自动拉取并分类整理 vLLM 仓库中与多模态相关的 Open Issue，按问题类型（Bug、Feature Request、性能等）分组，便于快速了解社区当前的痛点和待解决问题。
 
@@ -182,8 +184,6 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 - **按主题写新文章**：给定一个主题（如“vLLM 中的 Automatic Prefix Caching”），它会先阅读 vLLM 最新 `main` 分支的代码和相关资料，再生成一篇完整的中文技术博客，并按需画好架构图和流程图；
 - **补全已有草稿**：给定一篇写了一半的 Markdown 文章和参考资料，它会保留已有内容，只补全缺失的章节，新增的图片放在文章同级的 `images/` 目录中。
-
-本文的这次更新，就是用这个 Skill 根据仓库的最新内容完成的。
 
 ## 三、使用体验
 
@@ -210,7 +210,7 @@ for dir in /path/to/vllm-dev-skills/skills/*/; do
 done
 ```
 
-3. 在 Claude Code 中用自然语言描述需求，并在末尾加上 `/Skill名称` 调用对应 Skill：
+3. 在 Claude Code 中用自然语言描述需求，并在末尾加上 `/Skill名称` 调用对应 Skill，如：
 
 ```text
 # 示例：生成 EPD 特性的技术解析文档
@@ -221,6 +221,8 @@ done
 https://github.com/vllm-project/vllm/pull/35963
 /vllm-pr-summary
 ```
+
+   Claude Code 会加载对应的 Skill，按其中约定的流程完成调研并生成结果。
 
 ## 五、一些思考
 
@@ -236,6 +238,8 @@ https://github.com/vllm-project/vllm/pull/35963
 - 支持多 Skill 联动的 AI-Native 端到端 Workflow，例如从需求发现、代码学习一路串联到 PR 提交和性能验证（见仓库的 `workflows/` 目录，目前仍在建设中）；
 - 支持 GitHub Pages，提供更好的阅读体验；
 - 尝试使用 [archify](https://github.com/tt-a1i/archify) 为技术博客绘制更好的架构图。
+
+最后顺带一提，本文是先由我的 [`vllm-technical-blog-writer`](https://github.com/shen-shanshan/vllm-dev-skills/tree/master/skills/vllm-technical-blog-writer) Skill 根据我口述的要点生成初稿，再由我微调完成的。
 
 ## 七、参考资料
 
