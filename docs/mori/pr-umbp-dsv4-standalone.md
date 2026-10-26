@@ -6,8 +6,8 @@ This PR lets DeepSeek-V4-Pro on AMD Instinct (MI355X, TP8) offload its prefix KV
 
 It builds on the UMBP connector stack from RFC #57187:
 - #58568 = `[UMBP][1/10]` … `[UMBP][10/10]`
-- `[1/10]` and `[2/10]` are already merged
-- standalone mode is `[UMBP][7/10]` #61795
+- `[1/10]` #61789, `[2/10]` #61790 and `[3/10]` #61791 are already merged
+- `[4/10]` … `[10/10]` are still under review (#58568 head `078c7bf335`, rebased on the merged `[3/10]`); standalone mode is `[UMBP][7/10]` #61795
 
 It does **not** depend on the Kimi-K3 oriented UMBP PRs (#59276, #59281). **This PR must land after #58568's slices.** Until then the diff below is the delta on top of #58568.
 
@@ -57,7 +57,7 @@ Every one of these is an MLA-style spec (`MLAAttentionSpec` / `SlidingWindowMLAS
 - `tp_replicated_group_ids()` marks a cache group as TP-replicated when every layer spec is MLA-style, `tp_size > 1`, and there is no decode/prefill context parallelism (CP shards the latent).
 - `BlockIdentityCodec` gives replicated groups one TP-agnostic key (`tp*`):
   - `keys_for_topology` emits one key per object instead of one per TP rank;
-  - `keys_per_object` drives hit accounting in lookup and in the store residency check.
+  - `keys_per_object` drives hit accounting in lookup, and in every residency check (restored-block stores, lazy offload candidates, KV-event reconciliation), since replicated objects have one key instead of one per rank.
 - The worker stores replicated groups only on TP rank 0. The other ranks drop those plans, still complete the store event, and load the shared object.
 - Dedup is enabled only when the runtime shares one pool across ranks (`IUMBPRuntime.shares_pool_across_ranks`, true for standalone). Embedded mode keeps rank-private pools and per-rank keys unchanged.
 - Workers report the replicated groups in `UMBPHandshakeMetadata`, so the scheduler, which only sees flattened specs, uses the same keys. This also holds when `key_namespace` is configured.
@@ -82,16 +82,17 @@ Every one of these is an MLA-style spec (`MLAAttentionSpec` / `SlidingWindowMLAS
 
 ## Test Plan
 
-Unit tests (CPU, no MORI needed):
+Unit tests (ROCm; the UMBP suites mock the MORI client):
 
 ```bash
 .venv/bin/python -m pytest tests/v1/kv_connector/unit/test_umbp_*.py -v
-.venv/bin/python -m pytest tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py \
-  -k "kv_connector or canonical" -v
-```
-
-```bash
 .venv/bin/python -m pytest tests/v1/core/test_prefix_replay.py -v
+.venv/bin/python -m pytest tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py -v
+# regression for the touched shared code
+.venv/bin/python -m pytest tests/v1/core/test_contiguous_kv_packing.py \
+  tests/v1/core/test_kv_cache_utils.py \
+  tests/v1/attention/test_deepseek_v4_swa_visible.py \
+  tests/v1/kv_connector/unit/test_multi_connector.py -v
 ```
 
 New tests:
@@ -111,18 +112,45 @@ UMBP_DRAM_CAPACITY=$((1024 * 1024**3)) UMBP_SSD_ENABLED=0 umbp_standalone_server
 
 # 2. engine with --enable-prefix-caching and the UMBP connector (see docs)
 # 3. restore check: cold request -> POST /reset_prefix_cache -> same request;
-#    expect external prefix-cache hits, lower TTFT, identical greedy output
+#    expect external prefix-cache hits and lower TTFT (outputs may differ
+#    slightly: the SWA replay rebuilds the window approximately)
 # 4. GSM8K (lm_eval, 5-shot) with and without the connector
 HF_DATASETS_CACHE=/shared/models/huggingface/datasets lm_eval ...
 ```
 
 ## Test Result
 
-> TODO before marking ready for review. Do not fill in from memory:
-> - Unit test pass counts.
-> - Restore check: cold vs. warm TTFT, external hit tokens, output equality, and server key count with `dedup_tp_replicated_kv` true vs. false (expected ~1/8).
+### Unit tests
+
+Environment: MI355X, ROCm 10.0, torch 2.13.0+rocm10.0.0. The branch is rebased on `main` @ `fe5fe8ba5f` (which has `[UMBP][1/10]`–`[3/10]`) plus the `[UMBP][4/10]`–`[10/10]` stack (#58568 head `078c7bf335`).
+
+| Suite | Result |
+|---|---|
+| `tests/v1/kv_connector/unit/test_umbp_{core,async_lookup,hybrid,events,embedded,standalone,lazy}.py` | **275 passed** |
+| `tests/v1/core/test_prefix_replay.py` | **16 passed** |
+| `tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py` | **12 passed** |
+| Regression: `tests/v1/core/test_contiguous_kv_packing.py`, `tests/v1/core/test_kv_cache_utils.py`, `tests/v1/attention/test_deepseek_v4_swa_visible.py`, `tests/v1/kv_connector/unit/test_multi_connector.py` | 200 passed, 2 failed (environment-only, see below) |
+
+All seven new tests ran (none skipped) and passed:
+- `test_umbp_standalone.py::test_only_tp_replicated_mla_groups_are_deduplicated`
+- `test_umbp_standalone.py::test_tp_replicated_blocks_are_stored_once_and_loaded_by_every_rank`
+- `test_umbp_standalone.py::test_tp_dedup_can_be_disabled`
+- `test_umbp_standalone.py::test_embedded_rank_private_pools_are_not_deduplicated`
+- `test_prefix_replay.py::test_state_rebuilt_by_replay_is_not_prefix_cached`
+- `test_rocm_aiter_triton_sparse_mla.py::test_only_non_canonical_kv_connectors_disable_aiter_sparse_mla`
+- `test_rocm_aiter_triton_sparse_mla.py::test_dsv4_swa_replay_only_with_a_connector_that_asks`
+
+The two `test_multi_connector.py` failures come from the test environment and do not touch this change:
+- `test_multi_example_connector_consistency`: the gated HF model `meta-llama/Llama-3.2-1B-Instruct` returns 401 without an HF token.
+- `test_multi_connector_mixed_hma_disables_hybrid_kv_cache`: `ray` is not installed.
+
+### End-to-end (DeepSeek-V4-Pro, TP8, MI355X)
+
+> TODO: this needs MORI built with `BUILD_UMBP=ON`; the installed `amd_mori 1.2.3.post1` has no UMBP bindings. Do not fill in from memory:
+> - Restore check: cold vs. warm TTFT, external hit tokens, and output comparison. The SWA replay rebuilds the window approximately, so outputs may differ.
+> - UMBP server key count and bytes per request, with `dedup_tp_replicated_kv` true vs. false (expected ~1/8) and with `rebuild_sliding_window` true vs. false.
 > - GSM8K strict/flexible match with vs. without UMBP, plus a NaN-free run with `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=1`.
-> - Replay accuracy: long-context restore (e.g. 32K/128K prefix) without vs. with UMBP replay; UMBP object count and bytes per request.
+> - Replay accuracy on a long-context restore (e.g. 32K/128K prefix).
 
 ## Limitations / follow-ups
 

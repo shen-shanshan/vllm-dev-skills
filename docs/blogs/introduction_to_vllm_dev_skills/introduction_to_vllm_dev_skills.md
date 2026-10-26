@@ -21,6 +21,7 @@
 | `vllm-model-tutorial` | 代码学习 | 生成 vLLM 中具体模型的中文技术解析文档 | ⭐️⭐️⭐️⭐️⭐️ |
 | `vllm-feature-design` | 变更提案 | 根据需求生成核心代码实现与设计文档 | ⭐️ |
 | `vllm-rfc-generator` | 变更提案 | 生成 vLLM 风格的 RFC 文档 | ⭐️ |
+| `vllm-rocm-code-dev` | 代码贡献 | 根据开发需求实现仅影响 ROCm 路径的代码改动，并同步维护 PR 描述 | ⭐️⭐️⭐️⭐️⭐️ |
 | `vllm-pr-desc-generator` | 代码贡献 | 根据 PR 代码改动，按 vLLM 最新模板生成 PR 标题与描述 | ⭐️⭐️ |
 | `vllm-test-generator` | 代码贡献 | 生成单元测试与端到端测试 | ⭐️ |
 | `vllm-benchmark-result-analysis` | 性能优化 | 对比修改前后的 Serving Benchmark 结果 | ⭐️⭐️ |
@@ -31,7 +32,7 @@
 | `vllm-multimodal-open-issue-analyzer` | Issue 分析 | 搜集并整理多模态相关的 Open Issue | ⭐️ |
 | `vllm-technical-blog-writer` | 技术写作 | 按我的写作风格撰写或补全 vLLM 技术博客 | ⭐️⭐️ |
 
-其中，我日常用得最多的是 `vllm-feature-tutorial`、`vllm-model-tutorial` 和 `vllm-rocm-pr-review` 这三个。下面按分类逐一介绍，每个 Skill 的完整 Prompt 示例和输出样例都可以在仓库的 [README](https://github.com/shen-shanshan/vllm-dev-skills#-usages) 中找到。
+其中，我日常用得最多的是 `vllm-feature-tutorial`、`vllm-model-tutorial`、`vllm-rocm-code-dev` 和 `vllm-rocm-pr-review` 这四个。下面按分类逐一介绍，每个 Skill 的完整 Prompt 示例和输出样例都可以在仓库的 [README](https://github.com/shen-shanshan/vllm-dev-skills#-usages) 中找到。
 
 ### 2.1 需求发现
 
@@ -97,6 +98,15 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 例如：[Support ViT Full CUDA Graph](https://github.com/vllm-project/vllm/issues/38175)（同样经过了人工调整）。
 
 ### 2.4 代码贡献
+
+**`vllm-rocm-code-dev`：只改 ROCm 路径的代码开发。**
+
+在 vLLM 上做 AMD/ROCm 相关开发时，最容易出问题的是不小心改动了通用代码，影响到 CUDA 等其它硬件后端，Review 时还要逐处解释。这个 Skill 把这些约束固化成了开发流程：
+
+- **改动隔离**：优先修改 ROCm 专属代码（如 `vllm/platforms/rocm.py`、`vllm/_aiter_ops.py`、ROCm Attention Backend 等），必须改动通用代码时，通过在基类新增接口、由 ROCm 子类覆写的方式实现，并逐个文件确认其它后端的行为不变；
+- **简洁注释**：新增的关键代码只用一两句注释说明“为什么在 ROCm 上要这样做”，不写长篇大论；
+- **中文 Plan**：在 Plan Mode 下用中文输出方案，包括改动方案、对其它后端的影响分析、生效条件与回退路径以及验证方案；
+- **PR 描述联动**：代码完成后调用 `vllm-pr-desc-generator` 生成英文 PR 描述并保存到 `docs/tasks/` 目录，之后每次 Rebase、修复 Bug 或根据 Review 意见修改代码，都会同步更新这份描述。
 
 **`vllm-pr-desc-generator`：告别手写 PR 描述。**
 

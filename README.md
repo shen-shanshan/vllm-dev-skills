@@ -23,6 +23,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 | [vllm-model-tutorial](./skills/vllm-model-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM models. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-feature-design](./skills/vllm-feature-design/SKILL.md) | Change Proposing | Design and implement vLLM features according to user requirements. | ⭐️ |
 | [vllm-rfc-generator](./skills/vllm-rfc-generator/SKILL.md) | Change Proposing | Generate a vLLM-style RFC document based on user input. | ⭐️ |
+| [vllm-rocm-code-dev](./skills/vllm-rocm-code-dev/SKILL.md) | Code Contribution | Implement ROCm-only code changes in vLLM from a development requirement (no impact on CUDA or other backends, concise "why on ROCm" comments), and keep an English PR description in `docs/tasks/` in sync with every code update. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-pr-desc-generator](./skills/vllm-pr-desc-generator/SKILL.md) | Code Contribution | Generate a vLLM-style PR title and description (Overview / Claims / Validation / Details, following the latest PR template) from a GitHub PR's code changes. | ⭐️⭐️ |
 | [vllm-test-generator](./skills/vllm-test-generator/SKILL.md) | Code Contribution | Generate unit tests or end-to-end tests for vllm. | ⭐️ |
 | [vllm-benchmark-result-analysis](./skills/vllm-benchmark-result-analysis/SKILL.md) | Performance Optimization | Compare serving benchmark outputs before and after a code change. | ⭐️⭐️ |
@@ -117,6 +118,32 @@ https://github.com/vllm-project/vllm/pull/38061
 ```
 
 Output: [Support ViT Full CUDA Graph](https://github.com/vllm-project/vllm/issues/38175) (with manual adjustment and optimization).
+
+**📚 vllm-rocm-code-dev**
+
+Prompt:
+
+```text
+【需求背景】：
+https://github.com/vllm-project/vllm/pull/51794 为 vllm 中的 rocm 后端实现了 deepseek-v4 csa multi-stream overlap。现在需要你基于该 PR，继续为 vllm rocm 后端实现 deepseek-v4 hca layer 的 dual-stream overlap。
+
+【你的任务】：
+参考 /Users/shanshan-shen/Documents/GitHub/ATOM 中 deepseek-v4 hca 的 dual-stream overlap 实现：
+
+对于 HCA 层，先串行执行：mhc_fused_post_pre_gemm_sqrsum_kernel → mhc_pre_big_fuse_rmsnorm_kernel。
+
+然后，launch 两条 stream：
+1.default stream：fused wqa+wkv GEMM → q/kv RMSNorm → wq_b → qnorm/RoPE → SWA KV insert
+2.aux stream 0：HCA main compressor
+
+最后，join 两条 stream（多流 overlap 部分结束），接下来顺序执行 sparse attention 等后续流程。
+
+【注意事项】：
+1.给 vllm rocm 路径的 hca 多流 fork 加 capture-only gate（对齐 ATOM 的 in_hipgraph 规则）；
+/vllm-rocm-code-dev
+```
+
+Output: ROCm-only code changes in the local vLLM repo, plus an English PR description saved to `docs/tasks/<task-slug>.md`, which is updated after every rebase / bugfix / review fix.
 
 **📚 vllm-pr-desc-generator**
 
