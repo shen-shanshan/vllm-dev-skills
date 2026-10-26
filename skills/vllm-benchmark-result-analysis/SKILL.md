@@ -20,18 +20,18 @@ description: Compare vLLM serving benchmark outputs before and after a code chan
 Save the user's pasted text to `/tmp/bench_input.txt`, then:
 
 ```bash
-python3 /Users/shanshan-shen/.claude/skills/vllm-benchmark-result-analysis/scripts/compare_benchmarks.py \
+python3 ~/.claude/skills/vllm-benchmark-result-analysis/scripts/compare_benchmarks.py \
     /tmp/bench_input.txt \
-    --output-dir /Users/shanshan-shen/.claude/skills/vllm-benchmark-result-analysis/outputs \
+    --output-dir ~/.claude/skills/vllm-benchmark-result-analysis/outputs \
     --title "vLLM Benchmark Comparison"
 ```
 
 ### Two separate files
 
 ```bash
-python3 /Users/shanshan-shen/.claude/skills/vllm-benchmark-result-analysis/scripts/compare_benchmarks.py \
+python3 ~/.claude/skills/vllm-benchmark-result-analysis/scripts/compare_benchmarks.py \
     --before before.txt --after after.txt \
-    --output-dir /Users/shanshan-shen/.claude/skills/vllm-benchmark-result-analysis/outputs \
+    --output-dir ~/.claude/skills/vllm-benchmark-result-analysis/outputs \
     --title "vLLM Benchmark Comparison"
 ```
 
@@ -58,7 +58,7 @@ Metric lines must follow the pattern `Metric Name: <number>`. Section separator 
 
 ## Output
 
-The script creates a report file under `/Users/shanshan-shen/.claude/skills/vllm-benchmark-result-analysis/outputs/` containing:
+The script creates a report file under `~/.claude/skills/vllm-benchmark-result-analysis/outputs/` containing:
 
 - **Performance Metrics table** — metrics grouped into **Throughput** and **Latency** sections, with left-aligned columns and percentage comparison (e.g. `+0.54% ↑`, `-9.86% ↓`)
 
@@ -94,5 +94,5 @@ Refer to the `reference/reference.md` file for a full example of the generated r
 ## Notes
 
 - Always use `--title "vLLM Benchmark Comparison"` unless the user specifies a different title.
-- Save the output file into `/Users/shanshan-shen/.claude/skills/vllm-benchmark-result-analysis/outputs`.
+- Save the output file into `~/.claude/skills/vllm-benchmark-result-analysis/outputs`.
 - The script requires only the Python standard library — no extra dependencies.

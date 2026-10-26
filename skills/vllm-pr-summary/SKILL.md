@@ -20,7 +20,7 @@ Take `./reference/reference.md` as a reference for the report structure and styl
 ## Step 1: Fetch PR Data
 
 ```bash
-python3 /Users/shanshan-shen/.claude/skills/vllm-pr-summary/scripts/fetch_pr_data.py <PR_NUMBER> \
+python3 ~/.claude/skills/vllm-pr-summary/scripts/fetch_pr_data.py <PR_NUMBER> \
     --output /tmp/vllm_pr_<PR_NUMBER>.json
 ```
 
@@ -44,7 +44,7 @@ For large diffs, focus on the `files[].patch` fields grouped by module/directory
 
 ## Step 3: Write the Report
 
-Save to `/Users/shanshan-shen/.claude/skills/vllm-pr-summary/outputs/pr-<NUMBER>-summary.md`.
+Save to `~/.claude/skills/vllm-pr-summary/outputs/pr-<NUMBER>-summary.md`.
 
 ### Report Structure
 

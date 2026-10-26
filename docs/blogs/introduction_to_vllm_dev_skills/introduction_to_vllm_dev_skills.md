@@ -8,7 +8,7 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/10/25）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/10/26）。
 
 ## 二、项目介绍
 
@@ -21,7 +21,7 @@
 | `vllm-model-tutorial` | 代码学习 | 生成 vLLM 中具体模型的中文技术解析文档 | ⭐️⭐️⭐️⭐️⭐️ |
 | `vllm-feature-design` | 变更提案 | 根据需求生成核心代码实现与设计文档 | ⭐️ |
 | `vllm-rfc-generator` | 变更提案 | 生成 vLLM 风格的 RFC 文档 | ⭐️ |
-| `vllm-pr-desc-generator` | 代码贡献 | 根据 PR 代码改动生成 PR 描述 | ⭐️ |
+| `vllm-pr-desc-generator` | 代码贡献 | 根据 PR 代码改动，按 vLLM 最新模板生成 PR 标题与描述 | ⭐️⭐️ |
 | `vllm-test-generator` | 代码贡献 | 生成单元测试与端到端测试 | ⭐️ |
 | `vllm-benchmark-result-analysis` | 性能优化 | 对比修改前后的 Serving Benchmark 结果 | ⭐️⭐️ |
 | `vllm-vs-atom-decode-trace-comparison` | 性能优化 | 基于 Profiler Trace 对比 vLLM 与 ATOM 的 Decode Kernel 实现 | ⭐️⭐️ |
@@ -100,7 +100,15 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 **`vllm-pr-desc-generator`：告别手写 PR 描述。**
 
-输入一个 PR 的代码变更，自动生成符合 vLLM PR 模板（Purpose / Test Plan / Test Result）的规范描述。对于修改量大、涉及多个文件的 PR 尤其实用。
+输入一个 PR 的代码变更，自动生成 PR 标题和符合 vLLM 最新 PR 模板的规范描述。目前 vLLM 的 PR 模板已经从早期的 Purpose / Test Plan / Test Result 调整为 Overview / Claims / Validation / Details 四个部分，末尾还附带了一份 Pull Request Checklist，这个 Skill 也随之做了更新：
+
+- **PR 标题**：按照社区的 Tag 规范（如 `[Bugfix][Scheduler]`）生成标题，已有标题不规范时给出修正建议；
+- **Overview / Claims**：先用 1～2 句话概括改动并关联相关 Issue/PR，再用几条具体的 Claim 说明这个 PR 带来了什么（加速、新功能支持、Bug 修复等）；
+- **Validation**：为每条 Claim 给出复现命令和测试/Benchmark 结果，缺少的数据会用占位符标出，提醒作者补充，而不会凭空编造；
+- **Details**：说明动机、设计取舍、Root Cause 以及局限性，冗长的日志折叠到 `<details>` 中；
+- **Checklist**：原样保留模板中的 Pull Request Checklist，由作者自己勾选。
+
+对于修改量大、涉及多个文件的 PR 尤其实用。
 
 **`vllm-test-generator`：自动生成测试用例。**
 

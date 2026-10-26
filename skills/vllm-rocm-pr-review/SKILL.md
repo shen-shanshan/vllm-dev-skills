@@ -36,7 +36,7 @@ Non-ROCm path (gate says 不相关): Steps 1 → 2 → 3, then only housekeeping
 ## Step 1: Fetch PR Data
 
 ```bash
-python3 /Users/shanshan-shen/.claude/skills/vllm-rocm-pr-review/scripts/fetch_pr_data.py <PR_NUMBER> \
+python3 ~/.claude/skills/vllm-rocm-pr-review/scripts/fetch_pr_data.py <PR_NUMBER> \
     --output /tmp/vllm_rocm_pr_<PR_NUMBER>.json --include-ci
 ```
 
@@ -128,7 +128,7 @@ Finish with the blind-spot question: *is there any correctness risk, resource ha
 
 ## Step 9: Write the Report
 
-Save to `/Users/shanshan-shen/.claude/skills/vllm-rocm-pr-review/outputs/pr-<NUMBER>-review.md`. Chinese (Simplified) unless the user requests English. One file, two parts separated by `---`. Target ≤ ~750 lines: Part A ~250–400, Part B ~150–300, §9 ~40–60. 3–10 findings (fewer on the non-ROCm path).
+Save to `~/.claude/skills/vllm-rocm-pr-review/outputs/pr-<NUMBER>-review.md`. Chinese (Simplified) unless the user requests English. One file, two parts separated by `---`. Target ≤ ~750 lines: Part A ~250–400, Part B ~150–300, §9 ~40–60. 3–10 findings (fewer on the non-ROCm path).
 
 **Front matter (required)**: the file must start with the YAML block below — the Pingboard dashboard reads it to show the verdict and to tell whether the PR has changed since the review. Plain `key: value` lines only, no nesting or quotes.
 
@@ -257,7 +257,7 @@ cd <vllm-dev-skills checkout> && git add skills/vllm-rocm-pr-review/outputs/pr-<
 The skill refreshes its upstream knowledge with one command:
 
 ```bash
-python3 /Users/shanshan-shen/.claude/skills/vllm-rocm-pr-review/scripts/update_skill.py
+python3 ~/.claude/skills/vllm-rocm-pr-review/scripts/update_skill.py
 ```
 
 What it does:

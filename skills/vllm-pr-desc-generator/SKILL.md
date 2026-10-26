@@ -1,11 +1,13 @@
 ---
 name: vllm-pr-desc-generator
-description: Generate a vLLM-style PR description (Purpose / Test Plan / Test Result) from a GitHub PR's code changes. Use when the user provides a vLLM PR link or number and asks to generate, write, or draft a PR description. Triggered by requests like "帮我生成PR描述", "generate PR description for vllm PR 12345", "帮我写vllm PR的描述", "draft a PR desc for https://github.com/vllm-project/vllm/pull/12345".
+description: Generate a vLLM-style PR title and description (Overview / Claims / Validation / Details, following the current `.github/PULL_REQUEST_TEMPLATE.md`) from a GitHub PR's code changes. Use when the user provides a vLLM PR link or number and asks to generate, write, or draft a PR description. Triggered by requests like "帮我生成PR描述", "generate PR description for vllm PR 12345", "帮我写vllm PR的描述", "draft a PR desc for https://github.com/vllm-project/vllm/pull/12345".
 ---
 
 # vllm-pr-desc-generator
 
-Generate a vLLM-style PR description from code changes and save to `./outputs/`.
+Generate a vLLM-style PR title and description from code changes and save to `./outputs/`.
+
+The format follows vLLM's current PR template ([`.github/PULL_REQUEST_TEMPLATE.md`](https://github.com/vllm-project/vllm/blob/main/.github/PULL_REQUEST_TEMPLATE.md)) and the "Pull Request Contents" section of vLLM's `pr-checklist` skill (`.agents/skills/pr-checklist/SKILL.md`). If either has changed upstream, follow the upstream version.
 
 Take `./references/example-pr-desc.md` as a style reference for the output.
 
@@ -15,7 +17,7 @@ Take `./references/example-pr-desc.md` as a style reference for the output.
 2. **Fetch PR data** — run `scripts/fetch_pr_data.py`
 3. **Read the JSON** — load into context
 4. **Analyze code changes** — understand the diff, purpose, and impact
-5. **Generate PR description** — write vLLM-format description
+5. **Generate PR title + description** — write vLLM-format title and description
 6. **Save** — write to `./outputs/pr-<NUMBER>-desc.md`
 7. **Confirm** — tell the user the output path
 
@@ -31,7 +33,7 @@ For PRs from other repos (e.g., `vllm-project/vllm-ascend`), adjust the `--repo`
 ## Step 2: Fetch PR Data
 
 ```bash
-python3 /Users/shanshan-shen/.claude/skills/vllm-pr-desc-generator/scripts/fetch_pr_data.py <PR_NUMBER> \
+python3 ~/.claude/skills/vllm-pr-desc-generator/scripts/fetch_pr_data.py <PR_NUMBER> \
     --output /tmp/vllm_pr_<PR_NUMBER>.json
 ```
 
@@ -44,7 +46,7 @@ Optional flags:
 Read `/tmp/vllm_pr_<PR_NUMBER>.json`. Focus on:
 
 - **`diff`** and **`files`**: Understand what code changed, which modules are affected
-- **`pr.title`**: Infer the PR category prefix (e.g., `[Feature]`, `[BugFix]`, `[Misc]`, `[CI/Build]`, `[Doc]`)
+- **`pr.title`**: Check the existing title and its bracketed tags (see Step 4 for the tag conventions)
 - **`pr.body`**: Check if the author already provided context or linked issues
 - **`issue_comments` / `review_comments`**: Extract reviewer feedback, design decisions, test suggestions
 
@@ -56,52 +58,84 @@ Categorize the change type:
 - **Docs**: Documentation only
 - **CI/Build**: Build system, CI pipeline, dependency changes
 
-## Step 4: Generate PR Description
+## Step 4: Generate PR Title and Description
 
-Write the description following the vLLM PR template. The output MUST include these sections:
+### PR Title
+
+PR titles must start with one or more bracketed tags, followed by a space and a concise description, e.g. `[Bugfix][Scheduler] Fix priority handling`. Tags are stacked without spaces. Prefer these well-known tags; use a more specific one only when none fits:
+
+- **Type tags**: `[Bugfix]`, `[Feature]`, `[Perf]`, `[Refactor]`; `[CI]` / `[CI/Build]`, `[Test]`, `[Doc]` / `[Docs]`; `[Misc]` when nothing else fits.
+- **Scope tags**: `[Model]`, `[Frontend]`, `[Rust Frontend]`, `[Core]`, `[Kernel]`; `[Model Runner V2]` / `[MRV2]`, `[Attention]`, `[Multimodal]`, `[Quantization]`, `[MoE]`, `[Spec Decode]`, `[LoRA]`, `[KV Connector]`, `[KV Offload]`; `[ROCm]`, `[XPU]`, `[CPU]`, or `[Hardware][Vendor]` (e.g. `[Hardware][AMD]`).
+
+If the existing title already follows these rules and matches the change, keep it; otherwise propose a corrected one.
+
+### PR Description
+
+The output file MUST start with the title, followed by the four template sections in this order, then the template's checklist:
 
 ```markdown
-## Purpose
+**Title:** `[Type][Scope] Concise description`
 
-<1-3 paragraphs explaining WHY this change is needed and WHAT it does>
+## Overview
 
-<If there are linked issues, reference them: "Fixes #1234" or "Related: #5678">
+<1-2 lines summarizing the change. Link relevant issues and predecessor/blocking PRs, e.g. "Fixes #1234", "Follow-up to #5678".>
 
-### Key Changes
+## Claims
 
-<Bulleted list of the most important code changes, organized by module/file>
-<Each bullet: **bold file/class name** followed by a concise description>
-<Group related changes together>
+<A few concrete bullets stating what this PR accomplishes: speedups, feature support, bug fixes, etc.>
 
-## Test Plan
+## Validation
 
-<Commands or steps to verify the change>
-<Use code blocks for CLI commands>
+<Evidence that each claim is met, plus steps to reproduce: commands, test runs, accuracy evals, benchmarks.>
+<Compact tables with configuration, baseline, changed result, and reproduction commands.>
 
-## Test Result
+## Details
 
-<Expected results, benchmarks, or before/after comparisons>
-<Use tables for benchmark data when applicable>
+<Motivation, design decisions, root cause, tradeoffs, and limitations — concisely.>
+<Optional "Key changes" bullets grouped by module/file when the diff spans many files.>
+<Collapse lengthy logs or supporting material with <details>.>
 
-## (Optional) Documentation Update
+---
 
-<Only include if docs were changed or should be changed>
+<details>
+<summary> Pull Request Checklist </summary>
+
+- [ ] I used vLLM's `/pr-checklist` skill. (Mandatory for agents, optional for humans).
+- [ ] AI assistance was used during the creation of this PR.
+
+- [ ] **Design Fit:** Minimizes impact on core components, reuses existing functionality, and justifies added complexity.
+- [ ] **Testing and Validation:** Validates the change and ensures any added tests are meaningful and reliable, with CI coverage or documented CI resource constraints and validation performed outside CI.
+- [ ] **Code Quality and Style:** Keeps code and comments clear and concise, and updates relevant documentation and examples.
+- [ ] **Pull Request Contents:** Includes a brief summary and relevant links, supports claims with evidence, explains root causes and implementation trade-offs, and follows the contributing guide.
+</details>
 ```
+
+Copy the checklist verbatim and leave every box unchecked — the author ticks them. Do not include the `BEFORE SUBMITTING ...` footer; GitHub Actions strips it anyway.
 
 ### Writing Guidelines
 
-- **Purpose section**: Lead with the problem/motivation, then describe the solution approach. Be specific — "Fix OOM when loading large MoE models" is better than "Fix a bug".
-- **Key Changes**: Group by module. Use bold for file/class names. Each bullet should be self-contained and informative.
-- **Test Plan**: Provide concrete, copy-pasteable commands. Include model names, flags, and expected behavior.
-- **Test Result**: Prefer tables for quantitative results. For bug fixes, describe the before/after behavior.
+- **Overview**: 1-2 lines only. Lead with what the change does and why; put everything else in Details.
+- **Claims**: Concrete and verifiable — "Fix OOM when loading large MoE models with TP=8" beats "Fix a bug". Each claim should be backed by something in Validation. By change type:
+  - Bugfix — which issue is resolved and how it can be verified.
+  - Feature — what functionality is added and how to use it.
+  - Refactor — the motivation and expected improvements.
+  - Perf — targeted model / hardware / serving config / workload, and the measured gain.
+- **Validation**: Copy-pasteable commands with model names and flags.
+  - Bugfix: the reproducer, showing it fails before and passes after (including any new test).
+  - Feature: a validated usage example.
+  - Perf: prefer end-to-end serving benchmarks; for repeated runs report run count and variability; if only microbenchmarks are available, say so explicitly.
+  - If CI cannot cover the changed path (hardware / checkpoint unavailable), state the gap and what was validated outside CI.
+  - Only use results that appear in the PR body/comments or that the user provides. Never invent numbers — if evidence is missing, leave a clearly marked placeholder such as `<TODO: add benchmark result>` and tell the user.
+- **Details**: For bug fixes, include the root cause. For PD-disaggregation / NIXL connector changes, add a short numbered flow of the request path across P and D instances. Highlight non-obvious choices, tradeoffs, limitations, compatibility impacts, and areas needing maintainer attention.
+- **Conciseness**: Keep every section tight; link full logs or wrap them in `<details>` instead of pasting them inline.
 - **Language**: Match the PR title language. If title is in English, write in English. If Chinese, write in Chinese. Default to English.
 - **Tone**: Technical, concise, factual. No filler words.
 
 ## Step 5: Save Output
 
-Save to `/Users/shanshan-shen/.claude/skills/vllm-pr-desc-generator/outputs/pr-<NUMBER>-desc.md`.
+Save to `~/.claude/skills/vllm-pr-desc-generator/outputs/pr-<NUMBER>-desc.md`.
 
-Tell the user the file path and briefly summarize what the PR does.
+Tell the user the file path, the proposed title, a brief summary of what the PR does, and any `<TODO>` placeholders they need to fill in.
 
 ## Authentication
 

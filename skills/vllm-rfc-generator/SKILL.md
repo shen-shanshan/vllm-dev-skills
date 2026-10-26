@@ -59,7 +59,7 @@ gh pr view <NUMBER> --repo vllm-project/vllm --json title,url -q '"\(.url): \(.t
 
 ## RFC Document Template
 
-Save to `/Users/shanshan-shen/.claude/skills/vllm-rfc-generator/outputs/rfc-<slug>.md`
+Save to `~/.claude/skills/vllm-rfc-generator/outputs/rfc-<slug>.md`
 where `<slug>` is the title converted to lowercase with hyphens (e.g., `rfc-async-engine-redesign.md`).
 
 ```markdown
@@ -126,5 +126,5 @@ Key points to cover:
 ## Example Output Path
 
 ```
-/Users/shanshan-shen/.claude/skills/vllm-rfc-generator/outputs/rfc-async-engine-redesign.md
+~/.claude/skills/vllm-rfc-generator/outputs/rfc-async-engine-redesign.md
 ```
