@@ -20,6 +20,7 @@
 - [ ] docs/triton/amd_pointer_range_and_jit_warmup.md (Generated: ✅ / Read: )
 - [ ] skills/vllm-feature-tutorial/outputs/workspace_manager.md (Generated: ✅ / Read: )
 - [ ] skills/vllm-feature-tutorial/outputs/jit_kernel_warmup.md (Generated: ✅ / Read: )
+- [ ] skills/vllm-feature-tutorial/outputs/fast_start.md (Generated: ✅ / Read: )
 
 ## Blog Writing
 
