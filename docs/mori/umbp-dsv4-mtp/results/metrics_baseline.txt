@@ -1,0 +1,6 @@
+vllm:spec_decode_num_draft_tokens_total 165624
+vllm:external_prefix_cache_queries_total 0
+vllm:external_prefix_cache_hits_total 0
+vllm:prefix_cache_queries_total 1150678
+vllm:spec_decode_num_accepted_tokens_total 96011
+vllm:prefix_cache_hits_total 0

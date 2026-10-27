@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This PR lets DeepSeek-V4-Pro on AMD Instinct (MI355X, TP8) offload its prefix KV cache to a node-local MORI-UMBP `umbp_standalone_server` and restore it later. The pool is shared by every rank and engine on the host and survives engine restarts. Only single-node standalone mode is covered; RDMA / distributed mode is out of scope.
+This PR lets DeepSeek-V4-Pro on AMD Instinct (MI355X, TP8 or DP8) offload its prefix KV cache to a node-local MORI-UMBP `umbp_standalone_server` and restore it later. The pool is shared by every rank and engine on the host and survives engine restarts. It works with DSpark MTP speculative decoding (the InferenceX `mi355x-fp4-mtp` recipe) and runs on the MORI release the ROCm image pins (`v1.2.3.post1`). Only single-node standalone mode is covered; RDMA / distributed mode is out of scope.
 
 It builds on the UMBP connector stack from RFC #57187:
 - #58568 = `[UMBP][1/10]` … `[UMBP][10/10]`
@@ -68,11 +68,21 @@ Every one of these is an MLA-style spec (`MLAAttentionSpec` / `SlidingWindowMLAS
 - `KVConnectorBase_V1.only_restores_canonical_kv(kv_transfer_config)`: new classmethod, default `False`, following the `supports_sleep_mode` pattern.
   - `MultiConnector` returns true only if every child does.
   - `UMBPStoreConnector` returns `True`.
-- `vllm/models/deepseek_v4/amd/rocm.py`: `_has_foreign_kv_writer()` replaces the `kv_transfer_config is not None` checks feeding `_aiter_sparse_mla_enabled` and `_trust_dsv4_extra_cache_nan_free`.
+- `vllm/models/deepseek_v4/amd/rocm.py`: `_has_foreign_kv_writer()` replaces the `kv_transfer_config is not None` checks feeding the aiter sparse MLA decode and prefill gates (`_aiter_sparse_mla_enabled`, `_aiter_sparse_mla_prefill_enabled`) and `_trust_dsv4_extra_cache_nan_free`. The DeepSeek-V4.1 backend keeps its own `kv_transfer_config` check.
 - Only the ROCm DeepSeek-V4 backend consumes the new hook. CUDA paths and every other connector behave exactly as before.
 
+**Speculative decoding: DSpark MTP (UMBP connector, `umbp/connector.py`)**
+- The DeepSeek-V4-Pro MTP recipe uses `"method": "dspark"`. Its 3 draft layers have `compress_ratio=0`, so each one has only a sliding-window cache, and with replay on that cache becomes a `bounded_replay` group too.
+- DSpark builds a position's draft KV from the target's hidden states alone (`precompute_and_store_context_kv`; `needs_eagle_block_drop()` is false). So the replayed window that rebuilds the target's SWA cache rebuilds the draft's as well, with no extra code. UMBP stores none of the draft KV.
+- The connector's existing check only rejects EAGLE-style draft groups (`is_eagle_group`) that are not prefix-cacheable, so DSpark already passes it. This PR documents that and pins it with a test.
+- EAGLE-style MTP (`"method": "mtp"`) draft groups are not rebuilt by the replay and are still rejected at startup. The error now says to set `rebuild_sliding_window: false`, which stores every group instead.
+
+**Run on released MORI (`umbp/runtime/standalone.py`)**
+- The standalone runtime in #58568 required `UMBPStandaloneProcessConfig.lookup_timeout_ms`. Neither MORI `v1.2.3.post1` (pinned by `docker/Dockerfile.rocm_base`) nor ROCm/mori main has it, so the connector could not start on the ROCm image at all.
+- Now, when the binding is missing and `lookup_timeout_ms` is not configured, the connector logs a warning and attaches with unbounded lookups. Setting `lookup_timeout_ms` on such a MORI is still an error.
+
 **Docs**
-- `docs/features/umbp_standalone.md`: TP-replicated groups, the new option, and a DeepSeek-V4-Pro on MI355X section (server + `vllm serve` example).
+- `docs/features/umbp_standalone.md`: TP-replicated groups, the new option, a DeepSeek-V4-Pro on MI355X section (server + `vllm serve` example), speculative decoding (DSpark vs. EAGLE-style MTP), and the `lookup_timeout_ms` behavior on released MORI.
 
 ## Not duplicating existing work
 
@@ -102,8 +112,37 @@ New tests:
 - `::test_tp_replicated_blocks_are_stored_once_and_loaded_by_every_rank`: TP2; one `tp*` object per block; both ranks complete the store event; rank 1 restores byte-exact data.
 - `::test_tp_dedup_can_be_disabled`, `::test_embedded_rank_private_pools_are_not_deduplicated`
 - `test_rocm_aiter_triton_sparse_mla.py::test_only_non_canonical_kv_connectors_disable_aiter_sparse_mla`
+- `test_umbp_standalone.py::test_dspark_draft_rebuilt_by_replay_is_accepted`: a non-EAGLE draft SWA group rebuilt by replay passes the draft-group check.
+- `::test_eagle_draft_rebuilt_by_replay_is_rejected_with_a_hint`: an EAGLE draft group rebuilt by replay still raises, and the error points at `rebuild_sliding_window: false`.
+- `::test_released_mori_without_lookup_timeout_still_attaches`, `::test_lookup_timeout_needs_mori_with_bounded_lookups` (replaces `test_standalone_requires_mori_with_bounded_lookups`)
 
-E2E on 8x MI355X, DeepSeek-V4-Pro, TP8, fp8 KV, MORI built with `BUILD_UMBP=ON`:
+E2E accuracy with DSpark MTP: the InferenceX recipe `dsv4/vllm/mi355x-fp4-mtp/agentic.yaml` (base + `override_dep8_c128`) is launched twice with identical flags, once without and once with the UMBP connector. Then GSM8K is run against each. With UMBP it runs twice: pass 1 stores the KV, pass 2 resends the same prompts so they are restored from the pool.
+
+```bash
+# server (128 GiB pool is plenty for GSM8K)
+UMBP_STANDALONE_ADDRESS=unix:///tmp/umbp/standalone.grpc.sock \
+UMBP_DRAM_CAPACITY=$((128 * 1024**3)) UMBP_SSD_ENABLED=0 umbp_standalone_server
+
+# engine: recipe args, + --kv-transfer-config for the UMBP run
+VLLM_USE_V2_MODEL_RUNNER=1 VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_MOE=1 \
+VLLM_ROCM_USE_AITER_FUSION_SHARED_EXPERTS=0 VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4 \
+VLLM_PREFIX_CACHE_RETENTION_INTERVAL=32768 OMP_NUM_THREADS=1 \
+vllm serve deepseek-ai/DeepSeek-V4-Pro-0813 --trust-remote-code --async-scheduling \
+  --tensor-parallel-size 1 --data-parallel-size 8 --kv-cache-dtype fp8 \
+  --max-num-batched-tokens 8192 --max-num-seqs 128 --gpu-memory-utilization 0.86 \
+  --moe-backend aiter --compilation-config '{"mode":3,"cudagraph_mode":"FULL_AND_PIECEWISE"}' \
+  --speculative-config '{"method": "dspark", "num_speculative_tokens": 6, "draft_sample_method": "probabilistic"}' \
+  --tokenizer-mode deepseek_v4 --tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4 \
+  --enable-auto-tool-choice --enable-prefix-caching --no-disable-hybrid-kv-cache-manager \
+  --prefill-schedule-interval 8 --long-prefill-token-threshold 16384 \
+  --kv-transfer-config '{"kv_connector":"UMBPStoreConnector","kv_role":"kv_both","kv_load_failure_policy":"recompute","kv_connector_extra_config":{"mode":"standalone","endpoint":"unix:///tmp/umbp/standalone.grpc.sock"}}'
+
+lm_eval --model local-completions \
+  --model_args model=deepseek-ai/DeepSeek-V4-Pro-0813,base_url=http://0.0.0.0:8333/v1/completions,num_concurrent=64,max_retries=10,max_gen_toks=2048,timeout=60000,tokenized_requests=False \
+  --batch_size auto --tasks gsm8k --num_fewshot 5
+```
+
+Planned E2E on 8x MI355X, DeepSeek-V4-Pro, TP8, fp8 KV, MORI built with `BUILD_UMBP=ON` (not run yet, see Test Result):
 
 ```bash
 # 1. standalone server (1 TiB DRAM pool)
@@ -122,16 +161,20 @@ HF_DATASETS_CACHE=/shared/models/huggingface/datasets lm_eval ...
 
 ### Unit tests
 
-Environment: MI355X, ROCm 10.0, torch 2.13.0+rocm10.0.0. The branch is rebased on `main` @ `fe5fe8ba5f` (which has `[UMBP][1/10]`–`[3/10]`) plus the `[UMBP][4/10]`–`[10/10]` stack (#58568 head `078c7bf335`).
+Environment: MI355X, ROCm 10.0, torch 2.13.0+rocm10.0.0. The branch is rebased on `main` @ `803bc13cf9` (which has `[UMBP][1/10]`–`[3/10]`) plus the `[UMBP][4/10]`–`[10/10]` stack (#58568 head `078c7bf335`).
 
 | Suite | Result |
 |---|---|
-| `tests/v1/kv_connector/unit/test_umbp_{core,async_lookup,hybrid,events,embedded,standalone,lazy}.py` | **275 passed** |
+| `tests/v1/kv_connector/unit/test_umbp_{core,async_lookup,hybrid,events,embedded,standalone,lazy}.py` | **289 passed** |
 | `tests/v1/core/test_prefix_replay.py` | **16 passed** |
-| `tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py` | **12 passed** |
+| `tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py` | **19 passed** |
 | Regression: `tests/v1/core/test_contiguous_kv_packing.py`, `tests/v1/core/test_kv_cache_utils.py`, `tests/v1/attention/test_deepseek_v4_swa_visible.py`, `tests/v1/kv_connector/unit/test_multi_connector.py` | 200 passed, 2 failed (environment-only, see below) |
 
-All seven new tests ran (none skipped) and passed:
+All new tests ran (none skipped) and passed, including the four added for DSpark MTP and released MORI:
+- `test_umbp_standalone.py::test_dspark_draft_rebuilt_by_replay_is_accepted`
+- `test_umbp_standalone.py::test_eagle_draft_rebuilt_by_replay_is_rejected_with_a_hint`
+- `test_umbp_standalone.py::test_released_mori_without_lookup_timeout_still_attaches`
+- `test_umbp_standalone.py::test_lookup_timeout_needs_mori_with_bounded_lookups`
 - `test_umbp_standalone.py::test_only_tp_replicated_mla_groups_are_deduplicated`
 - `test_umbp_standalone.py::test_tp_replicated_blocks_are_stored_once_and_loaded_by_every_rank`
 - `test_umbp_standalone.py::test_tp_dedup_can_be_disabled`
@@ -144,21 +187,42 @@ The two `test_multi_connector.py` failures come from the test environment and do
 - `test_multi_example_connector_consistency`: the gated HF model `meta-llama/Llama-3.2-1B-Instruct` returns 401 without an HF token.
 - `test_multi_connector_mixed_hma_disables_hybrid_kv_cache`: `ray` is not installed.
 
-### End-to-end (DeepSeek-V4-Pro, TP8, MI355X)
+### End-to-end accuracy with DSpark MTP (DeepSeek-V4-Pro-0813, DP8, MI355X)
 
-> TODO: this needs MORI built with `BUILD_UMBP=ON`; the installed `amd_mori 1.2.3.post1` has no UMBP bindings. Do not fill in from memory:
-> - Restore check: cold vs. warm TTFT, external hit tokens, and output comparison. The SWA replay rebuilds the window approximately, so outputs may differ.
+Environment:
+- 8x MI355X, ROCm 10.0, torch 2.13.0+rocm10.0.0.
+- MORI `v1.2.3.post1` built with `BUILD_UMBP=ON`.
+- Recipe `dsv4/vllm/mi355x-fp4-mtp/agentic.yaml` with `override_dep8_c128`: DP8 x TP1, DSpark with 6 speculative tokens and probabilistic drafting, fp8 KV, model runner V2, prefix caching.
+- The recipe's `vllm-router` front end is replaced by the engine's built-in DP load balancer, identically in both runs. The router only picks a DP rank.
+- Every other flag and env var is identical between the two servers. The UMBP run adds only `--kv-transfer-config` (standalone, `kv_load_failure_policy: recompute`). Its startup log shows `DeepSeek-V4 SWA bounded replay: enabled`.
+- GSM8K: `lm_eval` 0.4.13, 5-shot, all 1319 questions, greedy decoding, `num_concurrent=64`.
+
+| Run | strict-match | flexible-extract | Draft acceptance | Mean acceptance length | Prompt tokens from UMBP / GPU prefix cache |
+|---|---|---|---|---|---|
+| Baseline (no connector) | 0.9515 ± 0.0059 | 0.9507 ± 0.0060 | 57.97% | 4.48 | 0 / 0 |
+| UMBP, pass 1 (stores) | 0.9538 ± 0.0058 | 0.9530 ± 0.0058 | 58.04% | 4.48 | 0.2% / 0 |
+| UMBP, pass 2 (same prompts restored) | 0.9522 ± 0.0059 | 0.9515 ± 0.0059 | 58.36% | 4.50 | **72.6%** / 12.5% |
+
+- Accuracy is unchanged. Every difference is at most 0.23 points, well inside one standard error (about 0.6 points).
+- Pass 2 is the stress case. 835,584 of 1,150,678 prompt tokens were restored from the UMBP pool (`vllm:external_prefix_cache_hits_total`), and 143,360 more hit the GPU prefix cache. Almost every request went through "restore compressed KV → recompute the last 128-token window".
+- That recomputation rebuilds the SWA cache and compressor states of the target, and the sliding-window cache of the three DSpark draft layers.
+- Draft acceptance is the signal for the draft side. Probabilistic rejection sampling keeps the output distribution exact even with bad drafts, so wrong draft KV would show up as lower acceptance, not lower accuracy. Acceptance stays at 58% (4.5 tokens per step) in every run, so the replay rebuilds the draft KV correctly.
+- In the baseline, GSM8K prompts get no GPU prefix hits: with `VLLM_PREFIX_CACHE_RETENTION_INTERVAL=32768`, the SWA groups keep checkpoints only every 32K tokens. With UMBP the SWA groups leave prefix caching, so GPU hits also become possible (pass 2).
+
+> TODO (not run yet, do not fill in from memory):
+> - TP8 restore check: cold vs. warm TTFT, external hit tokens, and output comparison.
 > - UMBP server key count and bytes per request, with `dedup_tp_replicated_kv` true vs. false (expected ~1/8) and with `rebuild_sliding_window` true vs. false.
-> - GSM8K strict/flexible match with vs. without UMBP, plus a NaN-free run with `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=1`.
+> - A NaN-free run with `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=1`.
 > - Replay accuracy on a long-context restore (e.g. 32K/128K prefix).
 
 ## Limitations / follow-ups
 
-- Speculative decoding (MTP) is not validated yet.
+- Speculative decoding is validated with DSpark only. EAGLE-style `"method": "mtp"` with replay is rejected at startup; it needs `rebuild_sliding_window: false`, which stores every group. That combination has not been run end to end. The 0813 checkpoint's `mtp.*` weights are the DSpark layers, so DSpark is the MTP path for this model.
+- On released MORI (no `lookup_timeout_ms`), scheduler lookups have no deadline: a stalled server blocks the lookup. The connector logs a warning.
+- With a 1 TiB `UMBP_DRAM_CAPACITY` (hugepages off), `umbp_standalone_server` spent more than 10 minutes faulting in the pool before it opened its gRPC socket. Size the pool for the workload, or back it with hugepages.
 - Distributed (RDMA) mode is not covered. It can reuse the same replicated keys once a shared pool is visible to all ranks.
 - While the connector is configured, GPU prefix-cache hits also replay the last window, since the SWA groups leave prefix caching.
 - The replay needs model runner V2. With `VLLM_USE_V2_MODEL_RUNNER=0` (or DBO), DeepSeek-V4 falls back to storing every group.
-- An MTP draft's SWA layers would also become replayed groups, which the UMBP connector rejects for draft models today.
 
 ---
 

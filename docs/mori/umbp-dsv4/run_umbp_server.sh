@@ -8,8 +8,11 @@ MORI_PKG=$(/home/shashen/vllm/vllm/.venv/bin/python -c 'import mori, os; print(o
 SERVER_BIN=${UMBP_STANDALONE_BIN:-${MORI_PKG}/umbp_standalone_server}
 export LD_LIBRARY_PATH=${MORI_PKG}:${LD_LIBRARY_PATH:-}
 export UMBP_STANDALONE_ADDRESS=unix://${SOCK_DIR}/standalone.grpc.sock
-export UMBP_DRAM_CAPACITY=${UMBP_DRAM_CAPACITY:-$((1024 * 1024**3))}
+# 1 TiB without hugepages takes >10 min to fault in before the socket opens.
+export UMBP_DRAM_CAPACITY=${UMBP_DRAM_CAPACITY:-$((128 * 1024**3))}
 export UMBP_DRAM_USE_HUGEPAGES=${UMBP_DRAM_USE_HUGEPAGES:-0}
 export UMBP_SSD_ENABLED=0
 export MORI_UMBP_LOG_LEVEL=${MORI_UMBP_LOG_LEVEL:-info}
-exec "${SERVER_BIN}" "${UMBP_STANDALONE_ADDRESS}" 2>&1 | tee "${SOCK_DIR}/server.log"
+LOG_DIR=${LOG_DIR:-/home/shashen/vllm/umbp_runs}
+mkdir -p "${LOG_DIR}"
+exec "${SERVER_BIN}" "${UMBP_STANDALONE_ADDRESS}" 2>&1 | tee "${LOG_DIR}/umbp_server.log"
