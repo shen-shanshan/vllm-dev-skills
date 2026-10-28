@@ -7,7 +7,11 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 TAG=${TAG:?}
 UMBP=${UMBP:-0}
-OUT=/home/shashen/vllm/umbp_runs/agentic/${TAG}
+# RUNS_DIR: logs and results. Keep it off a nearly full NFS home: a quota hit
+# mid-run truncates AIPerf's records (server_metrics_export.json is ~600 MB).
+export RUNS_DIR=${RUNS_DIR:-/home/shashen/vllm/umbp_runs}
+export LOG_DIR=${RUNS_DIR}
+OUT=${RUNS_DIR}/agentic/${TAG}
 mkdir -p "${OUT}"
 cleanup() {
   pkill -f "vllm_router_venv/bin/vllm-router" || true
@@ -16,26 +20,31 @@ cleanup() {
   sleep 30
 }
 cleanup
+# Tear down on any exit, including a failed startup.
+trap cleanup EXIT
 if [[ "${UMBP}" == "1" ]]; then
   rm -f /tmp/umbp/standalone.grpc.sock /tmp/umbp/standalone.fd.sock
   nohup bash "${HERE}/../umbp-dsv4/run_umbp_server.sh" >/dev/null 2>&1 &
   until [ -S /tmp/umbp/standalone.grpc.sock ]; do sleep 5; done
-  cp /home/shashen/vllm/umbp_runs/umbp_server.log "${OUT}/umbp_server_start.log" || true
+  cp "${RUNS_DIR}/umbp_server.log" "${OUT}/umbp_server_start.log" || true
 fi
 UMBP=${UMBP} LOG_NAME=agentic_${TAG} nohup bash "${HERE}/run_vllm_dsv4_mtp.sh" >/dev/null 2>&1 &
+# Watch the launcher's PID: pgrep on the vllm cmdline races its exec.
+ENGINE_PID=$!
 until curl -sf localhost:8333/health >/dev/null; do
-  pgrep -f "bin/vllm serve /shared" >/dev/null || { echo "engine died" >&2; exit 1; }
+  kill -0 "${ENGINE_PID}" 2>/dev/null || { echo "engine died" >&2; exit 1; }
   sleep 10
 done
 nohup bash "${HERE}/run_router.sh" >/dev/null 2>&1 &
 until curl -sf localhost:30000/health >/dev/null; do sleep 5; done
 if [[ "${UMBP}" == "1" ]]; then
+  # InferenceX aggregation requires backend metadata whenever KV offload is on.
   export KV_OFFLOADING=dram KV_OFFLOAD_BACKEND=umbp
+  export KV_OFFLOAD_BACKEND_METADATA='{"name":"umbp","version":"mori-1.2.3.post1"}'
   export TOTAL_CPU_DRAM_GB=$(( ${UMBP_DRAM_CAPACITY:-$((128 * 1024**3))} / 1024**3 ))
 fi
 TAG=${TAG} bash "${HERE}/run_agentic.sh" >/dev/null 2>&1 || echo "client rc=$?" >&2
 bash "${HERE}/snapshot_metrics.sh" > "${OUT}/engine_metrics.txt"
-cp "/home/shashen/vllm/umbp_runs/agentic_${TAG}.log" "${OUT}/engine.log" 2>/dev/null || true
-[[ "${UMBP}" == "1" ]] && cp /home/shashen/vllm/umbp_runs/umbp_server.log "${OUT}/umbp_server.log" || true
-cleanup
+cp "${RUNS_DIR}/agentic_${TAG}.log" "${OUT}/engine.log" 2>/dev/null || true
+[[ "${UMBP}" == "1" ]] && cp "${RUNS_DIR}/umbp_server.log" "${OUT}/umbp_server.log" || true
 echo "done ${TAG}"

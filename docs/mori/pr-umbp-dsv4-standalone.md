@@ -142,6 +142,33 @@ lm_eval --model local-completions \
   --batch_size auto --tasks gsm8k --num_fewshot 5
 ```
 
+E2E agentic performance with DSpark MTP: the same recipe point (`override_dep8_c128`), served behind the recipe's `vllm-router` frontend, replays the AgentX trace (`semianalysisai/cc-traces-weka-062126`) through InferenceX `python3 -m infx.bench agentic` with `DURATION=600`. Every run is a fresh deployment (fresh UMBP server, engine and router). The engine command is the one above, plus `--load-format fastsafetensors`; only the UMBP run adds `--kv-transfer-config`.
+
+```bash
+# server for the UMBP run: 512 GiB DRAM pool
+UMBP_STANDALONE_ADDRESS=unix:///tmp/umbp/standalone.grpc.sock \
+UMBP_DRAM_CAPACITY=$((512 * 1024**3)) UMBP_SSD_ENABLED=0 umbp_standalone_server
+
+# frontend: the recipe's router, sessions pinned to a DP rank by X-Session-ID
+vllm-router --worker-urls http://localhost:8333 --intra-node-data-parallel-size 8 \
+  --host 0.0.0.0 --port 30000 --policy consistent_hash \
+  --request-timeout-secs 14400 --disable-retries
+
+# client (InferenceX inferencex-e2e @ 6cbbb96e, agentx-harness 1.0.12)
+IS_AGENTIC=1 SCENARIO_TYPE=agentic-coding KV_OFFLOADING=none \
+ENABLE_AGENTX_POWER=0 REQUIRE_POWER=0 IS_MULTINODE=false EVAL_ONLY=false AIPERF_EXPERIMENTAL_FAST=0 \
+AIPERF_HTTP_TCP_USER_TIMEOUT=900000 AIPERF_REQUIRED_SERVER_METRIC_PREFIX='vllm:' \
+AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=1 CONC=128 DURATION=600 \
+TP=8 EP_SIZE=1 DP_ATTENTION=true SPEC_DECODING=draft_model \
+MODEL=deepseek-ai/DeepSeek-V4-Pro-0813 SERVED_MODEL_NAME=deepseek-ai/DeepSeek-V4-Pro-0813 \
+TOKENIZER=<DSpark checkpoint dir> MODEL_PREFIX=dsv4 FRAMEWORK=vllm PRECISION=fp4 \
+AIPERF_SERVER_URL=http://localhost:30000 AIPERF_SERVER_METRICS_URLS=http://localhost:8333/metrics \
+RESULT_DIR=<out> AGENTIC_OUTPUT_DIR=<out> RESULT_FILENAME=dsv4_vllm_dep8_c128_<tag> \
+bash -c 'source benchmarks/runtime_settings.sh && python3 -m infx.bench agentic'
+# the UMBP run instead sets KV_OFFLOADING=dram KV_OFFLOAD_BACKEND=umbp TOTAL_CPU_DRAM_GB=512 \
+#   KV_OFFLOAD_BACKEND_METADATA='{"name":"umbp","version":"mori-1.2.3.post1"}'
+```
+
 Planned E2E on 8x MI355X, DeepSeek-V4-Pro, TP8, fp8 KV, MORI built with `BUILD_UMBP=ON` (not run yet, see Test Result):
 
 ```bash
@@ -209,7 +236,42 @@ Environment:
 - Draft acceptance is the signal for the draft side. Probabilistic rejection sampling keeps the output distribution exact even with bad drafts, so wrong draft KV would show up as lower acceptance, not lower accuracy. Acceptance stays at 58% (4.5 tokens per step) in every run, so the replay rebuilds the draft KV correctly.
 - In the baseline, GSM8K prompts get no GPU prefix hits: with `VLLM_PREFIX_CACHE_RETENTION_INTERVAL=32768`, the SWA groups keep checkpoints only every 32K tokens. With UMBP the SWA groups leave prefix caching, so GPU hits also become possible (pass 2).
 
+### End-to-end agentic performance with DSpark MTP (DeepSeek-V4-Pro, DP8, MI355X)
+
+Environment:
+- Same host and software as the accuracy run above, with `--load-format fastsafetensors`.
+- Checkpoint: the DSpark revision `7c09739` (the recipe pins `72e1d32`).
+- Recipe `dsv4/vllm/mi355x-fp4-mtp/agentic.yaml` + `override_dep8_c128`, served behind the recipe's `vllm-router==0.1.14` (`consistent_hash`).
+- AgentX replay of `semianalysisai/cc-traces-weka-062126`, 128 concurrent sessions. `DURATION=600` is shorter than the matrix's 900 s minimum, so AIPerf runs with `--unsafe-override`.
+- Each run first replays a 1,422-request warmup (about 20 min) and then a 600 s profiling window. The table shows the profiling window only.
+- UMBP run: standalone server with a 512 GiB DRAM pool. Its log shows `DeepSeek-V4 SWA bounded replay: enabled`.
+- Every other flag and env var is identical between the two runs. One run per configuration.
+
+| Metric | Baseline (no connector) | UMBP standalone | Δ |
+|---|---|---|---|
+| Requests completed in window (errors) | 1,155 (0) | 1,315 (0) | +13.9% |
+| Input throughput (tok/s) | 148,395 | 170,036 | +14.6% |
+| Output throughput (tok/s) | 1,157 | 1,324 | **+14.4%** |
+| Output throughput / GPU (tok/s) | 144.7 | 165.4 | +14.4% |
+| TTFT mean / p50 / p90 (s) | 4.50 / 2.49 / 11.54 | 3.65 / 2.25 / 7.88 | −18.9% / −9.6% / −31.7% |
+| TPOT mean / p50 / p90 (ms) | 78.8 / 71.9 / 125.8 | 70.2 / 62.0 / 112.2 | −10.9% / −13.8% / −10.8% |
+| E2E latency mean / p50 / p90 (s) | 52.5 / 32.6 / 120.2 | 45.6 / 27.5 / 105.9 | −13.1% / −15.6% / −11.9% |
+| Interactivity p50 (tok/s/user) | 13.91 | 16.14 | +16.0% |
+| Prompt tokens: GPU prefix hit / UMBP hit (window) | 92.4% / 0 | 93.0% / 0.8% | |
+| Prefill tokens computed per request (window) | 13,937 | 11,203 | −19.6% |
+| GPU KV cache usage (window mean) | 36.4% | 33.0% | |
+| Draft acceptance / mean acceptance length (whole run) | 41.9% / 3.51 | 43.0% / 3.58 | |
+| Preemptions | 0 | 0 | |
+
+- With UMBP, every throughput and latency metric improves. Output throughput is +14.4%, and TTFT p90 is −31.7%.
+- The workload is prefill bound: mean ISL is about 81K in both runs, and 93% of prompt tokens already hit the GPU prefix cache. Throughput therefore follows the prefill tokens each completed request still computes, which drop by 2.7K (−19.6%). Roughly half of the drop comes from each of two sources:
+  - **UMBP restores, about 1.4K tokens per request.** 1.86M prompt tokens (0.8%) came from the pool.
+  - **More GPU prefix hits, about 1.3K tokens per request.** With the replay on, the SWA and compressor-state groups leave prefix caching. A hit then no longer has to land on an SWA checkpoint (`VLLM_PREFIX_CACHE_RETENTION_INTERVAL=32768` keeps one every 32K tokens), so it can extend to any 256-token block of the compressed KV.
+- At this point the GPU KV cache is only about a third full, so few prefixes are evicted and need a restore. Restores should matter more when the working set exceeds HBM: longer runs, higher concurrency, or engine restarts against a warm pool.
+- Caveat: this is one 600 s run per configuration, so run-to-run variance is not measured. The baseline's warmup also took longer (1,404 s vs. 1,234 s).
+
 > TODO (not run yet, do not fill in from memory):
+> - Repeat the agentic pair (and a full 900 s+ / complete-trace run) to bound run-to-run variance; add a `rebuild_sliding_window: false` point to separate the replay effect from the restore effect.
 > - TP8 restore check: cold vs. warm TTFT, external hit tokens, and output comparison.
 > - UMBP server key count and bytes per request, with `dedup_tp_replicated_kv` true vs. false (expected ~1/8) and with `rebuild_sliding_window` true vs. false.
 > - A NaN-free run with `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=1`.

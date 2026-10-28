@@ -8,7 +8,9 @@
 # built-in DP load balancer.
 set -euo pipefail
 VLLM_BIN=/home/shashen/vllm/vllm/.venv/bin/vllm
-MODEL=${MODEL:-/shared/DeepSeek-V4-Pro-0813}
+# DSpark checkpoint (served as DeepSeek-V4-Pro-0813); the recipe pins revision
+# 72e1d32, this host caches 7c09739.
+MODEL=${MODEL:-/shared/models--deepseek-ai--DeepSeek-V4-Pro-DSpark/snapshots/7c09739fd136abfb70a49ec334157f65f45b52cd}
 PORT=${PORT:-8333}
 UMBP=${UMBP:-1}
 ENDPOINT=${ENDPOINT:-unix:///tmp/umbp/standalone.grpc.sock}
