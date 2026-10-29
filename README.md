@@ -308,7 +308,7 @@ Prompt:
 
 Output: 每个 `<recipe>_<override>` 组合一个文件夹，包含 `01_docker_run.sh`（host 起容器）、`02_start_server.sh`（容器内起 server，可选 profiler 配置）、`03_run_client.sh`（容器内跑 AgentX replay）以及 `variant.json`/`variant.env`，示例见 [dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](./skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64/).
 
-## 💡 AI-Native E2E Workflows with Multi-Skills
+## 💡 AI-Native Workflows with Multi-Skills
 
 Coming soon...
 
