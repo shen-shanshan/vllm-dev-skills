@@ -4,7 +4,7 @@
 set -euo pipefail
 ENGINE_PORT=${ENGINE_PORT:-8333}
 ROUTER_PORT=${ROUTER_PORT:-30000}
-LOG_DIR=${LOG_DIR:-/home/shashen/vllm/umbp_runs}
+LOG_DIR=${LOG_DIR:-/tmp/umbp_runs}
 mkdir -p "${LOG_DIR}"
 exec /home/shashen/vllm/vllm_router_venv/bin/vllm-router \
   --worker-urls "http://localhost:${ENGINE_PORT}" \

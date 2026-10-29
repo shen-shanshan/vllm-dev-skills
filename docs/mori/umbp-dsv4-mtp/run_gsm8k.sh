@@ -8,7 +8,7 @@ export HF_HOME=/shared/huggingface
 export HF_DATASETS_CACHE=/shared/huggingface/datasets
 export HF_DATASETS_OFFLINE=1
 PORT=${PORT:-8333}
-OUT=${OUT:-/home/shashen/vllm/umbp_runs/gsm8k}
+OUT=${OUT:-/tmp/umbp_runs/gsm8k}
 mkdir -p "${OUT}"
 cd "${OUT}"
 /home/shashen/vllm/lm_eval_venv/bin/lm_eval \

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # AgentX trace replay (InferenceX `python3 -m infx.bench agentic`) at the
 # recipe's override_dep8_c128 point, through the router, scraping engine metrics.
-#   TAG=baseline DURATION=600 bash run_agentic.sh
+#   TAG=baseline bash run_agentic.sh
 # The AgentX runtime (agentx-harness==1.0.12) lives in a persistent venv so it
 # is not re-bootstrapped per run. The trace corpus (1.8 GB) is cached in a
 # persistent HF_HOME; /shared is a read-only mount on some hosts.
@@ -9,7 +9,7 @@ set -eo pipefail
 INFX=/home/shashen/vllm/InferenceX/inferencex-e2e
 RUNTIME=/home/shashen/vllm/agentx_runtime
 TAG=${TAG:?set TAG, e.g. baseline / umbp_replay}
-OUT=${OUT:-${RUNS_DIR:-/home/shashen/vllm/umbp_runs}/agentic/${TAG}}
+OUT=${OUT:-${RUNS_DIR:-/tmp/umbp_runs}/agentic/${TAG}}
 mkdir -p "${OUT}"
 
 # Matrix-point markers first (InferenceX AGENTS rule), then workflow defaults.
@@ -28,7 +28,9 @@ export CONC=128
 # Matrix shape of this point (amd-master.yaml: tp 8, ep 1, dp-attn true,
 # spec-decoding draft_model); the aggregation derives per-GPU numbers from it.
 export TP=8 EP_SIZE=1 DP_ATTENTION=true SPEC_DECODING=draft_model
-export DURATION=${DURATION:-600}
+# InferenceX matrix default (infx/matrix/validation.py:
+# DEFAULT_AGENTIC_DURATION_SECONDS); infx.bench itself requires DURATION.
+export DURATION=${DURATION:-3600}
 
 export MODEL=deepseek-ai/DeepSeek-V4-Pro-0813
 export SERVED_MODEL_NAME=deepseek-ai/DeepSeek-V4-Pro-0813

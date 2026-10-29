@@ -13,6 +13,6 @@ export UMBP_DRAM_CAPACITY=${UMBP_DRAM_CAPACITY:-$((128 * 1024**3))}
 export UMBP_DRAM_USE_HUGEPAGES=${UMBP_DRAM_USE_HUGEPAGES:-0}
 export UMBP_SSD_ENABLED=0
 export MORI_UMBP_LOG_LEVEL=${MORI_UMBP_LOG_LEVEL:-info}
-LOG_DIR=${LOG_DIR:-/home/shashen/vllm/umbp_runs}
+LOG_DIR=${LOG_DIR:-/tmp/umbp_runs}
 mkdir -p "${LOG_DIR}"
 exec "${SERVER_BIN}" "${UMBP_STANDALONE_ADDRESS}" 2>&1 | tee "${LOG_DIR}/umbp_server.log"

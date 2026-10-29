@@ -9,7 +9,7 @@ TAG=${TAG:?}
 UMBP=${UMBP:-0}
 # RUNS_DIR: logs and results. Keep it off a nearly full NFS home: a quota hit
 # mid-run truncates AIPerf's records (server_metrics_export.json is ~600 MB).
-export RUNS_DIR=${RUNS_DIR:-/home/shashen/vllm/umbp_runs}
+export RUNS_DIR=${RUNS_DIR:-/tmp/umbp_runs}
 export LOG_DIR=${RUNS_DIR}
 OUT=${RUNS_DIR}/agentic/${TAG}
 mkdir -p "${OUT}"

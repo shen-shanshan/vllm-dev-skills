@@ -17,6 +17,7 @@
   - SGLang 的 DSv4 + UMBP：`/home/shashen/vllm/sglang`。只存压缩池，命中后重算最后一个窗口；TP 复制的 KV 用同一个 key。
   - MORI 源码：`/home/shashen/vllm/mori`。这是个人 fork 的 main，没有 tag。编译用的是 tag worktree，见第 6 节。
   - 背景知识：[`umbp-background.md`](umbp-background.md)。
+  - 性能调优配置与方法（含 SGLang 官方 DSv4/MI355X UMBP 配置调研）：[`umbp-perf-tuning.md`](umbp-perf-tuning.md)。
 
 ## 2. 代码与分支状态
 
@@ -129,7 +130,7 @@ PR 新增的测试列表见 PR 描述的 "Test Plan" 一节。
 - pass1 期间 `external_prefix_cache_hits_total = 0`：GPQA 的 prompt 很短（约 300 token），各题之间也不共享前缀，所以 pass1 只验证了"挂上 connector、开启 SWA replay 之后精度不降"，没有覆盖恢复路径。
 - 结果存在 `/home/shashen/vllm/umbp_runs/gpqa/{baseline,umbp}`。
 - 用户已说明：baseline 跑一遍就够，不用重复跑。
-- **下次继续**：只补跑 UMBP，`TAG=umbp UMBP=1 PASSES=2 bash umbp-dsv4-mtp/run_gpqa_config.sh`，约 1.5 小时。跑完后统计空回答、做逐题对比；如果精度差别不大，再更新 PR 描述。
+- **已取消（2026-10-29）**：数据集已删除，不再补跑。原计划为只补跑 UMBP，`TAG=umbp UMBP=1 PASSES=2 bash umbp-dsv4-mtp/run_gpqa_config.sh`，约 1.5 小时。跑完后统计空回答、做逐题对比；如果精度差别不大，再更新 PR 描述。
 - 环境：GPQA 已缓存在 `HF_HOME=/home/shashen/vllm/hf_cache`，评测时离线读取；lm_eval 装在 `/home/shashen/vllm/lm_eval_venv`；HF 已登录，token 在 `~/.cache/huggingface/token`。
 
 ### 5.5 脚本索引
@@ -166,7 +167,7 @@ PR 新增的测试列表见 PR 描述的 "Test Plan" 一节。
 ## 7. 未完成事项（按优先级）
 
 - [x] ~~#58568 force-push 后 stack 内容有差异~~：2026-10-29 rebase 到 `fa3b9d1377` 时已对齐。除了本 PR 自己的增量，stack 和 #58568 head `e6a479fe63` 一致。
-- [ ] **GPQA 精度对比收尾**：补跑 UMBP 的 pass1 和 pass2，然后更新 PR 描述，见 5.4 节。
+- [x] ~~**GPQA 精度对比收尾**~~：2026-10-29 用户决定取消。GPQA 数据集已删除（`/home/shashen` 空间不足），不再做 GPQA；正确性改用 `umbp-dsv4-mtp/smoke_umbp.sh` 检查。
 - [ ] TP8 恢复验证（`check_restore.py`）：冷启动和命中后的 TTFT、外部命中 token 数、输出对比。
 - [ ] 统计 UMBP server 上的 key 数和每个请求的字节数，对比 `dedup_tp_replicated_kv` 开/关（预期开启后约为 1/8）、`rebuild_sliding_window` 开/关。
 - [ ] 开启 `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=1` 跑一次，确认没有 NaN。

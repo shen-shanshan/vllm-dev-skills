@@ -17,7 +17,7 @@ ENDPOINT=${ENDPOINT:-unix:///tmp/umbp/standalone.grpc.sock}
 # Extra kv_connector_extra_config entries, e.g. UMBP_EXTRA=',"rebuild_sliding_window":false'
 UMBP_EXTRA=${UMBP_EXTRA:-}
 LOG_NAME=${LOG_NAME:-vllm_mtp_umbp${UMBP}}
-LOG_DIR=${LOG_DIR:-/home/shashen/vllm/umbp_runs}
+LOG_DIR=${LOG_DIR:-/tmp/umbp_runs}
 mkdir -p "${LOG_DIR}"
 
 # roles.agg.env
