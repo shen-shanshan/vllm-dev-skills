@@ -8,7 +8,7 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/10/26）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/10/29）。
 
 ## 二、项目介绍
 
@@ -16,6 +16,7 @@
 
 | Skill | 分类 | 用途 | 推荐度 |
 | :--- | :--- | :--- | :--- |
+| `vllm-rocm-env-prepare` | 环境准备 | 在 ROCm 容器内一键搭建 vLLM 开发环境（代码仓、配置、免编译 venv、可选 MORI+UMBP） | ⭐️⭐️⭐️ |
 | `vllm-dev-task-discovery` | 需求发现 | 分析某个模块中可以给社区贡献的任务 | ⭐️ |
 | `vllm-feature-tutorial` | 代码学习 | 生成 vLLM 特性/模块的中文技术解析文档 | ⭐️⭐️⭐️⭐️⭐️ |
 | `vllm-model-tutorial` | 代码学习 | 生成 vLLM 中具体模型的中文技术解析文档 | ⭐️⭐️⭐️⭐️⭐️ |
@@ -34,7 +35,21 @@
 
 其中，我日常用得最多的是 `vllm-feature-tutorial`、`vllm-model-tutorial`、`vllm-rocm-code-dev` 和 `vllm-rocm-pr-review` 这四个。下面按分类逐一介绍，每个 Skill 的完整 Prompt 示例和输出样例都可以在仓库的 [README](https://github.com/shen-shanshan/vllm-dev-skills#-usages) 中找到。
 
-### 2.1 需求发现
+### 2.1 环境准备
+
+**`vllm-rocm-env-prepare`：进容器后一句话搭好开发环境。**
+
+**痛点**：我平时在 `vllm/vllm-openai-rocm` Nightly 镜像起的容器里开发，容器经常重建，每次都要重复一遍拉代码仓、写 Git 配置、装 Node.js 与 Claude Code、同步 `main` 分支、搭建虚拟环境等步骤。其中最容易出错的是 vLLM 本身：镜像里的 vLLM 已经编译好了 C++/HIP 扩展，如果本地源码和镜像对应的 Commit 不一致，或者重新编译一遍，既慢又容易出现二进制和源码不匹配的问题。
+
+**Skill 效果**：把这些步骤固化成一个可重复执行的流程，已经完成的步骤会自动跳过：
+
+- **代码仓与 Skill**：将 vLLM、vllm-dev-skills、InferenceX、ATOM、MORI 等代码仓 Clone 到宿主机挂载的持久化目录中，并把 vllm-dev-skills 中的 Skill 软链接到 `~/.claude/skills/`；
+- **基础配置**：写入 Git 用户信息与常用 Alias、Vim 配置，安装 claude-hud 依赖的 Node.js，并链接 Claude Code 可执行文件；
+- **免编译的 vLLM 开发环境**：同步 `main` 分支后，将当前分支对齐到镜像中 vLLM 的构建 Commit，拷贝镜像里预编译好的 `*.so`，再创建继承系统 site-packages 的 `.venv`，以 Editable 方式安装源码，这样修改 Python 代码后无需重新编译即可生效；
+- **模型与数据集**：优先复用只读挂载的 `/shared` 中已有的权重和数据集，没有时再下载到工作目录；
+- **MORI + UMBP（按需）**：用 vLLM 固定的 MORI 版本、打开 `BUILD_UMBP=ON` 源码编译 MORI 并装进 `.venv`，并通过检查编译日志和 Import 结果，避免装上一个悄悄关掉了 UMBP 的版本。
+
+### 2.2 需求发现
 
 **`vllm-dev-task-discovery`：不知道该做什么？先看看社区需要什么。**
 
@@ -44,7 +59,7 @@
 
 输出样例：[vllm_dev_task_multimodal_20260611](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-dev-task-discovery/outputs/vllm_dev_task_multimodal_20260611.md)。
 
-### 2.2 代码学习
+### 2.3 代码学习
 
 **`vllm-feature-tutorial`：读懂一个 vLLM 模块，只需一条指令。**
 
@@ -74,7 +89,7 @@
 
 输出样例：[deepseek_ocr](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-model-tutorial/outputs/deepseek_ocr.md)。
 
-### 2.3 变更提案
+### 2.4 变更提案
 
 **`vllm-feature-design`：从需求到实现的全流程辅助。**
 
@@ -97,7 +112,7 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 例如：[Support ViT Full CUDA Graph](https://github.com/vllm-project/vllm/issues/38175)（同样经过了人工调整）。
 
-### 2.4 代码贡献
+### 2.5 代码贡献
 
 **`vllm-rocm-code-dev`：只改 ROCm 路径的代码开发。**
 
@@ -129,7 +144,7 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 你也可以在 Prompt 中指定测试文件和复用要求，例如“在 `tests/v1/cudagraph/test_encoder_cudagraph.py` 中生成测试，并尽可能复用 `SimpleMockViTModel`”，这样生成的用例会更贴近仓库中已有的测试风格。
 
-### 2.5 性能优化
+### 2.6 性能优化
 
 **`vllm-benchmark-result-analysis`：快速对比性能数据。**
 
@@ -163,7 +178,7 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 输出样例：[dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](https://github.com/shen-shanshan/vllm-dev-skills/tree/master/skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64)。
 
-### 2.6 代码 Review
+### 2.7 代码 Review
 
 **`vllm-pr-summary`：PR Review 提效工具。**
 
@@ -188,13 +203,13 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 输出样例：[pr-29304-review](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-rocm-pr-review/outputs/pr-29304-review.md)。
 
-### 2.7 Issue 分析
+### 2.8 Issue 分析
 
 **`vllm-multimodal-open-issue-analyzer`：多模态相关待处理 Issue 搜集与整理。**
 
 自动拉取并分类整理 vLLM 仓库中与多模态相关的 Open Issue，按问题类型（Bug、Feature Request、性能等）分组，便于快速了解社区当前的痛点和待解决问题。
 
-### 2.8 技术写作
+### 2.9 技术写作
 
 **`vllm-technical-blog-writer`：用我自己的风格写 vLLM 技术博客。**
 

@@ -38,5 +38,5 @@ Instructions for AI coding agents working in this repository.
 2. **更新 `README.md`**：
    - 新增 skill：在 `## 🚀 Skills` 表格中按 Category 将其插入到合适位置（Name 链接到 `./skills/<skill-name>/SKILL.md`，填写 Category / Description / Rec），并在 `## 📖 Usages` 中补充对应的使用示例（Prompt 等），保持与已有条目一致的格式。
    - 更新 skill：若 skill 的功能、描述、触发方式或用法有变化，同步修改表格中的 Description 及 `## 📖 Usages` 中的对应内容。
-3. **更新项目介绍博客**：调用 `vllm-technical-blog-writer` skill，更新 `docs/blogs/introduction_to_vllm_dev_skills/` 下的博客（`introduction_to_vllm_dev_skills.md` 与 `zhihu.md` 需保持内容同步），在对应的研发环节小节（如 2.1 需求发现 ~ 2.8 技术写作）中新增或修改该 skill 的介绍，必要时同步调整“后续计划”等相关段落。同时将两篇博客开头 NOTE 中的日期（`本文将会随项目演进持续更新（Last Update：YYYY/MM/DD）`）更新为当天日期。
+3. **更新项目介绍博客**：调用 `vllm-technical-blog-writer` skill，更新 `docs/blogs/introduction_to_vllm_dev_skills/` 下的博客（`introduction_to_vllm_dev_skills.md` 与 `zhihu.md` 需保持内容同步），在对应的研发环节小节（如 2.1 环境准备 ~ 2.9 技术写作）中新增或修改该 skill 的介绍，必要时同步调整“后续计划”等相关段落。同时将两篇博客开头 NOTE 中的日期（`本文将会随项目演进持续更新（Last Update：YYYY/MM/DD）`）更新为当天日期。
 4. 完成后在回复中告知用户以上哪些内容已更新（软链接 / `README.md` / 博客）。
