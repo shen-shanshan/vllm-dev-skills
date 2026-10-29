@@ -11,7 +11,7 @@
 - **RFC**：https://github.com/vllm-project/vllm/issues/57187
 - **我们的 PR**：https://github.com/vllm-project/vllm/pull/63002，PR 描述正文见 [`pr-umbp-dsv4-standalone.md`](pr-umbp-dsv4-standalone.md)。
 - **依赖**：只依赖 base PR #58568（`[UMBP][1/10]`–`[10/10]`）。**不依赖** Kimi-K3 相关的 #59276、#59281（同事确认："It depends on the base PRs only, not on Kimi-K3 support PR"）。
-  - 已合入 main：`[1/10]` #61789、`[2/10]` #61790、`[3/10]` #61791。
+  - 已合入 main：`[1/10]` #61789 至 `[5/10]` #61793（`[5/10]` 是 embedded DRAM runtime，2026-10-28 合入）。
   - 还在 review：`[4/10]`–`[10/10]`。standalone 模式在 `[7/10]` #61795。
 - **参考实现**：
   - SGLang 的 DSv4 + UMBP：`/home/shashen/vllm/sglang`。只存压缩池，命中后重算最后一个窗口；TP 复制的 KV 用同一个 key。
@@ -24,7 +24,7 @@
 |---|---|
 | 仓库 | `/home/shashen/vllm/vllm` |
 | 分支 | `rocm-dsv4-umbp`（`origin` = fork `shen-shanshan/vllm`，`upstream` = `vllm-project/vllm`） |
-| 本地 base | `5ea8301982`（2026-10-28 的 upstream/main，同时也是 Docker 镜像的构建 commit）。**已经 rebase 到最新 main，不需要再动** |
+| 本地 base | `fa3b9d1377`（2026-10-29 用户 rebase 到的最新 main，包含 `[5/10]`）。提交 1 = `c6e94502f1`，提交 2 = `387c1975ac` |
 | origin 上的 base | `803bc13cf9`（旧 base；两个提交 `git range-diff` 完全一致，只是 base 不同） |
 | 提交 1 | `a4d93efad4 support umbp for dsv4`：#58568 的 `[4/10]`–`[10/10]` stack 和 DSv4 增量**压在一个提交里** |
 | 提交 2 | `2f2b03baf5 update`：已发布 MORI 没有 `lookup_timeout_ms` 时的兼容处理，以及 DSpark MTP 的测试 |
@@ -33,6 +33,14 @@
 注意：
 - `dev/init.sh`（未跟踪）会把分支 rebase 到 Docker 镜像的构建 commit，所以本地和 origin 会显示 "diverged"。推送时需要 `git push -f origin rocm-dsv4-umbp`，**推送前先确认**。
 - 本地 `gh` CLI 不可用，PR 信息用 `git fetch upstream pull/<N>/head:refs/remotes/pr/<N>` 拉取。
+
+### 2026-10-29 rebase 冲突的处理（以 main 上已合入的 UMBP 代码为准）
+- `runtime/embedded.py`：用 main 的版本，再加回 standalone 需要的 `serve_lookups` 参数。结果和 #58568 head 完全一致。
+- `runtime/__init__.py`：在 main 的基础上补注册 standalone，去掉重复的 embedded 注册。结果和 #58568 head 一致。
+- `test_umbp_embedded.py`：main 的 4 个测试和 2 个 fixture 原样保留（包括 `socket_dir`）；我们旧版的 `test_lookup_server_refuses_...` 换成 main 的写法；其余 stack 和 DSv4 的测试保留。
+- 文档：删掉和 main 的 `umbp_store_connector_usage.md` 重复的 `umbp_embedded_dram.md`；把它独有的 `lazy_offload*` 两个选项按 #58568 的写法补进 usage 文档；README 保留 main 的条目，再加上 standalone 的链接。
+- 语义冲突：main 的 embedded 给 load 加了超时（`_load_deadlines`）。为此带入了 #58568 的 `c174da7a0f`（standalone 的 poll 也检查 load 超时）和配套测试 `5625615f59`。
+- 验证：ruff 0.14.0 通过；单元测试和回归测试 530 passed，另外 2 个失败是环境原因（gated Llama、缺 ray）。
 
 ## 3. 当前结论
 
@@ -157,13 +165,7 @@ PR 新增的测试列表见 PR 描述的 "Test Plan" 一节。
 
 ## 7. 未完成事项（按优先级）
 
-- [ ] **（待确认，暂不处理）#58568 force-push 后 stack 内容有差异**。本地基线已经是最新 main，这一条和基线无关，只涉及 #58568 自身 `[4/10]`–`[10/10]` 内容的变化。是否同步由用户决定：PR 描述中引用的 head `078c7bf335` 已经不存在，当前 head 是 `e6a479fe63`（2026-10-27）。本地的 stack 部分落后于它，主要差异：
-  - `embedded.py` 给 load 也加了超时（`_load_deadlines`）；
-  - lookup server 只删除自己创建的 socket（`_owns_path`）；
-  - `_SharedPoolWorkerHandle.poll` 区分了 load 和 store；
-  - 新增了 lazy 模式下 rank 缺失以及 DRAM 恢复 token 的测试。
-
-  做法：把提交 1 中属于 stack 的部分换成新 head 的内容，再把 DSv4 增量叠上去。重点检查 `standalone.py` 的 `poll`、`_build_client` 中 `lookup_timeout_ms` 的处理，以及 `test_umbp_standalone.py` 有没有冲突。完成后重跑单元测试，并更新 PR 描述里的 head hash。
+- [x] ~~#58568 force-push 后 stack 内容有差异~~：2026-10-29 rebase 到 `fa3b9d1377` 时已对齐。除了本 PR 自己的增量，stack 和 #58568 head `e6a479fe63` 一致。
 - [ ] **GPQA 精度对比收尾**：补跑 UMBP 的 pass1 和 pass2，然后更新 PR 描述，见 5.4 节。
 - [ ] TP8 恢复验证（`check_restore.py`）：冷启动和命中后的 TTFT、外部命中 token 数、输出对比。
 - [ ] 统计 UMBP server 上的 key 数和每个请求的字节数，对比 `dedup_tp_replicated_kv` 开/关（预期开启后约为 1/8）、`rebuild_sliding_window` 开/关。

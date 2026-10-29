@@ -6,8 +6,8 @@ This PR lets DeepSeek-V4-Pro on AMD Instinct (MI355X, TP8 or DP8) offload its pr
 
 It builds on the UMBP connector stack from RFC #57187:
 - #58568 = `[UMBP][1/10]` … `[UMBP][10/10]`
-- `[1/10]` #61789, `[2/10]` #61790 and `[3/10]` #61791 are already merged
-- `[4/10]` … `[10/10]` are still under review (#58568 head `078c7bf335`, rebased on the merged `[3/10]`); standalone mode is `[UMBP][7/10]` #61795
+- `[1/10]` #61789 … `[5/10]` #61793 (embedded DRAM runtime) are already merged
+- `[6/10]` … `[10/10]` are still under review (#58568 head `e6a479fe63`); standalone mode is `[UMBP][7/10]` #61795
 
 It does **not** depend on the Kimi-K3 oriented UMBP PRs (#59276, #59281). **This PR must land after #58568's slices.** Until then the diff below is the delta on top of #58568.
 
@@ -188,14 +188,14 @@ HF_DATASETS_CACHE=/shared/models/huggingface/datasets lm_eval ...
 
 ### Unit tests
 
-Environment: MI355X, ROCm 10.0, torch 2.13.0+rocm10.0.0. The branch is rebased on `main` @ `803bc13cf9` (which has `[UMBP][1/10]`–`[3/10]`) plus the `[UMBP][4/10]`–`[10/10]` stack (#58568 head `078c7bf335`).
+Environment: MI355X, ROCm 10.0, torch 2.13.0+rocm10.0.0. The branch is rebased on `main` @ `fa3b9d1377` (which has `[UMBP][1/10]`–`[5/10]`) plus the `[UMBP][6/10]`–`[10/10]` stack. The merged embedded runtime is taken as is from `main`. Apart from this PR's own changes, the unmerged stack matches #58568 head `e6a479fe63`.
 
 | Suite | Result |
 |---|---|
-| `tests/v1/kv_connector/unit/test_umbp_{core,async_lookup,hybrid,events,embedded,standalone,lazy}.py` | **289 passed** |
+| `tests/v1/kv_connector/unit/test_umbp_{core,async_lookup,hybrid,events,embedded,standalone,lazy}.py` | **294 passed** |
 | `tests/v1/core/test_prefix_replay.py` | **16 passed** |
 | `tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py` | **19 passed** |
-| Regression: `tests/v1/core/test_contiguous_kv_packing.py`, `tests/v1/core/test_kv_cache_utils.py`, `tests/v1/attention/test_deepseek_v4_swa_visible.py`, `tests/v1/kv_connector/unit/test_multi_connector.py` | 200 passed, 2 failed (environment-only, see below) |
+| Regression: `tests/v1/core/test_contiguous_kv_packing.py`, `tests/v1/core/test_kv_cache_utils.py`, `tests/v1/attention/test_deepseek_v4_swa_visible.py`, `tests/v1/kv_connector/unit/test_multi_connector.py` | 201 passed, 2 failed (environment-only, see below) |
 
 All new tests ran (none skipped) and passed, including the four added for DSpark MTP and released MORI:
 - `test_umbp_standalone.py::test_dspark_draft_rebuilt_by_replay_is_accepted`
