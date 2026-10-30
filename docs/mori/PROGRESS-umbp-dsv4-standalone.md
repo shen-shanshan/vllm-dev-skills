@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4-Pro 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-10-28（agentic 性能对比完成）
+> 最后更新：2026-10-30（rebase 到 main `deacc36701`，已解决冲突）
 > 每次推进后请同步更新「当前状态」「测试进展」「未完成事项」三节。
 
 ## 1. 任务概述
@@ -25,15 +25,22 @@
 |---|---|
 | 仓库 | `/home/shashen/vllm/vllm` |
 | 分支 | `rocm-dsv4-umbp`（`origin` = fork `shen-shanshan/vllm`，`upstream` = `vllm-project/vllm`） |
-| 本地 base | `fa3b9d1377`（2026-10-29 用户 rebase 到的最新 main，包含 `[5/10]`）。提交 1 = `c6e94502f1`，提交 2 = `387c1975ac` |
+| 本地 base | `deacc36701`（2026-10-30 用户 rebase 到的最新 main，包含 `[5/10]` 和 `[Test][6/10]` #61794）。提交 1 = `72a52a8c6c`，提交 2 = `7a1ac8904d`，均未 push |
 | origin 上的 base | `803bc13cf9`（旧 base；两个提交 `git range-diff` 完全一致，只是 base 不同） |
-| 提交 1 | `a4d93efad4 support umbp for dsv4`：#58568 的 `[4/10]`–`[10/10]` stack 和 DSv4 增量**压在一个提交里** |
-| 提交 2 | `2f2b03baf5 update`：已发布 MORI 没有 `lookup_timeout_ms` 时的兼容处理，以及 DSpark MTP 的测试 |
+| 提交 1 | `72a52a8c6c support umbp for dsv4`：#58568 的 `[4/10]`–`[10/10]` stack 和 DSv4 增量**压在一个提交里** |
+| 提交 2 | `7a1ac8904d update`：已发布 MORI 没有 `lookup_timeout_ms` 时的兼容处理，以及 DSpark MTP 的测试 |
 | 备份分支 | `pre-align-backup`，由 `dev/init.sh` 在改写历史前自动创建 |
 
 注意：
 - `dev/init.sh`（未跟踪）会把分支 rebase 到 Docker 镜像的构建 commit，所以本地和 origin 会显示 "diverged"。推送时需要 `git push -f origin rocm-dsv4-umbp`，**推送前先确认**。
 - 本地 `gh` CLI 不可用，PR 信息用 `git fetch upstream pull/<N>/head:refs/remotes/pr/<N>` 拉取。
+
+### 2026-10-30 rebase 冲突的处理（以 main 为准）
+- main 合入了 `[Test][UMBP][6/10]` #61794。我们提交里的 6/10 测试是旧版 `umbp-pr-6` head（字节相同），而合入版已被重写。
+- 因此 4 个冲突文件都直接用 main 的版本：`.buildkite/test-amd.yaml`、`umbp_integration/test_mori_embedded_gpu.py`、`umbp_integration/test_mori_token_e2e.py`、`unit/test_umbp_embedded.py`。
+- 6/10 改过的其他文件（conftest、`umbp_test_utils.py`、`test_umbp_hybrid.py`、Dockerfile、gsm8k）我们的提交没动，自动合并后和 main 一致。新增测试从 `umbp_test_utils` import 的名字都还在。
+- 第 2 个提交 `update` 没有冲突。
+- 验证：`tests/v1/kv_connector/unit/test_umbp_*.py` 289 passed（`.venv` 里补装了 `tblib`）。
 
 ### 2026-10-29 rebase 冲突的处理（以 main 上已合入的 UMBP 代码为准）
 - `runtime/embedded.py`：用 main 的版本，再加回 standalone 需要的 `serve_lookups` 参数。结果和 #58568 head 完全一致。

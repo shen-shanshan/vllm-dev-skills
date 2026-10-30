@@ -1,0 +1,5 @@
+# lm_eval's gsm8k task, reading the HF snapshot cached under /shared directly:
+# offline `datasets` cannot resolve "openai/gsm8k" from a hub cache.
+include: /home/shashen/vllm/lm_eval_venv/lib/python3.12/site-packages/lm_eval/tasks/gsm8k/gsm8k.yaml
+task: gsm8k_local
+dataset_path: /shared/datasets--openai--gsm8k/snapshots/740312add88f781978c0658806c59bc2815b9866
