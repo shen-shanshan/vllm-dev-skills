@@ -1,6 +1,6 @@
 ---
 name: vllm-technical-blog-writer
-description: Write or complete Chinese vLLM technical blog posts in the author's established Zhihu style. Use when the user provides a vLLM feature, model, architecture, optimization, or other topic and asks for a full blog post, or provides an existing Markdown outline/draft plus references and asks to research current vllm-project/vllm code and finish the missing sections. Produces concise technical diagrams and stores each new article with its images under this skill's outputs directory.
+description: Write or complete Chinese vLLM technical blog posts in the author's established Zhihu style. Use when the user provides a vLLM feature, model, architecture, optimization, or other topic and asks for a full blog post, or provides an existing Markdown outline/draft plus references and asks to research current vllm-project/vllm code and finish the missing sections. Produces concise technical diagrams that reproduce the author's hand-drawn draw.io style (Comic Sans, draw.io color pairs, nested containers, red request / blue output edges) and stores each new article with its images under this skill's outputs directory.
 ---
 
 # vLLM Technical Blog Writer
@@ -12,7 +12,7 @@ Write technically accurate vLLM articles that sound like the author, not a gener
 Before writing:
 
 1. Read [references/style-profile.md](references/style-profile.md).
-2. Read [references/diagram-guide.md](references/diagram-guide.md) when the article needs any diagram.
+2. Read [references/diagram-guide.md](references/diagram-guide.md) and open [assets/diagram-style-template.svg](assets/diagram-style-template.svg) when the article needs any diagram. Every diagram must reproduce the author's hand-drawn draw.io style described there.
 3. Treat the user's draft, outline, references, and explicit wording as higher priority than the default patterns in those files.
 
 ## Select the workflow
@@ -58,8 +58,8 @@ Create:
 outputs/<article-slug>/
 ├── <article-slug>.md
 └── images/
-    ├── <diagram-name>.mmd
-    └── <diagram-name>.svg
+    ├── <diagram-name>.svg
+    └── <diagram-name>.mmd   # only for Mermaid diagrams
 ```
 
 - Resolve `outputs/` relative to this `SKILL.md`, not relative to the user's repository.
@@ -100,11 +100,9 @@ outputs/<article-slug>/
 ## Diagram workflow
 
 1. Decide whether the relationship is best shown as architecture, flow, sequence, state, or data-layout diagram.
-2. Draft Mermaid source for architecture, flow, sequence, and state diagrams. Use a hand-authored SVG only when Mermaid cannot express the concept clearly.
-3. Save the source as `images/<name>.mmd`.
-4. Render to `images/<name>.svg` by using an available Mermaid renderer such as `mmdc`. If SVG is unsuitable for the target platform, render a PNG as well.
-5. Inspect the rendered result. Fix clipped labels, crossing lines, unreadable text, or unnecessary nodes before referencing it.
-6. Use a descriptive Chinese caption in the article.
+2. Hand-author `images/<name>.svg` by default, starting from the `<defs>` and `<style>` of `assets/diagram-style-template.svg`: white canvas, Comic Sans MS 12px, draw.io fill/stroke color pairs, nested containers with top-left bold titles, 1px orthogonal edges colored by data flow (request red, output blue), and a 10px grid. Use Mermaid (saved as `images/<name>.mmd` with the themed init line from the guide) only for sequence or state diagrams that are impractical to lay out by hand.
+3. Render the SVG to PNG (for example with Playwright + Chromium) and inspect it. Compare against the template and the author's original figures; fix style drift, clipped labels, crossing lines, unreadable text, or unnecessary nodes before referencing it. If SVG is unsuitable for the target platform, ship the PNG as well.
+4. Use a descriptive Chinese caption in the article.
 
 Never reference an image file that was not created successfully.
 
@@ -127,4 +125,4 @@ Before finishing, verify:
 - [ ] English words in prose start with a capital letter; code, paths, URLs, brand names with fixed casing (vLLM) and quoted UI text (in inline code) are left as is.
 - [ ] The summary ends with the fixed authorship statement (本文是先由我的 `vllm-technical-blog-writer` Skill …微调完成的), placed before the references section, link intact.
 - [ ] The references section is numbered like the other top-level sections (e.g. `八、参考资料`).
-- [ ] Diagrams use the light background `#f3f6fb` and the Comic Sans MS font stack from the diagram guide.
+- [ ] Diagrams follow the author's draw.io style from the diagram guide: white background, Comic Sans MS font stack, draw.io color pairs (dark red `#a20025` key nodes, red request path / blue output path), nested containers, 1px orthogonal edges.

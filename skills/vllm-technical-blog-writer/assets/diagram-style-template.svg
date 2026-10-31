@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Style template distilled from the author's hand-drawn draw.io figures
+  (technical-blogs/assets/figures/vllm-*). Copy <defs>/<style> into new
+  diagrams and reuse the classes; see references/diagram-guide.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640">
+  <defs>
+    <!-- draw.io "classic" arrowheads, one per edge color -->
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#000000"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#cc0000"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#0066cc"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#006600"/></marker>
+    <marker id="arrow-darkred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#660000"/></marker>
+    <!-- draw.io gradients: light top -> saturated bottom -->
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dae8fc"/><stop offset="1" stop-color="#7ea6e0"/></linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8cecc"/><stop offset="1" stop-color="#ea6b66"/></linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2cc"/><stop offset="1" stop-color="#ffd966"/></linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5e8d4"/><stop offset="1" stop-color="#97d077"/></linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcd28"/><stop offset="1" stop-color="#ffa500"/></linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f5f5"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
+  </defs>
+  <style>
+    text { font-family: "Comic Sans MS", "Comic Sans", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", cursive; font-size: 12px; fill: #000000; dominant-baseline: central; }
+    .c { text-anchor: middle; }
+    .w { fill: #ffffff; }
+    .b { font-weight: bold; }
+    .hl { fill: #cc0000; }
+    .panel-title { font-size: 16px; text-anchor: middle; }
+    .sys-title { font-size: 20px; font-weight: bold; font-style: italic; text-anchor: middle; }
+    rect, path, polygon, circle { stroke-width: 1; }
+    /* key function / op / module: dark red, white text */
+    .n-key { fill: #a20025; stroke: #6f0000; }
+    /* output-path function: strong blue, white text */
+    .n-out { fill: #1ba1e2; stroke: #006eaf; }
+    /* big model bar (LLM / decoder / DiT): violet, white text */
+    .n-model { fill: #6a00ff; stroke: #3700cc; }
+    /* framework / system container node: purple-gray, white text */
+    .n-sys { fill: #76608a; stroke: #432d57; }
+    /* pastel pairs */
+    .n-blue { fill: #dae8fc; stroke: #6c8ebf; }
+    .n-green { fill: #d5e8d4; stroke: #82b366; }
+    .n-yellow { fill: #fff2cc; stroke: #d6b656; }
+    .n-orange { fill: #ffe6cc; stroke: #d79b00; }
+    .n-red { fill: #f8cecc; stroke: #b85450; }
+    .n-purple { fill: #e1d5e7; stroke: #9673a6; }
+    .n-cyan { fill: #b1ddf0; stroke: #10739e; }
+    .n-salmon { fill: #fad9d5; stroke: #ae4132; }
+    .n-cream { fill: #f9f7ed; stroke: #36393d; }
+    /* containers */
+    .box-outer { fill: #eeeeee; stroke: #36393d; }
+    .box-inner { fill: #f5f5f5; stroke: #666666; }
+    .box-dashed { fill: none; stroke: #666666; stroke-dasharray: 3 3; }
+    .panel { fill: #f5f5f5; stroke: #666666; stroke-dasharray: 3 3; }
+    /* edges: 1px orthogonal polylines */
+    .e { fill: none; stroke: #000000; marker-end: url(#arrow-black); }
+    .e-req { fill: none; stroke: #cc0000; marker-end: url(#arrow-red); }
+    .e-resp { fill: none; stroke: #0066cc; marker-end: url(#arrow-blue); }
+    .e-alt1 { fill: none; stroke: #006600; marker-end: url(#arrow-green); }
+    .e-alt2 { fill: none; stroke: #660000; marker-end: url(#arrow-darkred); }
+    .block-arrow { fill: #a20025; stroke: #6f0000; }
+    .step-arrow { fill: #ffffff; stroke: #000000; }
+  </style>
+
+  <!-- Solid white canvas, like draw.io export -->
+  <rect width="1000" height="640" fill="#ffffff"/>
+
+  <!-- ===== Left: layered call flow (request goes down on the left in red, output goes up on the right in blue) ===== -->
+  <rect x="40" y="30" width="520" height="80" class="box-outer"/>
+  <text x="50" y="46" class="b">User</text>
+  <rect x="90" y="60" width="160" height="40" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="170" y="80" class="c">Prompt</text>
+  <rect x="350" y="60" width="160" height="40" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="430" y="80" class="c">RequestOutput</text>
+
+  <rect x="20" y="140" width="560" height="460" class="box-dashed"/>
+  <text x="36" y="156" class="b">Process 0</text>
+
+  <rect x="40" y="180" width="520" height="400" class="box-outer"/>
+  <text x="50" y="196" class="b">LLMEngine</text>
+  <rect x="60" y="210" width="480" height="40" class="n-purple"/>
+  <text x="300" y="230" class="c">generate()</text>
+
+  <rect x="70" y="280" width="200" height="40" class="n-key"/>
+  <text x="170" y="300" class="c w">add_request()</text>
+
+  <rect x="70" y="350" width="200" height="150" class="n-red"/>
+  <text x="86" y="366" class="b">Processor</text>
+  <rect x="100" y="380" width="140" height="40" class="n-key"/>
+  <text x="170" y="400" class="c w">process_inputs()</text>
+  <rect x="100" y="440" width="140" height="40" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="170" y="460" class="c">EngineCoreRequest</text>
+
+  <rect x="330" y="280" width="200" height="60" class="n-out"/>
+  <text x="430" y="300" class="c w">has_unfinished_requests() ?</text>
+  <text x="430" y="318" class="c w">loop: step()</text>
+
+  <rect x="330" y="370" width="200" height="190" class="n-blue"/>
+  <text x="346" y="386" class="b">OutputProcessor</text>
+  <rect x="360" y="400" width="140" height="40" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="430" y="420" class="c">RequestOutput</text>
+  <rect x="360" y="460" width="140" height="40" class="n-out"/>
+  <text x="430" y="480" class="c w">process_outputs()</text>
+  <rect x="340" y="515" width="180" height="35" fill="#dae8fc" stroke="#6c8ebf" stroke-dasharray="3 3"/>
+  <text x="352" y="532">Thread</text>
+  <text x="472" y="532" class="c">outputs_queue</text>
+
+  <path d="M170 100 V280" class="e-req"/>
+  <path d="M170 320 V380" class="e-req"/>
+  <path d="M170 420 V440" class="e-req"/>
+  <path d="M170 480 V620" class="e-req"/>
+  <path d="M430 515 V500" class="e-resp"/>
+  <path d="M430 460 V440" class="e-resp"/>
+  <path d="M430 400 V340" class="e-resp"/>
+  <path d="M430 280 V250" class="e-resp"/>
+  <path d="M430 210 V100" class="e-resp"/>
+
+  <!-- ===== Right: side-by-side model panels with token squares and block arrows ===== -->
+  <text x="790" y="40" class="panel-title">多模态理解</text>
+  <rect x="620" y="60" width="340" height="300" rx="40" class="panel"/>
+  <rect x="655" y="90" width="20" height="20" class="n-yellow"/>
+  <rect x="685" y="90" width="20" height="20" class="n-yellow"/>
+  <rect x="640" y="125" width="300" height="40" class="n-model"/>
+  <text x="790" y="145" class="c w">LLM AR-decoder</text>
+  <rect x="655" y="180" width="20" height="20" class="n-yellow"/>
+  <rect x="685" y="180" width="20" height="20" class="n-yellow"/>
+  <rect x="715" y="180" width="20" height="20" class="n-yellow"/>
+  <rect x="805" y="180" width="20" height="20" class="n-green"/>
+  <rect x="835" y="180" width="20" height="20" class="n-green"/>
+  <rect x="865" y="180" width="20" height="20" class="n-green"/>
+  <rect x="640" y="215" width="120" height="40" rx="6" fill="url(#g-yellow)" stroke="#d6b656"/>
+  <text x="700" y="235" class="c">Text Tokenizer</text>
+  <rect x="790" y="215" width="120" height="40" rx="6" fill="url(#g-green)" stroke="#82b366"/>
+  <text x="850" y="235" class="c">Vision Encoder</text>
+  <!-- flexArrow: dark red block arrow pointing up -->
+  <polygon points="697,300 697,282 692,282 700,268 708,282 703,282 703,300" class="block-arrow"/>
+  <polygon points="847,300 847,282 842,282 850,268 858,282 853,282 853,300" class="block-arrow"/>
+  <text x="700" y="320" class="c">Text Prompt</text>
+  <text x="850" y="320" class="c">Images</text>
+
+  <!-- ===== Right bottom: dispatch with alternative paths and inline red highlights ===== -->
+  <text x="790" y="400" class="sys-title">vLLM</text>
+  <rect x="620" y="420" width="140" height="40" class="n-sys"/>
+  <text x="690" y="440" class="c w">CustomOp</text>
+  <rect x="620" y="490" width="140" height="40" fill="#60a917" stroke="#2d7600"/>
+  <text x="690" y="510" class="c w">Native Platform</text>
+  <rect x="620" y="550" width="140" height="40" class="n-key"/>
+  <text x="690" y="570" class="c w">OOT Platform</text>
+  <rect x="800" y="490" width="160" height="40" rx="6" class="n-cream"/>
+  <text x="880" y="510" class="c">register(<tspan class="hl">"Aaa"</tspan>)</text>
+  <rect x="800" y="550" width="160" height="40" rx="6" class="n-cream"/>
+  <text x="880" y="570" class="c"><tspan class="hl">obj</tspan> = <tspan class="hl">cls</tspan>()</text>
+  <path d="M760 510 H800" class="e-alt1"/>
+  <path d="M760 570 H800" class="e-alt2"/>
+  <path d="M690 460 V490" class="e"/>
+  <text x="700" y="475">load</text>
+</svg>

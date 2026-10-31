@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1210" viewBox="0 0 1040 1210">
+  <defs>
+    <!-- draw.io "classic" arrowheads, one per edge color -->
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#000000"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#cc0000"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#0066cc"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#006600"/></marker>
+    <marker id="arrow-darkred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#660000"/></marker>
+    <!-- draw.io gradients: light top -> saturated bottom -->
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dae8fc"/><stop offset="1" stop-color="#7ea6e0"/></linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8cecc"/><stop offset="1" stop-color="#ea6b66"/></linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2cc"/><stop offset="1" stop-color="#ffd966"/></linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5e8d4"/><stop offset="1" stop-color="#97d077"/></linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcd28"/><stop offset="1" stop-color="#ffa500"/></linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f5f5"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
+  </defs>
+  <style>
+    text { font-family: "Comic Sans MS", "Comic Sans", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", cursive; font-size: 12px; fill: #000000; dominant-baseline: central; }
+    .c { text-anchor: middle; }
+    .w { fill: #ffffff; }
+    .b { font-weight: bold; }
+    .hl { fill: #cc0000; }
+    .panel-title { font-size: 16px; text-anchor: middle; }
+    .sys-title { font-size: 20px; font-weight: bold; font-style: italic; text-anchor: middle; }
+    rect, path, polygon, circle { stroke-width: 1; }
+    /* key function / op / module: dark red, white text */
+    .n-key { fill: #a20025; stroke: #6f0000; }
+    /* output-path function: strong blue, white text */
+    .n-out { fill: #1ba1e2; stroke: #006eaf; }
+    /* big model bar (LLM / decoder / DiT): violet, white text */
+    .n-model { fill: #6a00ff; stroke: #3700cc; }
+    /* framework / system container node: purple-gray, white text */
+    .n-sys { fill: #76608a; stroke: #432d57; }
+    /* pastel pairs */
+    .n-blue { fill: #dae8fc; stroke: #6c8ebf; }
+    .n-green { fill: #d5e8d4; stroke: #82b366; }
+    .n-yellow { fill: #fff2cc; stroke: #d6b656; }
+    .n-orange { fill: #ffe6cc; stroke: #d79b00; }
+    .n-red { fill: #f8cecc; stroke: #b85450; }
+    .n-purple { fill: #e1d5e7; stroke: #9673a6; }
+    .n-cyan { fill: #b1ddf0; stroke: #10739e; }
+    .n-salmon { fill: #fad9d5; stroke: #ae4132; }
+    .n-cream { fill: #f9f7ed; stroke: #36393d; }
+    /* containers */
+    .box-outer { fill: #eeeeee; stroke: #36393d; }
+    .box-inner { fill: #f5f5f5; stroke: #666666; }
+    .box-dashed { fill: none; stroke: #666666; stroke-dasharray: 3 3; }
+    .panel { fill: #f5f5f5; stroke: #666666; stroke-dasharray: 3 3; }
+    /* edges: 1px orthogonal polylines */
+    .e { fill: none; stroke: #000000; marker-end: url(#arrow-black); }
+    .e-req { fill: none; stroke: #cc0000; marker-end: url(#arrow-red); }
+    .e-resp { fill: none; stroke: #0066cc; marker-end: url(#arrow-blue); }
+    .e-alt1 { fill: none; stroke: #006600; marker-end: url(#arrow-green); }
+    .e-alt2 { fill: none; stroke: #660000; marker-end: url(#arrow-darkred); }
+    .block-arrow { fill: #a20025; stroke: #6f0000; }
+    .step-arrow { fill: #ffffff; stroke: #000000; }
+  </style>
+
+  <rect width="1040" height="1210" fill="#ffffff"/>
+
+  <!-- ===== 启动阶段：capture ===== -->
+  <rect x="20" y="50" width="1000" height="280" class="box-dashed"/>
+  <text x="36" y="66" class="b">启动阶段：GPUModelRunner.capture_model()</text>
+
+  <rect x="40" y="90" width="300" height="220" class="n-purple"/>
+  <text x="56" y="106" class="b">EncoderCudaGraphManager.__init__()</text>
+  <rect x="60" y="130" width="260" height="50" class="n-key"/>
+  <text x="190" y="146" class="c w">get_encoder_cudagraph</text>
+  <text x="190" y="164" class="c w">_budget_range()</text>
+  <rect x="60" y="210" width="260" height="80" rx="6" class="n-cream"/>
+  <text x="190" y="230" class="c"><tspan class="hl">token_budgets</tspan>：min ~ max，2 倍递增</text>
+  <text x="190" y="250" class="c">例：[2048, 4096, 8192, 13824]</text>
+  <text x="190" y="270" class="c"><tspan class="hl">max_batch_size</tspan> = max // min</text>
+  <path d="M190 180 V210" class="e"/>
+
+  <rect x="380" y="90" width="300" height="220" class="n-yellow"/>
+  <text x="396" y="106" class="b">capture(graph_pool)</text>
+  <text x="400" y="126">for budget in 从大到小：</text>
+  <rect x="400" y="140" width="260" height="50" class="n-key"/>
+  <text x="530" y="156" class="c w">prepare_encoder_cudagraph</text>
+  <text x="530" y="174" class="c w">_capture_inputs()</text>
+  <rect x="400" y="220" width="260" height="50" class="n-key"/>
+  <text x="530" y="236" class="c w">torch.cuda.graph(graph, pool)</text>
+  <text x="530" y="254" class="c w">encoder_cudagraph_forward()</text>
+  <path d="M530 190 V220" class="e"/>
+  <path d="M340 200 H380" class="e"/>
+
+  <rect x="720" y="90" width="280" height="220" class="box-inner"/>
+  <text x="736" y="106" class="b">budget_graphs（BudgetGraphMetadata）</text>
+  <rect x="760" y="130" width="220" height="30" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="870" y="145" class="c">token_budget = 13824</text>
+  <rect x="760" y="170" width="220" height="30" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="870" y="185" class="c">token_budget = 8192</text>
+  <rect x="760" y="210" width="220" height="30" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="870" y="225" class="c">token_budget = 4096</text>
+  <rect x="760" y="250" width="220" height="30" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="870" y="265" class="c">token_budget = 2048</text>
+  <text x="870" y="296" class="c">graph + input_buffers + output_buffer</text>
+  <path d="M660 245 H720" class="e"/>
+  <text x="690" y="235" class="c">记录</text>
+
+  <!-- ===== 推理阶段：replay ===== -->
+  <rect x="20" y="360" width="1000" height="830" class="box-dashed"/>
+  <text x="36" y="376" class="b">推理阶段：GPUModelRunner._execute_mm_encoder()</text>
+
+  <rect x="100" y="400" width="200" height="40" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="200" y="420" class="c">mm_kwargs（图片 / 视频）</text>
+  <rect x="740" y="400" width="220" height="40" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="850" y="420" class="c">encoder_cache</text>
+
+  <rect x="40" y="470" width="960" height="700" class="box-outer"/>
+  <text x="50" y="486" class="b">EncoderCudaGraphManager.execute()</text>
+  <rect x="100" y="500" width="200" height="50" class="n-key"/>
+  <text x="200" y="516" class="c w">_dp_shard()</text>
+  <text x="200" y="534" class="c w">（仅 ViT DP 模式）</text>
+  <rect x="740" y="500" width="220" height="50" class="n-out"/>
+  <text x="850" y="516" class="c w">_dp_gather()</text>
+  <text x="850" y="534" class="c w">（仅 ViT DP 模式）</text>
+
+  <rect x="60" y="570" width="920" height="580" class="box-inner"/>
+  <text x="70" y="586" class="b">_execute_local()</text>
+
+  <rect x="80" y="610" width="240" height="50" class="n-key"/>
+  <text x="200" y="626" class="c w">get_encoder_cudagraph</text>
+  <text x="200" y="644" class="c w">_item_specs()</text>
+  <rect x="80" y="700" width="240" height="50" class="n-key"/>
+  <text x="200" y="716" class="c w">按 output_tokens 升序排序</text>
+  <text x="200" y="734" class="c w">贪心打包成多个 batch</text>
+  <text x="90" y="775">每个 batch：</text>
+  <rect x="80" y="800" width="240" height="50" class="n-key"/>
+  <text x="200" y="816" class="c w">_path_fitting_budget()</text>
+  <text x="200" y="834" class="c w">找最小可容纳的 budget</text>
+  <rect x="80" y="1080" width="240" height="50" fill="url(#g-gray)" stroke="#666666"/>
+  <text x="200" y="1096" class="c">encoder_eager_forward()</text>
+  <text x="200" y="1114" class="c">（超出最大 budget）</text>
+
+  <rect x="360" y="760" width="300" height="270" class="n-red"/>
+  <text x="376" y="776" class="b">_run_budget_graph()</text>
+  <rect x="390" y="800" width="240" height="50" class="n-key"/>
+  <text x="510" y="816" class="c w">prepare_encoder_cudagraph</text>
+  <text x="510" y="834" class="c w">_replay_buffers()</text>
+  <rect x="390" y="880" width="240" height="50" class="n-key"/>
+  <text x="510" y="896" class="c w">zero_() + slice copy</text>
+  <text x="510" y="914" class="c w">写入 input_buffers</text>
+  <rect x="390" y="960" width="240" height="40" class="n-key"/>
+  <text x="510" y="980" class="c w">graph.replay()</text>
+
+  <rect x="740" y="960" width="220" height="40" class="n-cyan"/>
+  <text x="850" y="980" class="c">output_buffer</text>
+  <rect x="740" y="700" width="220" height="50" class="n-out"/>
+  <text x="850" y="716" class="c w">postprocess_encoder_output()</text>
+  <text x="850" y="734" class="c w">按 item 切分 + clone</text>
+
+  <!-- request path (red) -->
+  <path d="M200 440 V500" class="e-req"/>
+  <text x="210" y="460">execute(mm_kwargs)</text>
+  <path d="M200 550 V610" class="e-req"/>
+  <path d="M200 660 V700" class="e-req"/>
+  <path d="M200 750 V800" class="e-req"/>
+  <path d="M320 825 H390" class="e-req"/>
+  <text x="340" y="813" class="c">命中</text>
+  <path d="M200 850 V1080" class="e-req"/>
+  <text x="210" y="960">None</text>
+  <path d="M510 850 V880" class="e-req"/>
+  <path d="M510 930 V960" class="e-req"/>
+
+  <!-- graph lookup (black) -->
+  <path d="M728 310 V780 H660" class="e"/>
+  <text x="718" y="640" style="text-anchor: end">按 token_budget</text>
+  <text x="718" y="658" style="text-anchor: end">取出对应 graph</text>
+
+  <!-- output path (blue) -->
+  <path d="M630 980 H740" class="e-resp"/>
+  <path d="M850 960 V750" class="e-resp"/>
+  <path d="M320 1105 H970 V725 H960" class="e-resp"/>
+  <path d="M850 700 V550" class="e-resp"/>
+  <path d="M850 500 V440" class="e-resp"/>
+  <text x="858" y="456">_cache_encoder_output()</text>
+</svg>

@@ -8,7 +8,7 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/10/29）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/10/31）。
 
 ## 二、项目介绍
 
@@ -213,7 +213,7 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 **`vllm-technical-blog-writer`：用我自己的风格写 vLLM 技术博客。**
 
-这个 Skill 基于我在知乎“vLLM 学习笔记”专栏中的历史文章，总结了一份写作风格档案，并约定了画图规范。它支持两种用法：
+这个 Skill 基于我在知乎“vLLM 学习笔记”专栏中的历史文章，总结了一份写作风格档案；同时从我过去用 draw.io 手绘的博客配图中提炼出一套画图规范（Comic Sans 字体、draw.io 配色、嵌套容器构图、请求链路红色下行 / 输出链路蓝色上行等），并整理成可复用的 SVG 模板，让生成的配图直接复刻我手绘的风格。它支持两种用法：
 
 - **按主题写新文章**：给定一个主题（如“vLLM 中的 Automatic Prefix Caching”），它会先阅读 vLLM 最新 `main` 分支的代码和相关资料，再生成一篇完整的中文技术博客，并按需画好架构图和流程图；
 - **补全已有草稿**：给定一篇写了一半的 Markdown 文章和参考资料，它会保留已有内容，只补全缺失的章节，新增的图片放在文章同级的 `images/` 目录中。
