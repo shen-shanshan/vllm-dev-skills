@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="690" viewBox="0 0 1000 690">
+  <defs>
+    <!-- draw.io "classic" arrowheads, one per edge color -->
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#000000"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#cc0000"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#0066cc"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#006600"/></marker>
+    <marker id="arrow-darkred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#660000"/></marker>
+    <!-- draw.io gradients: light top -> saturated bottom -->
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dae8fc"/><stop offset="1" stop-color="#7ea6e0"/></linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8cecc"/><stop offset="1" stop-color="#ea6b66"/></linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2cc"/><stop offset="1" stop-color="#ffd966"/></linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5e8d4"/><stop offset="1" stop-color="#97d077"/></linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcd28"/><stop offset="1" stop-color="#ffa500"/></linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f5f5"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
+  </defs>
+  <style>
+    text { font-family: "Comic Sans MS", "Comic Sans", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", cursive; font-size: 12px; fill: #000000; dominant-baseline: central; }
+    .c { text-anchor: middle; }
+    .w { fill: #ffffff; }
+    .b { font-weight: bold; }
+    .hl { fill: #cc0000; }
+    .panel-title { font-size: 16px; text-anchor: middle; }
+    .sys-title { font-size: 20px; font-weight: bold; font-style: italic; text-anchor: middle; }
+    rect, path, polygon, circle { stroke-width: 1; }
+    /* key function / op / module: dark red, white text */
+    .n-key { fill: #a20025; stroke: #6f0000; }
+    /* output-path function: strong blue, white text */
+    .n-out { fill: #1ba1e2; stroke: #006eaf; }
+    /* big model bar (LLM / decoder / DiT): violet, white text */
+    .n-model { fill: #6a00ff; stroke: #3700cc; }
+    /* framework / system container node: purple-gray, white text */
+    .n-sys { fill: #76608a; stroke: #432d57; }
+    /* pastel pairs */
+    .n-blue { fill: #dae8fc; stroke: #6c8ebf; }
+    .n-green { fill: #d5e8d4; stroke: #82b366; }
+    .n-yellow { fill: #fff2cc; stroke: #d6b656; }
+    .n-orange { fill: #ffe6cc; stroke: #d79b00; }
+    .n-red { fill: #f8cecc; stroke: #b85450; }
+    .n-purple { fill: #e1d5e7; stroke: #9673a6; }
+    .n-cyan { fill: #b1ddf0; stroke: #10739e; }
+    .n-salmon { fill: #fad9d5; stroke: #ae4132; }
+    .n-cream { fill: #f9f7ed; stroke: #36393d; }
+    /* containers */
+    .box-outer { fill: #eeeeee; stroke: #36393d; }
+    .box-inner { fill: #f5f5f5; stroke: #666666; }
+    .box-dashed { fill: none; stroke: #666666; stroke-dasharray: 3 3; }
+    .panel { fill: #f5f5f5; stroke: #666666; stroke-dasharray: 3 3; }
+    /* edges: 1px orthogonal polylines */
+    .e { fill: none; stroke: #000000; marker-end: url(#arrow-black); }
+    .e-req { fill: none; stroke: #cc0000; marker-end: url(#arrow-red); }
+    .e-resp { fill: none; stroke: #0066cc; marker-end: url(#arrow-blue); }
+    .e-alt1 { fill: none; stroke: #006600; marker-end: url(#arrow-green); }
+    .e-alt2 { fill: none; stroke: #660000; marker-end: url(#arrow-darkred); }
+    .block-arrow { fill: #a20025; stroke: #6f0000; }
+    .step-arrow { fill: #ffffff; stroke: #000000; }
+  </style>
+  <rect width="1000" height="690" fill="#ffffff"/>
+  <rect x="230" y="40" width="160" height="30" fill="#60a917" stroke="#2d7600"/>
+  <text x="310.0" y="55.0" class="c w">GPU0</text>
+  <rect x="410" y="40" width="160" height="30" fill="#60a917" stroke="#2d7600"/>
+  <text x="490.0" y="55.0" class="c w">GPU1</text>
+  <rect x="650" y="40" width="160" height="30" fill="#60a917" stroke="#2d7600"/>
+  <text x="730.0" y="55.0" class="c w">GPU7</text>
+  <text x="610" y="55" class="c">……</text>
+  <rect x="230" y="100" width="160" height="40" class="n-yellow"/>
+  <text x="310.0" y="120.0" class="c">q：[B, 16, D]</text>
+  <path d="M310 70 V100" class="e"/>
+  <rect x="230" y="220" width="160" height="40" class="n-yellow"/>
+  <text x="310.0" y="240.0" class="c">q：[B, 128, D]</text>
+  <rect x="230" y="290" width="160" height="50" class="n-key"/>
+  <text x="310.0" y="306.0" class="c w">Attention</text>
+  <text x="310.0" y="324.0" class="c w">128 head × 本卡 1/8 KV</text>
+  <path d="M310 260 V290" class="e"/>
+  <rect x="230" y="370" width="160" height="50" class="n-orange"/>
+  <text x="310.0" y="386.0" class="c">部分结果 O_i：[B, 128, D]</text>
+  <text x="310.0" y="404.0" class="c">LSE_i：[B, 128]</text>
+  <path d="M310 340 V370" class="e"/>
+  <rect x="230" y="500" width="160" height="40" class="n-orange"/>
+  <text x="310.0" y="520.0" class="c">8 份 [B, 16, D] + LSE</text>
+  <rect x="230" y="570" width="160" height="50" class="n-out"/>
+  <text x="310.0" y="586.0" class="c w">按 LSE 加权合并</text>
+  <text x="310.0" y="604.0" class="c w">O：[B, 16, D]</text>
+  <path d="M310 540 V570" class="e"/>
+  <rect x="230" y="640" width="160" height="40" class="n-purple"/>
+  <text x="310.0" y="660.0" class="c">o_proj（TP）</text>
+  <path d="M310 620 V640" class="e"/>
+  <path d="M310 140 V160" class="e"/>
+  <path d="M310 190 V220" class="e"/>
+  <path d="M310 420 V440" class="e"/>
+  <path d="M310 470 V500" class="e"/>
+  <rect x="410" y="100" width="160" height="40" class="n-yellow"/>
+  <text x="490.0" y="120.0" class="c">q：[B, 16, D]</text>
+  <path d="M490 70 V100" class="e"/>
+  <rect x="410" y="220" width="160" height="40" class="n-yellow"/>
+  <text x="490.0" y="240.0" class="c">q：[B, 128, D]</text>
+  <rect x="410" y="290" width="160" height="50" class="n-key"/>
+  <text x="490.0" y="306.0" class="c w">Attention</text>
+  <text x="490.0" y="324.0" class="c w">128 head × 本卡 1/8 KV</text>
+  <path d="M490 260 V290" class="e"/>
+  <rect x="410" y="370" width="160" height="50" class="n-orange"/>
+  <text x="490.0" y="386.0" class="c">部分结果 O_i：[B, 128, D]</text>
+  <text x="490.0" y="404.0" class="c">LSE_i：[B, 128]</text>
+  <path d="M490 340 V370" class="e"/>
+  <rect x="410" y="500" width="160" height="40" class="n-orange"/>
+  <text x="490.0" y="520.0" class="c">8 份 [B, 16, D] + LSE</text>
+  <rect x="410" y="570" width="160" height="50" class="n-out"/>
+  <text x="490.0" y="586.0" class="c w">按 LSE 加权合并</text>
+  <text x="490.0" y="604.0" class="c w">O：[B, 16, D]</text>
+  <path d="M490 540 V570" class="e"/>
+  <rect x="410" y="640" width="160" height="40" class="n-purple"/>
+  <text x="490.0" y="660.0" class="c">o_proj（TP）</text>
+  <path d="M490 620 V640" class="e"/>
+  <path d="M490 140 V160" class="e"/>
+  <path d="M490 190 V220" class="e"/>
+  <path d="M490 420 V440" class="e"/>
+  <path d="M490 470 V500" class="e"/>
+  <rect x="650" y="100" width="160" height="40" class="n-yellow"/>
+  <text x="730.0" y="120.0" class="c">q：[B, 16, D]</text>
+  <path d="M730 70 V100" class="e"/>
+  <rect x="650" y="220" width="160" height="40" class="n-yellow"/>
+  <text x="730.0" y="240.0" class="c">q：[B, 128, D]</text>
+  <rect x="650" y="290" width="160" height="50" class="n-key"/>
+  <text x="730.0" y="306.0" class="c w">Attention</text>
+  <text x="730.0" y="324.0" class="c w">128 head × 本卡 1/8 KV</text>
+  <path d="M730 260 V290" class="e"/>
+  <rect x="650" y="370" width="160" height="50" class="n-orange"/>
+  <text x="730.0" y="386.0" class="c">部分结果 O_i：[B, 128, D]</text>
+  <text x="730.0" y="404.0" class="c">LSE_i：[B, 128]</text>
+  <path d="M730 340 V370" class="e"/>
+  <rect x="650" y="500" width="160" height="40" class="n-orange"/>
+  <text x="730.0" y="520.0" class="c">8 份 [B, 16, D] + LSE</text>
+  <rect x="650" y="570" width="160" height="50" class="n-out"/>
+  <text x="730.0" y="586.0" class="c w">按 LSE 加权合并</text>
+  <text x="730.0" y="604.0" class="c w">O：[B, 16, D]</text>
+  <path d="M730 540 V570" class="e"/>
+  <rect x="650" y="640" width="160" height="40" class="n-purple"/>
+  <text x="730.0" y="660.0" class="c">o_proj（TP）</text>
+  <path d="M730 620 V640" class="e"/>
+  <path d="M730 140 V160" class="e"/>
+  <path d="M730 190 V220" class="e"/>
+  <path d="M730 420 V440" class="e"/>
+  <path d="M730 470 V500" class="e"/>
+  <rect x="230" y="160" width="580" height="30" class="n-cyan"/>
+  <text x="520.0" y="175.0" class="c">AllGather Q（DCP 组内）</text>
+  <rect x="230" y="440" width="580" height="30" class="n-cyan"/>
+  <text x="520.0" y="455.0" class="c">All-to-All：GPU j 收到所有卡上 head [16j, 16j+16) 的 O_i 与 LSE_i</text>
+  <text x="30" y="111.0">① TP 计算本卡</text>
+  <text x="30" y="129.0">16 个 head 的 Q</text>
+  <text x="30" y="231.0">② 拿到全部</text>
+  <text x="30" y="249.0">128 个 head 的 Q</text>
+  <text x="30" y="386.0">③ 只对本卡 1/8</text>
+  <text x="30" y="404.0">KV 做 Attention</text>
+  <text x="30" y="526.0">④ 交换并合并</text>
+  <text x="30" y="544.0">（Online Softmax）</text>
+  <text x="30" y="660.0">⑤ 回到 TP 路径</text>
+  <rect x="830" y="150" width="150" height="50" rx="6" class="n-cream"/>
+  <text x="905.0" y="166.0" class="c">dcp_q_replicate=True</text>
+  <text x="905.0" y="184.0" class="c">可跳过这一步</text>
+  <rect x="830" y="430" width="150" height="50" rx="6" class="n-cream"/>
+  <text x="905.0" y="446.0" class="c">dcp_comm_backend</text>
+  <text x="905.0" y="464.0" class="c">= "a2a"</text>
+</svg>

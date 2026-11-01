@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="520" viewBox="0 0 940 520">
+  <defs>
+    <!-- draw.io "classic" arrowheads, one per edge color -->
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#000000"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#cc0000"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#0066cc"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#006600"/></marker>
+    <marker id="arrow-darkred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#660000"/></marker>
+    <!-- draw.io gradients: light top -> saturated bottom -->
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dae8fc"/><stop offset="1" stop-color="#7ea6e0"/></linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8cecc"/><stop offset="1" stop-color="#ea6b66"/></linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2cc"/><stop offset="1" stop-color="#ffd966"/></linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5e8d4"/><stop offset="1" stop-color="#97d077"/></linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcd28"/><stop offset="1" stop-color="#ffa500"/></linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f5f5"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
+  </defs>
+  <style>
+    text { font-family: "Comic Sans MS", "Comic Sans", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", cursive; font-size: 12px; fill: #000000; dominant-baseline: central; }
+    .c { text-anchor: middle; }
+    .w { fill: #ffffff; }
+    .b { font-weight: bold; }
+    .hl { fill: #cc0000; }
+    .panel-title { font-size: 16px; text-anchor: middle; }
+    .sys-title { font-size: 20px; font-weight: bold; font-style: italic; text-anchor: middle; }
+    rect, path, polygon, circle { stroke-width: 1; }
+    /* key function / op / module: dark red, white text */
+    .n-key { fill: #a20025; stroke: #6f0000; }
+    /* output-path function: strong blue, white text */
+    .n-out { fill: #1ba1e2; stroke: #006eaf; }
+    /* big model bar (LLM / decoder / DiT): violet, white text */
+    .n-model { fill: #6a00ff; stroke: #3700cc; }
+    /* framework / system container node: purple-gray, white text */
+    .n-sys { fill: #76608a; stroke: #432d57; }
+    /* pastel pairs */
+    .n-blue { fill: #dae8fc; stroke: #6c8ebf; }
+    .n-green { fill: #d5e8d4; stroke: #82b366; }
+    .n-yellow { fill: #fff2cc; stroke: #d6b656; }
+    .n-orange { fill: #ffe6cc; stroke: #d79b00; }
+    .n-red { fill: #f8cecc; stroke: #b85450; }
+    .n-purple { fill: #e1d5e7; stroke: #9673a6; }
+    .n-cyan { fill: #b1ddf0; stroke: #10739e; }
+    .n-salmon { fill: #fad9d5; stroke: #ae4132; }
+    .n-cream { fill: #f9f7ed; stroke: #36393d; }
+    /* containers */
+    .box-outer { fill: #eeeeee; stroke: #36393d; }
+    .box-inner { fill: #f5f5f5; stroke: #666666; }
+    .box-dashed { fill: none; stroke: #666666; stroke-dasharray: 3 3; }
+    .panel { fill: #f5f5f5; stroke: #666666; stroke-dasharray: 3 3; }
+    /* edges: 1px orthogonal polylines */
+    .e { fill: none; stroke: #000000; marker-end: url(#arrow-black); }
+    .e-req { fill: none; stroke: #cc0000; marker-end: url(#arrow-red); }
+    .e-resp { fill: none; stroke: #0066cc; marker-end: url(#arrow-blue); }
+    .e-alt1 { fill: none; stroke: #006600; marker-end: url(#arrow-green); }
+    .e-alt2 { fill: none; stroke: #660000; marker-end: url(#arrow-darkred); }
+    .block-arrow { fill: #a20025; stroke: #6f0000; }
+    .step-arrow { fill: #ffffff; stroke: #000000; }
+  </style>
+  <rect width="940" height="520" fill="#ffffff"/>
+  <path d="M110 430 H740" class="e"/>
+  <path d="M110 430 V50" class="e"/>
+  <text x="425" y="455" class="c">P90 Interactivity（tok/s/user）→ 单个用户感受到的速度</text>
+  <text x="40" y="240" class="c" transform="rotate(-90 40 240)">Total Tokens / GPU / s（或按 TCO 折算的 Tokens / $）</text>
+  <path d="M180 200 L270 240 L380 300 L500 350 L610 390" class="" fill="none" stroke="#0066cc" stroke-width="2"/>
+  <circle cx="180" cy="200" r="4" fill="#0066cc" stroke="#0066cc"/>
+  <text x="188" y="188">c=256</text>
+  <circle cx="270" cy="240" r="4" fill="#0066cc" stroke="#0066cc"/>
+  <text x="278" y="228">c=64</text>
+  <circle cx="380" cy="300" r="4" fill="#0066cc" stroke="#0066cc"/>
+  <text x="388" y="288">c=16</text>
+  <circle cx="500" cy="350" r="4" fill="#0066cc" stroke="#0066cc"/>
+  <text x="508" y="338">c=4</text>
+  <circle cx="610" cy="390" r="4" fill="#0066cc" stroke="#0066cc"/>
+  <text x="618" y="378">c=1</text>
+  <path d="M200 120 L310 150 L440 210 L570 270 L680 320" class="" fill="none" stroke="#cc0000" stroke-width="2"/>
+  <circle cx="200" cy="120" r="4" fill="#cc0000" stroke="#cc0000"/>
+  <text x="208" y="108">c=256</text>
+  <circle cx="310" cy="150" r="4" fill="#cc0000" stroke="#cc0000"/>
+  <text x="318" y="138">c=64</text>
+  <circle cx="440" cy="210" r="4" fill="#cc0000" stroke="#cc0000"/>
+  <text x="448" y="198">c=16</text>
+  <circle cx="570" cy="270" r="4" fill="#cc0000" stroke="#cc0000"/>
+  <text x="578" y="258">c=4</text>
+  <circle cx="680" cy="320" r="4" fill="#cc0000" stroke="#cc0000"/>
+  <text x="688" y="308">c=1</text>
+  <path d="M300 430 V70" class="" fill="none" stroke="#666666" stroke-dasharray="3 3"/>
+  <text x="306" y="80">SLO：P90 ≥ 50 tok/s（示意）</text>
+  <polygon points="762,170 762,120 752,120 770,96 788,120 778,120 778,170" class="block-arrow"/>
+  <text x="800" y="120">向上：每卡吞吐更高</text>
+  <text x="800" y="138">（存得下更多 KV）</text>
+  <polygon points="560,92 600,92 600,82 624,100 600,118 600,108 560,108" class="block-arrow"/>
+  <text x="592" y="60" class="c">向右：每个用户更快</text>
+  <text x="592" y="78" class="c">（调度与 Kernel）</text>
+  <rect x="130" y="490" width="20" height="4" fill="#cc0000" stroke="#cc0000"/>
+  <text x="156" y="492">引擎 B + 模型 X：曲线更靠右上，更优</text>
+  <rect x="440" y="490" width="20" height="4" fill="#0066cc" stroke="#0066cc"/>
+  <text x="466" y="492">引擎 A + 模型 X</text>
+</svg>

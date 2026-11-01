@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640">
+  <defs>
+    <!-- draw.io "classic" arrowheads, one per edge color -->
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#000000"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#cc0000"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#0066cc"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#006600"/></marker>
+    <marker id="arrow-darkred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#660000"/></marker>
+    <!-- draw.io gradients: light top -> saturated bottom -->
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dae8fc"/><stop offset="1" stop-color="#7ea6e0"/></linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8cecc"/><stop offset="1" stop-color="#ea6b66"/></linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2cc"/><stop offset="1" stop-color="#ffd966"/></linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5e8d4"/><stop offset="1" stop-color="#97d077"/></linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcd28"/><stop offset="1" stop-color="#ffa500"/></linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f5f5"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
+  </defs>
+  <style>
+    text { font-family: "Comic Sans MS", "Comic Sans", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", cursive; font-size: 12px; fill: #000000; dominant-baseline: central; }
+    .c { text-anchor: middle; }
+    .w { fill: #ffffff; }
+    .b { font-weight: bold; }
+    .hl { fill: #cc0000; }
+    .panel-title { font-size: 16px; text-anchor: middle; }
+    .sys-title { font-size: 20px; font-weight: bold; font-style: italic; text-anchor: middle; }
+    rect, path, polygon, circle { stroke-width: 1; }
+    /* key function / op / module: dark red, white text */
+    .n-key { fill: #a20025; stroke: #6f0000; }
+    /* output-path function: strong blue, white text */
+    .n-out { fill: #1ba1e2; stroke: #006eaf; }
+    /* big model bar (LLM / decoder / DiT): violet, white text */
+    .n-model { fill: #6a00ff; stroke: #3700cc; }
+    /* framework / system container node: purple-gray, white text */
+    .n-sys { fill: #76608a; stroke: #432d57; }
+    /* pastel pairs */
+    .n-blue { fill: #dae8fc; stroke: #6c8ebf; }
+    .n-green { fill: #d5e8d4; stroke: #82b366; }
+    .n-yellow { fill: #fff2cc; stroke: #d6b656; }
+    .n-orange { fill: #ffe6cc; stroke: #d79b00; }
+    .n-red { fill: #f8cecc; stroke: #b85450; }
+    .n-purple { fill: #e1d5e7; stroke: #9673a6; }
+    .n-cyan { fill: #b1ddf0; stroke: #10739e; }
+    .n-salmon { fill: #fad9d5; stroke: #ae4132; }
+    .n-cream { fill: #f9f7ed; stroke: #36393d; }
+    /* containers */
+    .box-outer { fill: #eeeeee; stroke: #36393d; }
+    .box-inner { fill: #f5f5f5; stroke: #666666; }
+    .box-dashed { fill: none; stroke: #666666; stroke-dasharray: 3 3; }
+    .panel { fill: #f5f5f5; stroke: #666666; stroke-dasharray: 3 3; }
+    /* edges: 1px orthogonal polylines */
+    .e { fill: none; stroke: #000000; marker-end: url(#arrow-black); }
+    .e-req { fill: none; stroke: #cc0000; marker-end: url(#arrow-red); }
+    .e-resp { fill: none; stroke: #0066cc; marker-end: url(#arrow-blue); }
+    .e-alt1 { fill: none; stroke: #006600; marker-end: url(#arrow-green); }
+    .e-alt2 { fill: none; stroke: #660000; marker-end: url(#arrow-darkred); }
+    .block-arrow { fill: #a20025; stroke: #6f0000; }
+    .step-arrow { fill: #ffffff; stroke: #000000; }
+  </style>
+  <rect width="1000" height="640" fill="#ffffff"/>
+  <text x="220" y="30" class="panel-title">默认路径：一层由许多细粒度 Kernel 组成（示意）</text>
+  <rect x="20" y="50" width="400" height="520" rx="40" class="panel"/>
+  <rect x="110" y="80" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="92.0" class="c w">mHC seam / RMSNorm</text>
+  <path d="M220 104 V112" class="e"/>
+  <rect x="110" y="112" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="124.0" class="c w">wqkv GEMM</text>
+  <path d="M220 136 V144" class="e"/>
+  <rect x="110" y="144" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="156.0" class="c w">q / kv norm + KV insert</text>
+  <path d="M220 168 V176" class="e"/>
+  <rect x="110" y="176" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="188.0" class="c w">wq_b + RoPE</text>
+  <path d="M220 200 V208" class="e"/>
+  <rect x="110" y="208" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="220.0" class="c w">compressor / indexer top-k</text>
+  <path d="M220 232 V240" class="e"/>
+  <rect x="110" y="240" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="252.0" class="c w">sparse attention</text>
+  <path d="M220 264 V272" class="e"/>
+  <rect x="110" y="272" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="284.0" class="c w">wo_a / wo_b</text>
+  <path d="M220 296 V304" class="e"/>
+  <rect x="110" y="304" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="316.0" class="c w">TP all-reduce</text>
+  <path d="M220 328 V336" class="e"/>
+  <rect x="110" y="336" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="348.0" class="c w">FFN seam / RMSNorm</text>
+  <path d="M220 360 V368" class="e"/>
+  <rect x="110" y="368" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="380.0" class="c w">router + top-k</text>
+  <path d="M220 392 V400" class="e"/>
+  <rect x="110" y="400" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="412.0" class="c w">shared expert</text>
+  <path d="M220 424 V432" class="e"/>
+  <rect x="110" y="432" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="444.0" class="c w">routed experts（MoE）</text>
+  <path d="M220 456 V464" class="e"/>
+  <rect x="110" y="464" width="220" height="24" class="n-key"/>
+  <text x="220.0" y="476.0" class="c w">TP all-reduce</text>
+  <rect x="60" y="506" width="320" height="40" rx="6" class="n-cream"/>
+  <text x="220.0" y="517.0" class="c">每个 Kernel：launch 间隙 + 中间结果写回 HBM</text>
+  <text x="220.0" y="535.0" class="c">小 batch 时带宽和算力都吃不满</text>
+  <text x="720" y="30" class="panel-title">--monokernel：每层 2 个持久化 Kernel</text>
+  <rect x="460" y="50" width="520" height="520" rx="40" class="panel"/>
+  <rect x="490" y="80" width="460" height="150" fill="url(#g-orange)" stroke="#d79b00"/>
+  <text x="500" y="96" class="b">K1</text>
+  <rect x="530" y="110" width="380" height="30" rx="6" class="n-cream"/>
+  <text x="720.0" y="125.0" class="c">mHC seam：gate / Sinkhorn / norm</text>
+  <rect x="530" y="148" width="380" height="30" rx="6" class="n-cream"/>
+  <text x="720.0" y="163.0" class="c">wqkv + q / kv norm + KV insert</text>
+  <rect x="530" y="186" width="380" height="30" rx="6" class="n-cream"/>
+  <text x="720.0" y="201.0" class="c">wq_b + RoPE → Q；输出 qr 和 normed input</text>
+  <rect x="560" y="250" width="320" height="40" class="n-sys"/>
+  <text x="720.0" y="270.0" class="c w">vLLM 原有路径：compressor / indexer（top-k）</text>
+  <rect x="490" y="310" width="460" height="230" fill="url(#g-orange)" stroke="#d79b00"/>
+  <text x="500" y="326" class="b">K2</text>
+  <rect x="530" y="340" width="380" height="26" rx="6" class="n-cream"/>
+  <text x="720.0" y="353.0" class="c">key table（CSA 的 top-k / HCA 的压缩行）</text>
+  <rect x="530" y="372" width="380" height="26" rx="6" class="n-cream"/>
+  <text x="720.0" y="385.0" class="c">split attention + combine + 逆 RoPE</text>
+  <rect x="530" y="404" width="380" height="26" rx="6" class="n-cream"/>
+  <text x="720.0" y="417.0" class="c">wo_a / wo_b → 核内 TP all-reduce</text>
+  <rect x="530" y="436" width="380" height="26" rx="6" class="n-cream"/>
+  <text x="720.0" y="449.0" class="c">FFN seam：reduce / gate / norm</text>
+  <rect x="530" y="468" width="380" height="26" rx="6" class="n-cream"/>
+  <text x="720.0" y="481.0" class="c">router + shared expert + MoE（ug / down）</text>
+  <rect x="530" y="500" width="380" height="26" rx="6" class="n-cream"/>
+  <text x="720.0" y="513.0" class="c">核内 TP all-reduce → 层输出</text>
+  <path d="M720 230 V250" class="e"/>
+  <path d="M720 290 V310" class="e"/>
+  <rect x="40" y="590" width="920" height="40" class="n-blue"/>
+  <text x="500.0" y="601.0" class="c">256 个 CTA 常驻（每 CU 一个），stage = task table，CTA 之间用 tag / epoch 同步；跨卡通过对称 peer memory 直接 push 部分和</text>
+  <text x="500.0" y="619.0" class="c">生效条件：DeepSeek-V4-Pro · MI355X · TP8 · 纯 decode step · 每步 ≤ 64 行</text>
+</svg>

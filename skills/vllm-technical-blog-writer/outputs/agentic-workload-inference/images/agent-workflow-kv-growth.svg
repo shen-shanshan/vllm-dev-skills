@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="700" viewBox="0 0 1080 700">
+  <defs>
+    <!-- draw.io "classic" arrowheads, one per edge color -->
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#000000"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#cc0000"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#0066cc"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#006600"/></marker>
+    <marker id="arrow-darkred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#660000"/></marker>
+    <!-- draw.io gradients: light top -> saturated bottom -->
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dae8fc"/><stop offset="1" stop-color="#7ea6e0"/></linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8cecc"/><stop offset="1" stop-color="#ea6b66"/></linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2cc"/><stop offset="1" stop-color="#ffd966"/></linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5e8d4"/><stop offset="1" stop-color="#97d077"/></linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcd28"/><stop offset="1" stop-color="#ffa500"/></linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f5f5"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
+  </defs>
+  <style>
+    text { font-family: "Comic Sans MS", "Comic Sans", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", cursive; font-size: 12px; fill: #000000; dominant-baseline: central; }
+    .c { text-anchor: middle; }
+    .w { fill: #ffffff; }
+    .b { font-weight: bold; }
+    .hl { fill: #cc0000; }
+    .panel-title { font-size: 16px; text-anchor: middle; }
+    .sys-title { font-size: 20px; font-weight: bold; font-style: italic; text-anchor: middle; }
+    rect, path, polygon, circle { stroke-width: 1; }
+    /* key function / op / module: dark red, white text */
+    .n-key { fill: #a20025; stroke: #6f0000; }
+    /* output-path function: strong blue, white text */
+    .n-out { fill: #1ba1e2; stroke: #006eaf; }
+    /* big model bar (LLM / decoder / DiT): violet, white text */
+    .n-model { fill: #6a00ff; stroke: #3700cc; }
+    /* framework / system container node: purple-gray, white text */
+    .n-sys { fill: #76608a; stroke: #432d57; }
+    /* pastel pairs */
+    .n-blue { fill: #dae8fc; stroke: #6c8ebf; }
+    .n-green { fill: #d5e8d4; stroke: #82b366; }
+    .n-yellow { fill: #fff2cc; stroke: #d6b656; }
+    .n-orange { fill: #ffe6cc; stroke: #d79b00; }
+    .n-red { fill: #f8cecc; stroke: #b85450; }
+    .n-purple { fill: #e1d5e7; stroke: #9673a6; }
+    .n-cyan { fill: #b1ddf0; stroke: #10739e; }
+    .n-salmon { fill: #fad9d5; stroke: #ae4132; }
+    .n-cream { fill: #f9f7ed; stroke: #36393d; }
+    /* containers */
+    .box-outer { fill: #eeeeee; stroke: #36393d; }
+    .box-inner { fill: #f5f5f5; stroke: #666666; }
+    .box-dashed { fill: none; stroke: #666666; stroke-dasharray: 3 3; }
+    .panel { fill: #f5f5f5; stroke: #666666; stroke-dasharray: 3 3; }
+    /* edges: 1px orthogonal polylines */
+    .e { fill: none; stroke: #000000; marker-end: url(#arrow-black); }
+    .e-req { fill: none; stroke: #cc0000; marker-end: url(#arrow-red); }
+    .e-resp { fill: none; stroke: #0066cc; marker-end: url(#arrow-blue); }
+    .e-alt1 { fill: none; stroke: #006600; marker-end: url(#arrow-green); }
+    .e-alt2 { fill: none; stroke: #660000; marker-end: url(#arrow-darkred); }
+    .block-arrow { fill: #a20025; stroke: #6f0000; }
+    .step-arrow { fill: #ffffff; stroke: #000000; }
+  </style>
+  <rect width="1080" height="700" fill="#ffffff"/>
+  <rect x="20" y="30" width="1040" height="60" class="box-inner"/>
+  <text x="30" y="60" class="b">User</text>
+  <rect x="20" y="100" width="1040" height="60" class="box-inner"/>
+  <text x="30" y="121" class="b">Main Agent</text>
+  <text x="30" y="139">（GPU 推理）</text>
+  <rect x="20" y="170" width="1040" height="60" class="box-inner"/>
+  <text x="30" y="191" class="b">Tool Call</text>
+  <text x="30" y="209">（CPU 执行）</text>
+  <rect x="20" y="240" width="1040" height="60" class="box-inner"/>
+  <text x="30" y="270" class="b">Sub-agent 1</text>
+  <rect x="20" y="310" width="1040" height="60" class="box-inner"/>
+  <text x="30" y="340" class="b">Sub-agent 2</text>
+  <rect x="120" y="40" width="80" height="40" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="160.0" y="60.0" class="c">Prompt</text>
+  <rect x="210" y="110" width="80" height="40" class="n-key"/>
+  <text x="250.0" y="121.0" class="c w">推理</text>
+  <text x="250.0" y="139.0" class="c w">45.7k</text>
+  <rect x="300" y="180" width="80" height="40" class="n-sys"/>
+  <text x="340.0" y="200.0" class="c w">理解项目</text>
+  <rect x="390" y="110" width="80" height="40" class="n-key"/>
+  <text x="430.0" y="121.0" class="c w">推理</text>
+  <text x="430.0" y="139.0" class="c w">48.4k</text>
+  <rect x="480" y="180" width="80" height="40" class="n-sys"/>
+  <text x="520.0" y="200.0" class="c w">写代码</text>
+  <text x="590" y="150" class="c">……</text>
+  <text x="590" y="220" class="c">……</text>
+  <rect x="620" y="110" width="80" height="40" class="n-key"/>
+  <text x="660.0" y="121.0" class="c w">推理</text>
+  <text x="660.0" y="139.0" class="c w">108.5k</text>
+  <rect x="710" y="250" width="80" height="40" class="n-key"/>
+  <text x="750.0" y="261.0" class="c w">推理</text>
+  <text x="750.0" y="279.0" class="c w">10k</text>
+  <rect x="710" y="320" width="80" height="40" class="n-key"/>
+  <text x="750.0" y="331.0" class="c w">推理</text>
+  <text x="750.0" y="349.0" class="c w">10k</text>
+  <rect x="800" y="250" width="80" height="40" class="n-sys"/>
+  <text x="840.0" y="261.0" class="c w">查文档</text>
+  <text x="840.0" y="279.0" class="c w">29.4k</text>
+  <rect x="800" y="320" width="80" height="40" class="n-sys"/>
+  <text x="840.0" y="331.0" class="c w">跑测试</text>
+  <text x="840.0" y="349.0" class="c w">59.3k</text>
+  <rect x="710" y="110" width="170" height="40" class="box-dashed"/>
+  <text x="795" y="121" class="c">等待 Sub-agent</text>
+  <text x="795" y="139" class="c hl">KV Cache keep warm</text>
+  <rect x="890" y="110" width="80" height="40" class="n-key"/>
+  <text x="930.0" y="121.0" class="c w">推理</text>
+  <text x="930.0" y="139.0" class="c w">141.5k</text>
+  <rect x="980" y="40" width="80" height="40" fill="url(#g-blue)" stroke="#6c8ebf"/>
+  <text x="1020.0" y="51.0" class="c">汇报进展</text>
+  <text x="1020.0" y="69.0" class="c">新 Prompt</text>
+  <path d="M200 60.0 H205.0 V130.0 H210" class="e-req"/>
+  <path d="M290 130.0 H295.0 V200.0 H300" class="e"/>
+  <path d="M380 200.0 H385.0 V130.0 H390" class="e"/>
+  <path d="M470 130.0 H475.0 V200.0 H480" class="e"/>
+  <path d="M560 220 H570" class="e"/>
+  <path d="M610 150 H620" class="e"/>
+  <path d="M700 130.0 H705 V270.0 H710" class="e"/>
+  <path d="M700 130.0 H705 V340.0 H710" class="e"/>
+  <path d="M790 270.0 H800" class="e"/>
+  <path d="M790 340.0 H800" class="e"/>
+  <path d="M880 270.0 H885 V130.0 H890" class="e-resp"/>
+  <path d="M880 340.0 H885 V130.0 H890" class="e-resp"/>
+  <path d="M970 130.0 H975.0 V60.0 H980" class="e-resp"/>
+  <text x="698" y="196" text-anchor="end">fan out</text>
+  <text x="892" y="196">返回结果</text>
+  <rect x="20" y="400" width="1040" height="230" class="box-outer"/>
+  <text x="30" y="416" class="b">每次 Model Call 的上下文长度（KV Cache 中的 tokens）</text>
+  <rect x="230" y="550" width="40" height="50" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="250" y="540" class="c">45.7k</text>
+  <rect x="410" y="547" width="40" height="53" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="430" y="537" class="c">48.4k</text>
+  <rect x="640" y="481" width="40" height="119" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="660" y="471" class="c">108.5k</text>
+  <rect x="730" y="589" width="40" height="11" fill="url(#g-green)" stroke="#82b366"/>
+  <text x="750" y="579" class="c">10k</text>
+  <rect x="910" y="444" width="40" height="156" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="930" y="434" class="c">141.5k</text>
+  <path d="M120 600 H1040" class="e" marker-end="none"/>
+  <text x="590" y="580" class="c">……</text>
+  <rect x="140" y="440" width="20" height="20" fill="url(#g-red)" stroke="#b85450"/>
+  <text x="166" y="450">主 Agent 上下文</text>
+  <rect x="140" y="470" width="20" height="20" fill="url(#g-green)" stroke="#82b366"/>
+  <text x="166" y="480">Sub-agent 上下文（每个）</text>
+  <text x="30" y="660" class="b">GPU</text>
+  <rect x="120" y="645" width="80" height="30" fill="#f5f5f5" stroke="#666666"/>
+  <text x="160.0" y="660.0" class="c">空闲</text>
+  <rect x="210" y="645" width="80" height="30" fill="#f8cecc" stroke="#b85450"/>
+  <text x="250.0" y="660.0" class="c">忙</text>
+  <rect x="300" y="645" width="80" height="30" fill="#f5f5f5" stroke="#666666"/>
+  <text x="340.0" y="660.0" class="c">空闲</text>
+  <rect x="390" y="645" width="80" height="30" fill="#f8cecc" stroke="#b85450"/>
+  <text x="430.0" y="660.0" class="c">忙</text>
+  <rect x="480" y="645" width="80" height="30" fill="#f5f5f5" stroke="#666666"/>
+  <text x="520.0" y="660.0" class="c">空闲</text>
+  <rect x="620" y="645" width="80" height="30" fill="#f8cecc" stroke="#b85450"/>
+  <text x="660.0" y="660.0" class="c">忙</text>
+  <rect x="710" y="645" width="80" height="30" fill="#ffe6cc" stroke="#d79b00"/>
+  <text x="750.0" y="660.0" class="c">并发洪峰</text>
+  <rect x="800" y="645" width="80" height="30" fill="#f5f5f5" stroke="#666666"/>
+  <text x="840.0" y="660.0" class="c">空闲</text>
+  <rect x="890" y="645" width="80" height="30" fill="#f8cecc" stroke="#b85450"/>
+  <text x="930.0" y="660.0" class="c">忙</text>
+</svg>

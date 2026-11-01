@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="470" viewBox="0 0 1020 470">
+  <defs>
+    <!-- draw.io "classic" arrowheads, one per edge color -->
+    <marker id="arrow-black" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#000000"/></marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#cc0000"/></marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#0066cc"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#006600"/></marker>
+    <marker id="arrow-darkred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 L3,5z" fill="#660000"/></marker>
+    <!-- draw.io gradients: light top -> saturated bottom -->
+    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dae8fc"/><stop offset="1" stop-color="#7ea6e0"/></linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8cecc"/><stop offset="1" stop-color="#ea6b66"/></linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2cc"/><stop offset="1" stop-color="#ffd966"/></linearGradient>
+    <linearGradient id="g-green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5e8d4"/><stop offset="1" stop-color="#97d077"/></linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcd28"/><stop offset="1" stop-color="#ffa500"/></linearGradient>
+    <linearGradient id="g-gray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f5f5"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
+  </defs>
+  <style>
+    text { font-family: "Comic Sans MS", "Comic Sans", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", cursive; font-size: 12px; fill: #000000; dominant-baseline: central; }
+    .c { text-anchor: middle; }
+    .w { fill: #ffffff; }
+    .b { font-weight: bold; }
+    .hl { fill: #cc0000; }
+    .panel-title { font-size: 16px; text-anchor: middle; }
+    .sys-title { font-size: 20px; font-weight: bold; font-style: italic; text-anchor: middle; }
+    rect, path, polygon, circle { stroke-width: 1; }
+    /* key function / op / module: dark red, white text */
+    .n-key { fill: #a20025; stroke: #6f0000; }
+    /* output-path function: strong blue, white text */
+    .n-out { fill: #1ba1e2; stroke: #006eaf; }
+    /* big model bar (LLM / decoder / DiT): violet, white text */
+    .n-model { fill: #6a00ff; stroke: #3700cc; }
+    /* framework / system container node: purple-gray, white text */
+    .n-sys { fill: #76608a; stroke: #432d57; }
+    /* pastel pairs */
+    .n-blue { fill: #dae8fc; stroke: #6c8ebf; }
+    .n-green { fill: #d5e8d4; stroke: #82b366; }
+    .n-yellow { fill: #fff2cc; stroke: #d6b656; }
+    .n-orange { fill: #ffe6cc; stroke: #d79b00; }
+    .n-red { fill: #f8cecc; stroke: #b85450; }
+    .n-purple { fill: #e1d5e7; stroke: #9673a6; }
+    .n-cyan { fill: #b1ddf0; stroke: #10739e; }
+    .n-salmon { fill: #fad9d5; stroke: #ae4132; }
+    .n-cream { fill: #f9f7ed; stroke: #36393d; }
+    /* containers */
+    .box-outer { fill: #eeeeee; stroke: #36393d; }
+    .box-inner { fill: #f5f5f5; stroke: #666666; }
+    .box-dashed { fill: none; stroke: #666666; stroke-dasharray: 3 3; }
+    .panel { fill: #f5f5f5; stroke: #666666; stroke-dasharray: 3 3; }
+    /* edges: 1px orthogonal polylines */
+    .e { fill: none; stroke: #000000; marker-end: url(#arrow-black); }
+    .e-req { fill: none; stroke: #cc0000; marker-end: url(#arrow-red); }
+    .e-resp { fill: none; stroke: #0066cc; marker-end: url(#arrow-blue); }
+    .e-alt1 { fill: none; stroke: #006600; marker-end: url(#arrow-green); }
+    .e-alt2 { fill: none; stroke: #660000; marker-end: url(#arrow-darkred); }
+    .block-arrow { fill: #a20025; stroke: #6f0000; }
+    .step-arrow { fill: #ffffff; stroke: #000000; }
+  </style>
+  <rect width="1020" height="470" fill="#ffffff"/>
+  <text x="250" y="30" class="panel-title">纯 TP8：按 head 切分，latent KV 每卡一份完整副本</text>
+  <rect x="20" y="50" width="460" height="360" rx="40" class="panel"/>
+  <text x="70" y="80" class="c b">GPU0</text>
+  <rect x="50" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="70.0" y="110.0" class="c">H×16</text>
+  <rect x="60" y="145" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="155.0" class="c">0</text>
+  <rect x="60" y="171" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="181.0" class="c">1</text>
+  <rect x="60" y="197" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="207.0" class="c">2</text>
+  <rect x="60" y="223" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="233.0" class="c">3</text>
+  <rect x="60" y="249" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="259.0" class="c">4</text>
+  <rect x="60" y="275" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="285.0" class="c">5</text>
+  <rect x="60" y="301" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="311.0" class="c">6</text>
+  <rect x="60" y="327" width="20" height="20" class="n-green"/>
+  <text x="70.0" y="337.0" class="c">7</text>
+  <text x="122" y="80" class="c b">GPU1</text>
+  <rect x="102" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="122.0" y="110.0" class="c">H×16</text>
+  <rect x="112" y="145" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="155.0" class="c">0</text>
+  <rect x="112" y="171" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="181.0" class="c">1</text>
+  <rect x="112" y="197" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="207.0" class="c">2</text>
+  <rect x="112" y="223" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="233.0" class="c">3</text>
+  <rect x="112" y="249" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="259.0" class="c">4</text>
+  <rect x="112" y="275" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="285.0" class="c">5</text>
+  <rect x="112" y="301" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="311.0" class="c">6</text>
+  <rect x="112" y="327" width="20" height="20" class="n-green"/>
+  <text x="122.0" y="337.0" class="c">7</text>
+  <text x="174" y="80" class="c b">GPU2</text>
+  <rect x="154" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="174.0" y="110.0" class="c">H×16</text>
+  <rect x="164" y="145" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="155.0" class="c">0</text>
+  <rect x="164" y="171" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="181.0" class="c">1</text>
+  <rect x="164" y="197" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="207.0" class="c">2</text>
+  <rect x="164" y="223" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="233.0" class="c">3</text>
+  <rect x="164" y="249" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="259.0" class="c">4</text>
+  <rect x="164" y="275" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="285.0" class="c">5</text>
+  <rect x="164" y="301" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="311.0" class="c">6</text>
+  <rect x="164" y="327" width="20" height="20" class="n-green"/>
+  <text x="174.0" y="337.0" class="c">7</text>
+  <text x="226" y="80" class="c b">GPU3</text>
+  <rect x="206" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="226.0" y="110.0" class="c">H×16</text>
+  <rect x="216" y="145" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="155.0" class="c">0</text>
+  <rect x="216" y="171" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="181.0" class="c">1</text>
+  <rect x="216" y="197" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="207.0" class="c">2</text>
+  <rect x="216" y="223" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="233.0" class="c">3</text>
+  <rect x="216" y="249" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="259.0" class="c">4</text>
+  <rect x="216" y="275" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="285.0" class="c">5</text>
+  <rect x="216" y="301" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="311.0" class="c">6</text>
+  <rect x="216" y="327" width="20" height="20" class="n-green"/>
+  <text x="226.0" y="337.0" class="c">7</text>
+  <text x="278" y="80" class="c b">GPU4</text>
+  <rect x="258" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="278.0" y="110.0" class="c">H×16</text>
+  <rect x="268" y="145" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="155.0" class="c">0</text>
+  <rect x="268" y="171" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="181.0" class="c">1</text>
+  <rect x="268" y="197" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="207.0" class="c">2</text>
+  <rect x="268" y="223" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="233.0" class="c">3</text>
+  <rect x="268" y="249" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="259.0" class="c">4</text>
+  <rect x="268" y="275" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="285.0" class="c">5</text>
+  <rect x="268" y="301" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="311.0" class="c">6</text>
+  <rect x="268" y="327" width="20" height="20" class="n-green"/>
+  <text x="278.0" y="337.0" class="c">7</text>
+  <text x="330" y="80" class="c b">GPU5</text>
+  <rect x="310" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="330.0" y="110.0" class="c">H×16</text>
+  <rect x="320" y="145" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="155.0" class="c">0</text>
+  <rect x="320" y="171" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="181.0" class="c">1</text>
+  <rect x="320" y="197" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="207.0" class="c">2</text>
+  <rect x="320" y="223" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="233.0" class="c">3</text>
+  <rect x="320" y="249" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="259.0" class="c">4</text>
+  <rect x="320" y="275" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="285.0" class="c">5</text>
+  <rect x="320" y="301" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="311.0" class="c">6</text>
+  <rect x="320" y="327" width="20" height="20" class="n-green"/>
+  <text x="330.0" y="337.0" class="c">7</text>
+  <text x="382" y="80" class="c b">GPU6</text>
+  <rect x="362" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="382.0" y="110.0" class="c">H×16</text>
+  <rect x="372" y="145" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="155.0" class="c">0</text>
+  <rect x="372" y="171" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="181.0" class="c">1</text>
+  <rect x="372" y="197" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="207.0" class="c">2</text>
+  <rect x="372" y="223" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="233.0" class="c">3</text>
+  <rect x="372" y="249" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="259.0" class="c">4</text>
+  <rect x="372" y="275" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="285.0" class="c">5</text>
+  <rect x="372" y="301" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="311.0" class="c">6</text>
+  <rect x="372" y="327" width="20" height="20" class="n-green"/>
+  <text x="382.0" y="337.0" class="c">7</text>
+  <text x="434" y="80" class="c b">GPU7</text>
+  <rect x="414" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="434.0" y="110.0" class="c">H×16</text>
+  <rect x="424" y="145" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="155.0" class="c">0</text>
+  <rect x="424" y="171" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="181.0" class="c">1</text>
+  <rect x="424" y="197" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="207.0" class="c">2</text>
+  <rect x="424" y="223" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="233.0" class="c">3</text>
+  <rect x="424" y="249" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="259.0" class="c">4</text>
+  <rect x="424" y="275" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="285.0" class="c">5</text>
+  <rect x="424" y="301" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="311.0" class="c">6</text>
+  <rect x="424" y="327" width="20" height="20" class="n-green"/>
+  <text x="434.0" y="337.0" class="c">7</text>
+  <text x="770" y="30" class="panel-title">TP8 + DCP8：按 token 切分，每卡只存 1/8</text>
+  <rect x="540" y="50" width="460" height="360" rx="40" class="panel"/>
+  <text x="590" y="80" class="c b">GPU0</text>
+  <rect x="570" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="590.0" y="110.0" class="c">H×16</text>
+  <rect x="580" y="145" width="20" height="20" class="n-green"/>
+  <text x="590.0" y="155.0" class="c">0</text>
+  <rect x="580" y="171" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="580" y="197" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="580" y="223" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="580" y="249" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="580" y="275" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="580" y="301" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="580" y="327" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <text x="642" y="80" class="c b">GPU1</text>
+  <rect x="622" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="642.0" y="110.0" class="c">H×16</text>
+  <rect x="632" y="145" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="632" y="171" width="20" height="20" class="n-green"/>
+  <text x="642.0" y="181.0" class="c">1</text>
+  <rect x="632" y="197" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="632" y="223" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="632" y="249" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="632" y="275" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="632" y="301" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="632" y="327" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <text x="694" y="80" class="c b">GPU2</text>
+  <rect x="674" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="694.0" y="110.0" class="c">H×16</text>
+  <rect x="684" y="145" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="684" y="171" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="684" y="197" width="20" height="20" class="n-green"/>
+  <text x="694.0" y="207.0" class="c">2</text>
+  <rect x="684" y="223" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="684" y="249" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="684" y="275" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="684" y="301" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="684" y="327" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <text x="746" y="80" class="c b">GPU3</text>
+  <rect x="726" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="746.0" y="110.0" class="c">H×16</text>
+  <rect x="736" y="145" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="736" y="171" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="736" y="197" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="736" y="223" width="20" height="20" class="n-green"/>
+  <text x="746.0" y="233.0" class="c">3</text>
+  <rect x="736" y="249" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="736" y="275" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="736" y="301" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="736" y="327" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <text x="798" y="80" class="c b">GPU4</text>
+  <rect x="778" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="798.0" y="110.0" class="c">H×16</text>
+  <rect x="788" y="145" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="788" y="171" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="788" y="197" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="788" y="223" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="788" y="249" width="20" height="20" class="n-green"/>
+  <text x="798.0" y="259.0" class="c">4</text>
+  <rect x="788" y="275" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="788" y="301" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="788" y="327" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <text x="850" y="80" class="c b">GPU5</text>
+  <rect x="830" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="850.0" y="110.0" class="c">H×16</text>
+  <rect x="840" y="145" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="840" y="171" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="840" y="197" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="840" y="223" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="840" y="249" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="840" y="275" width="20" height="20" class="n-green"/>
+  <text x="850.0" y="285.0" class="c">5</text>
+  <rect x="840" y="301" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="840" y="327" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <text x="902" y="80" class="c b">GPU6</text>
+  <rect x="882" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="902.0" y="110.0" class="c">H×16</text>
+  <rect x="892" y="145" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="892" y="171" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="892" y="197" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="892" y="223" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="892" y="249" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="892" y="275" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="892" y="301" width="20" height="20" class="n-green"/>
+  <text x="902.0" y="311.0" class="c">6</text>
+  <rect x="892" y="327" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <text x="954" y="80" class="c b">GPU7</text>
+  <rect x="934" y="95" width="40" height="30" class="n-yellow"/>
+  <text x="954.0" y="110.0" class="c">H×16</text>
+  <rect x="944" y="145" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="944" y="171" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="944" y="197" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="944" y="223" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="944" y="249" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="944" y="275" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="944" y="301" width="20" height="20" fill="#ffffff" stroke="#b3b3b3" stroke-dasharray="2 2"/>
+  <rect x="944" y="327" width="20" height="20" class="n-green"/>
+  <text x="954.0" y="337.0" class="c">7</text>
+  <rect x="100" y="365" width="300" height="40" rx="6" class="n-cream"/>
+  <text x="250.0" y="376.0" class="c">每卡 KV = 全部 token</text>
+  <text x="250.0" y="394.0" class="c">8 卡共存 8 份相同的 latent KV</text>
+  <rect x="620" y="365" width="300" height="40" rx="6" class="n-cream"/>
+  <text x="770.0" y="376.0" class="c">token i 存在 GPU (i % 8)</text>
+  <text x="770.0" y="394.0" class="c">cp_kv_cache_interleave_size = 1</text>
+  <rect x="300" y="430" width="20" height="20" class="n-yellow"/>
+  <text x="326" y="440">本卡负责的 Query head</text>
+  <rect x="500" y="430" width="20" height="20" class="n-green"/>
+  <text x="526" y="440">本卡存储的 token 的 latent KV（c_KV + k_rope）</text>
+</svg>
