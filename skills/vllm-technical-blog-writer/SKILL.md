@@ -13,13 +13,19 @@ Before writing:
 
 1. Read [references/style-profile.md](references/style-profile.md).
 2. Read [references/diagram-guide.md](references/diagram-guide.md) and open [assets/diagram-style-template.svg](assets/diagram-style-template.svg) when the article needs any diagram. Every diagram must reproduce the author's hand-drawn draw.io style described there.
-3. Treat the user's draft, outline, references, and explicit wording as higher priority than the default patterns in those files.
+3. Treat the user's draft, outline, references, and explicit requirements as higher priority than the default patterns in those files.
+
+## Titles and outlines
+
+- Every article title is two segments joined by a full-width bar: `<主题域>｜<本文核心>`. When the user explicitly says the post is about vLLM, the title must contain “vLLM” (e.g. `vLLM 多模态推理｜ViT 性能优化`). Rewrite a user-supplied title that does not follow this form, keeping its meaning. See the style profile ("标题").
+- Section headings and the bullet points under them in a user's outline or draft are references, not text to copy verbatim. Reword and polish headings and points as needed, while keeping the intended meaning, facts, and opinions.
+- Unless the user explicitly asks to keep the section design (order, number of sections, line of argument, etc.), you may add, merge, remove, or reorder sections of a supplied outline when that makes the article clearer. Mention the structural changes in the final reply.
 
 ## Select the workflow
 
 - **New article**: the user supplies a topic but no article draft. Follow "Create a new article".
 - **Complete an article**: the user supplies an outline, template, or partially written Markdown article. Follow "Complete an existing article".
-- If the request mixes both, preserve supplied content and treat it as an existing article.
+- If the request mixes both, treat it as an existing article and keep the supplied content's facts, opinions, and examples.
 
 ## Research rules
 
@@ -42,7 +48,7 @@ Research before drafting. Do not rely on model memory for current vLLM behavior.
 
 1. Clarify only genuinely blocking ambiguity, such as two unrelated features sharing a name.
 2. Decide the article's single main question and intended reader.
-3. Build a compact outline that moves from motivation and basic principle to concrete flow, implementation, and trade-offs. Do not force every article into the same template.
+3. Decide a two-segment title (see "Titles and outlines"). Build a compact outline that moves from motivation and basic principle to concrete flow, implementation, and trade-offs. Do not force every article into the same template.
 4. Choose one running example when the topic is abstract. Reuse it across sections.
 5. Research the current implementation and collect only the code snippets, diagrams, and data needed to explain the main question.
 6. Draft in Chinese following the style profile. Keep English for proper nouns, code identifiers, APIs, and established technical terms.
@@ -73,11 +79,11 @@ outputs/<article-slug>/
 
 1. Read the entire article and supplied references before editing.
 2. Identify:
-   - completed sections that must remain unchanged,
-   - explicit placeholders or empty headings,
+   - completed prose whose facts, opinions, and examples must be kept,
+   - explicit placeholders, empty headings, and outline-style bullet points to expand,
    - claims that need current-code verification,
    - terminology, heading depth, numbering, and local writing patterns.
-3. Preserve the author's existing wording, opinions, examples, title hierarchy, and section order unless the user explicitly requests restructuring.
+3. Keep the author's opinions, examples, and facts. Headings and outline points are references (see "Titles and outlines"): polish them freely, and adjust the section structure when it helps, unless the user explicitly asks to keep the section design. Lightly polish finished prose only where needed for flow or correctness. Make the title follow the two-segment form.
 4. Research only what is needed to fill gaps, while checking interfaces affected by the latest `main` branch.
 5. Continue from the surrounding prose. Match its detail level and transitions; do not paste a separate tutorial style into the middle of the draft.
 6. Replace placeholders with finished prose. Do not leave TODOs, fabricated citations, or notes to the author.
@@ -115,7 +121,8 @@ Before finishing, verify:
 - [ ] Class, function, CLI option, config, and file names exactly match the source.
 - [ ] Version-sensitive statements and performance numbers have sources.
 - [ ] The prose follows the style profile without copying sentences mechanically.
-- [ ] Existing user-written content was preserved in completion mode.
+- [ ] The title is two segments joined by `｜`, and contains “vLLM” when the user said the post is about vLLM.
+- [ ] In completion mode, the user's facts, opinions, and examples were kept; headings and outline points were polished rather than copied, and any section added, removed, or reordered is reported (unless the user asked to keep the section design).
 - [ ] All diagrams are necessary, simple, rendered, and linked with valid relative paths.
 - [ ] New-article output is `outputs/<article-slug>/<article-slug>.md`.
 - [ ] Every article-owned image is under its `images/` directory.
