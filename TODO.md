@@ -6,7 +6,7 @@
 - [ ] Explore AI-native e2e workflows with multi-skills.
 - [ ] Support github-page for better reading experience.
 - [ ] Write acc eval and perf benchmark (infx) skill.
-- [ ] Write `vllm-rocm-env-prepare` skill.
+- [x] Write `vllm-rocm-env-prepare` skill.
 - [x] Write `vllm-rocm-code-dev` skill.
 - [x] Add usage examples (prompts and outputs) for each skill into `README.md`.
 - [x] Write `vllm-dev-task-discovery` skill.
@@ -27,5 +27,5 @@
 
 ## Blog Writing
 
-- [ ] Update blog writing skill (learn image color style from previous blogs, learn from vllm official blogs)
 - [ ] Update vLLM ViT CG report -> draw with `archify`.
+- [x] Update blog writing skill (learn image color style from previous blogs, learn from vllm official blogs)
