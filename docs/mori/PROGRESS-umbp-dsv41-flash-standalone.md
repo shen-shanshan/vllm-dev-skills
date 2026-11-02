@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4.1-Flash 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-10-30（rebase 到 main `5cae6fd0c9`；GSM8K 精度测试完成，UMBP 无损）
+> 最后更新：2026-11-02（AgentX c128 的 B0 和 S1 已跑完，见 5.3）
 > 每次推进后，同步更新以下几节：「代码与分支状态」「当前结论」「测试进展」「未完成事项」。
 
 ## 1. 任务概述
@@ -14,6 +14,7 @@
 - **PR 描述正文**：[`pr-umbp-dsv41-flash-standalone.md`](pr-umbp-dsv41-flash-standalone.md)，标题为 `[ROCm][UMBP] Support UMBP standalone mode for DeepSeek-V4.1-Flash`。尚未开 PR。
 - **设计方案**（用户已批准）：`/root/.claude/plans/lucky-popping-fog.md`
 - **姊妹任务**：DeepSeek-V4-Pro 对应 PR #63002，进度见 [`PROGRESS-umbp-dsv4-standalone.md`](PROGRESS-umbp-dsv4-standalone.md)。本任务复用了其中的通用 connector 改动。
+- **姊妹任务（对照组）**：Mooncake 接入 DeepSeek-V4.1-Flash，用于做 UMBP 和 Mooncake 的性能对比，进度见 [`PROGRESS-mooncake-dsv41-flash.md`](PROGRESS-mooncake-dsv41-flash.md)。它的 base 和本分支相同。
 - **背景资料**：[`umbp-background.md`](umbp-background.md)、[`umbp-install.md`](umbp-install.md)、[`umbp-perf-tuning.md`](umbp-perf-tuning.md)
 
 ## 2. 代码与分支状态
@@ -22,10 +23,10 @@
 |---|---|
 | 仓库 | `/home/shashen/vllm/vllm` |
 | 分支 | `rocm-dsv41-flash-umbp`，尚未 push |
-| base | upstream/main `5cae6fd0c9`（用户 2026-10-30 rebase），已包含 `[UMBP][1/10]`–`[6/10]` |
-| cherry-pick：`[UMBP][7/10]` #61795 standalone | `fbd0e8af99` `6310717d5f` `5e9943a09c` `1dcf75df82` `376f06dbc2` |
-| cherry-pick：`[UMBP][9/10]` #61797 lazy offload | `100deaa070` `66752a7a73` `3f3db5b35e` |
-| 本任务改动 | 已由用户 commit：`aa3076f283 support umbp for dsv41-flash` |
+| base | main `51c6dfd8c8`（2026-11-02 用户再次 rebase；更早依次是 `410ab341a8`、`5cae6fd0c9`），已包含 `[UMBP][1/10]`–`[6/10]` |
+| cherry-pick：`[UMBP][7/10]` #61795 standalone | `366891897a` `c5eefb447d` `e3a67672e9` `6d9a315e88` `bbe1a941fb` |
+| cherry-pick：`[UMBP][9/10]` #61797 lazy offload | `8b7a7adac5` `1bcdf81a43` `18baaefc3c` |
+| 本任务改动 | 已由用户 commit：`3c14ef42b6 support umbp for dsv41-flash`（2026-11-02 再次 rebase 后的 hash） |
 
 cherry-pick 的说明：
 - 用了 `-x`，所以每个 commit 都记录了原 hash。
@@ -93,7 +94,7 @@ cherry-pick 的说明：
 - 引擎启动约 40 分钟（权重加载、warmup、cudagraph capture）。
 - **未验证**：TP 去重是否实际生效。server 的 info 日志不打印 key，日志里看不到 `tp*`。
 
-### 5.2 E2E 精度：GSM8K 5-shot，TP2，GPU 0/1（2026-10-30，✅ 无损）
+### 5.2 E2E 精度：GSM8K 5-shot，TP2，GPU 0/1（2026-10-30，base `5cae6fd0c9`，✅ 无损）
 
 - **代码**：main `5cae6fd0c9` + 7/10 + 9/10 cherry-pick + `aa3076f283`。
 - **配置**：与 5.1 相同的 recipe（`override_tp2_c64`），两组服务 flag 完全一致（都设 `VLLM_SERVER_DEV_MODE=1`），UMBP 组只多 `--kv-transfer-config`；UMBP 池 128 GiB。
@@ -116,10 +117,37 @@ cherry-pick 的说明：
 - `/shared/datasets--openai--gsm8k` 是 HF hub cache 布局，离线时 `datasets` 无法按 `openai/gsm8k` 解析。改用自定义 task `gsm8k_local`（`umbp-dsv41-flash/gsm8k_task/`），`dataset_path` 直接指向 snapshot 目录。
 - `--load-format fastsafetensors` 在 TP2 下会一次性在每张卡上申请 91.55 GiB，直接 OOM，引擎起不来，已从脚本中去掉。权重在 page cache 里时，默认加载约 6 分钟即可起服务。
 
-### 5.3 脚本索引（`umbp-dsv41-flash/`）
+### 5.3 E2E 性能：AgentX TP2 c128，DURATION=3600（2026-11-02）
+
+条件：
+- 代码 `3c14ef42b6`，base `51c6dfd8c8`；
+- `override_tp2_c64` 的引擎参数，`CONC=128`；
+- synthetic AL 3.51，rust 前端；
+- `--no-enable-extensible-kv-cache`，原因见 5.4；
+- UMBP standalone 128GiB，默认开关。
+
+| 指标 | B0（不开 offloading） | S1（UMBP） | Δ |
+|---|---|---|---|
+| 每 GPU 总吞吐（tok/s） | 245,339 | 246,816 | +0.6% |
+| 输出吞吐（tok/s） | 4,097 | 4,120 | +0.6% |
+| TTFT mean / p90 / p95（s） | 0.50 / 0.96 / 1.99 | 0.47 / 0.87 / 1.69 | −6% / −9% / −15% |
+| TPOT mean（ms） | 19.5 | 19.2 | −1.5% |
+| 来自 GPU prefix cache / UMBP 的 prompt token | 94.7% / 0 | 94.8% / 0.14% | |
+
+结论：在这个场景下 GPU KV 足够用，UMBP 基本没有收益，也没有额外开销。每个点只跑了一次，TTFT 尾部的改善还需要重复测量才能确认。详细分析见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md) §7.6。
+
+### 5.4 新 base 的兼容问题（2026-11-02 冒烟时发现）
+
+- **extensible KV cache**：main 的 #56492 在 ROCm 上默认开启，用 VMM 分配 KV cache。`hipIpcGetMemHandle` 不接受这种内存，返回 invalid argument，导致 UMBP standalone 注册 KV 失败、引擎起不来。
+  - 目前的绕过方法：所有测试点都加 `--no-enable-extensible-kv-cache`。
+  - 正式修复需要 MORI 或 connector 支持 VMM 内存（例如走 dma-buf 或 `hipMemExportToShareableHandle`），待办。
+- **lazy offload 在 DSv4.1 上存不进任何数据**：扫描空闲队列时找不到带 hash 的块。同样的配置在 Qwen3-0.6B 上正常。待办。
+
+### 5.5 脚本索引（`umbp-dsv41-flash/`）
 | 脚本 | 作用 |
 |---|---|
-| `run_vllm_dsv41_flash.sh` | 启动引擎。`UMBP=0/1` 切换开关；`GPUS` 默认 `6,7`；`UMBP_EXTRA` 追加 connector 选项 |
+| `run_vllm_dsv41_flash.sh` | 启动引擎。`UMBP=0/1` 切换开关；`GPUS` 默认 `6,7`；`UMBP_EXTRA` 追加 connector 选项；`SYNTHETIC_AL` 开启 synthetic 接受长度；默认打开 rust 前端，并加 `--no-enable-extensible-kv-cache`（设 `EXTENSIBLE_KV_CACHE=1` 可恢复） |
+| `run_config.sh`、`run_agentic.sh`、`compare_agentic.py` | AgentX 性能点：全新部署 → 跑 agentic → 采集指标 → 清理。用法：`TAG=s1_c128 UMBP=1 SYNTHETIC_AL=3.51 bash run_config.sh` |
 | `smoke_umbp.sh` | 拉起 server 和引擎，跑 restore 检查。用法：`TAG=<name> bash smoke_umbp.sh` |
 | `run_gsm8k_config.sh` | 一次完整部署跑 GSM8K。`TAG=baseline UMBP=0` 跑一遍；`TAG=umbp UMBP=1` 跑 pass1 + reset + pass2，并在每遍前后快照引擎计数器 |
 | `run_gsm8k.sh`、`gsm8k_task/gsm8k_local.yaml` | lm_eval 命令和读本地 snapshot 的 gsm8k task |
@@ -135,8 +163,11 @@ cherry-pick 的说明：
 1. 是否 push、何时开 PR，由用户决定。
 2. （可选）确认 TP 去重生效：开 server 的 debug 日志，或者临时统计 key 数量。
 3. ~~精度：GSM8K~~ 已完成（5.2）。
-4. 性能：AgentX agentic，按 InferenceX 默认 `DURATION=3600`，UMBP 开/关对比。用户说"先不测"。
-5. 跟进上游：
+4. 性能：「不开 offloading vs UMBP」，方案和结果见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md)。B0 和 S1 已跑完（见 5.4），S2 及之后是否继续，由用户决定。之后再按 InferenceX 默认 `DURATION=3600`，和 Mooncake 对比（同一个 base、同一份 recipe、池子都是 128GB）。用户说"先不测"。前提条件见 [`PROGRESS-mooncake-dsv41-flash.md`](PROGRESS-mooncake-dsv41-flash.md) 第 6 节，主要是容器的 RDMA 问题。
+5. 兼容问题（见 5.4）：
+   - UMBP standalone 不支持 VMM 内存，所以新 main 的 extensible KV cache 下注册会失败；
+   - lazy offload 在 DSv4.1 上存不进任何数据。
+6. 跟进上游：
    - 7/10 和 9/10 合入后 rebase。
    - 与 #63002 共享的改动，谁后合入谁 rebase，以 main 为准。
    - `[Test][UMBP]` 合入后补跑相关单测。

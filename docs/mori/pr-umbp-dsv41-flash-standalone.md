@@ -10,6 +10,7 @@ Run DeepSeek-V4.1-Flash on ROCm with the standalone `UMBPStoreConnector`, which 
 - With UMBP, the DeepSeek-V4.1 ROCm attention keeps `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA` and the NaN-free extra-cache path. Before this PR, any KV connector disabled them.
 - With standalone UMBP at TP > 1, each MLA-style group (compressed KV, SWA, indexer K) is stored once under a TP-agnostic key. Before this PR it was stored `tp_size` times.
 - GSM8K accuracy is unchanged with UMBP, including when almost every prompt is restored from the pool (93% of prompt tokens).
+- On the full InferenceX AgentX workload at TP2 and concurrency 128, UMBP adds no overhead: throughput is within 1% of the no-connector baseline. It also brings no material gain there, because the GPU prefix cache already serves 94.7% of prompt tokens.
 - No behavior change for other connectors, for embedded UMBP, or for non-ROCm platforms.
 
 ## Validation
@@ -65,14 +66,43 @@ lm_eval --model local-completions \
 - Draft acceptance stays at about 48.5% (3.4 tokens per step) in every run. Probabilistic rejection sampling keeps outputs exact even with bad drafts, so corrupted restored KV would show up here as lower acceptance; it does not.
 - The engine logs have no NaN, Traceback, or `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA is ignored` warning.
 
-AgentX performance is not part of this PR; it follows in a separate change.
+E2E performance on the InferenceX AgentX workload:
+- Branch: `main` @ `51c6dfd8c8`, plus the cherry-picked #61795 and #61797, plus this PR.
+- Engine: the recipe above with these changes, identical on both arms:
+  - the client drives it at `CONC=128`. The recipe's own TP2 points stop at c64, where the GPU KV cache leaves no room for offloading;
+  - `rejection_sample_method=synthetic` with `synthetic_acceptance_length=3.51`, the golden AL that InferenceX substitutes for throughput runs;
+  - `VLLM_USE_RUST_FRONTEND=1`;
+  - `--no-enable-extensible-kv-cache` (see Limitations). With it, the GPU KV cache is 67.59 GiB per rank, 29.4M tokens.
+- Arms: the baseline has no connector. The UMBP arm adds only `--kv-transfer-config`, with a 128 GiB standalone pool and default options.
+- Each arm is a fresh deployment, run once.
+- Client: `python3 -m infx.bench agentic` (AgentX trace `semianalysis_cc_traces_weka_062126`), `DURATION=3600`, sending straight to the engine.
+
+| Metric | Baseline | UMBP | Δ |
+|---|---|---|---|
+| Requests (profiled) | 14,657 | 14,745 | |
+| Total throughput / GPU (tok/s) | 245,339 | 246,816 | +0.6% |
+| Output throughput (tok/s) | 4,097 | 4,120 | +0.6% |
+| TTFT mean / p50 / p90 / p95 (s) | 0.50 / 0.23 / 0.96 / 1.99 | 0.47 / 0.23 / 0.87 / 1.69 | −6% / 0% / −9% / −15% |
+| TPOT mean / p90 (ms) | 19.5 / 26.9 | 19.2 / 26.5 | −1.5% / −1.5% |
+| E2E latency mean / p90 (s) | 19.9 / 44.1 | 19.6 / 43.1 | −1.5% / −2.3% |
+| Prompt tokens from GPU prefix cache | 94.7% | 94.8% | |
+| Prompt tokens from UMBP | 0 | 0.14% (2.84M) | |
+| Mean acceptance length | 3.51 | 3.51 | |
+| Preemptions | 0 | 0 | |
+
+- Workload: ISL mean 120K tokens, median 86K, p90 252K; OSL mean 1,014.
+- Throughput and TPOT are within single-run noise, so UMBP adds no measurable overhead on this workload.
+- The 9–15% lower TTFT tail comes from a single run of each arm and is not a confirmed gain.
+- UMBP has little to restore here. At c128 the concurrent sessions fit in the 29.4M-token GPU KV cache, and the GPU prefix cache already serves 94.7% of prompt tokens. The UMBP pool never filled and evicted nothing.
+- Offloading pays off only where the working set exceeds the GPU KV cache, for example at higher concurrency or with longer sessions.
+- Failed requests: none on the baseline, and 1 of 14,746 on UMBP. That one was a client-side `ClientOSError` while writing the request body.
 
 ## Details
 
 **Why DeepSeek-V4.1 needs fewer changes than V4.**
 - Its compressor state is a `CircularBufferSpec`, which is not prefix-cacheable. Hits are 128-aligned, so the open compression group is empty on restore, the same as on a GPU prefix-cache hit.
 - Prefix-cache SWA replay is off on ROCm for V4.1 (`deepseek_v41/attention.py`). So the SWA group stays prefix-cacheable, and UMBP stores it next to the compressed KV and the indexer K.
-- The generic HMA lookup, the asynchronous load (forced for indexer models), and lazy offload work unchanged.
+- The generic HMA lookup and the asynchronous load (forced for indexer models) work unchanged.
 
 Key changes:
 - **`KVConnectorBase_V1.only_restores_canonical_kv`** (`base.py`): a new classmethod hook, default `False`. `MultiConnector` returns `True` only when every child does. `UMBPStoreConnector` returns `True`: its objects are whole blocks written by this cache layout, and the key namespace fingerprints every per-layer spec.
@@ -92,6 +122,8 @@ Limitations:
 - Single node only; distributed or RDMA UMBP is out of scope.
 - Without SWA replay on ROCm, V4.1 stores the SWA group as well. That means more and smaller objects than V4-Pro, which uses replay.
 - The connector changes overlap with #63002. Whichever PR merges second needs a rebase.
+- The extensible KV cache (#56492, on by default on ROCm) allocates the KV cache with VMM. `hipIpcGetMemHandle` rejects that memory, so the standalone server cannot map it and worker registration fails. For now, run standalone UMBP with `--no-enable-extensible-kv-cache`. A real fix needs VMM-aware registration in MORI or the connector, and is left to a follow-up.
+- `lazy_offload` stores nothing on DeepSeek-V4.1 in our tests: the lazy scan finds no hashed free blocks. The same config works on Qwen3-0.6B. This is a follow-up; the default eager store is unaffected.
 
 ---
 
