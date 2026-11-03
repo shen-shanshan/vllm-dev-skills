@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4.1-Flash 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-11-02（AgentX c128 的 B0 和 S1 已跑完，见 5.3）
+> 最后更新：2026-11-03（c128 和 c192 的 B0 和 S1 都已跑完，见 5.3；c192 下 UMBP 吞吐 +46%）
 > 每次推进后，同步更新以下几节：「代码与分支状态」「当前结论」「测试进展」「未完成事项」。
 
 ## 1. 任务概述
@@ -136,6 +136,20 @@ cherry-pick 的说明：
 
 结论：在这个场景下 GPU KV 足够用，UMBP 基本没有收益，也没有额外开销。每个点只跑了一次，TTFT 尾部的改善还需要重复测量才能确认。详细分析见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md) §7.6。
 
+**c192**（B0 2026-11-02，S1 2026-11-03，代码和 `vllm-rs` 版本相同）：
+
+| 指标 | B0 | S1（UMBP） | Δ |
+|---|---|---|---|
+| 每 GPU 总吞吐（tok/s） | 179,305 | 262,518 | **+46%** |
+| 输出吞吐（tok/s） | 2,778 | 3,954 | +42% |
+| TTFT mean / p90（s） | 7.12 / 19.46 | 1.59 / 4.18 | **−78% / −79%** |
+| TPOT mean（ms） | 58.0 | 37.0 | −36% |
+| GPU prefix 命中 / UMBP 恢复的 prompt | 87.8% / 0 | 88.1% / 4.8% | |
+| 实际计算的 prompt 比例 | 12.2% | 7.1% | −42% |
+
+- c192 时 GPU KV 装不下，引擎 prefill 过载。UMBP 恢复了 4.8% 的 prompt，把需要计算的 prefill 减少了 42%，吞吐和延迟都大幅改善。
+- 每个臂只跑了一次，但收益远超噪声。详见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md) §7.7。
+
 ### 5.4 新 base 的兼容问题（2026-11-02 冒烟时发现）
 
 - **extensible KV cache**：main 的 #56492 在 ROCm 上默认开启，用 VMM 分配 KV cache。`hipIpcGetMemHandle` 不接受这种内存，返回 invalid argument，导致 UMBP standalone 注册 KV 失败、引擎起不来。
@@ -163,7 +177,11 @@ cherry-pick 的说明：
 1. 是否 push、何时开 PR，由用户决定。
 2. （可选）确认 TP 去重生效：开 server 的 debug 日志，或者临时统计 key 数量。
 3. ~~精度：GSM8K~~ 已完成（5.2）。
-4. 性能：「不开 offloading vs UMBP」，方案和结果见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md)。B0 和 S1 已跑完（见 5.4），S2 及之后是否继续，由用户决定。之后再按 InferenceX 默认 `DURATION=3600`，和 Mooncake 对比（同一个 base、同一份 recipe、池子都是 128GB）。用户说"先不测"。前提条件见 [`PROGRESS-mooncake-dsv41-flash.md`](PROGRESS-mooncake-dsv41-flash.md) 第 6 节，主要是容器的 RDMA 问题。
+4. 性能：「不开 offloading vs UMBP」，方案和结果见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md)。
+   - c128 的 B0 和 S1 已完成（5.3）。
+   - c192 的 B0 和 S1 已完成（5.3）。
+   - c192 的结果已写进 PR 描述（2026-11-03）。
+   - S2 是否要测，由用户决定。之后再按 InferenceX 默认 `DURATION=3600`，和 Mooncake 对比（同一个 base、同一份 recipe、池子都是 128GB）。用户说"先不测"。前提条件见 [`PROGRESS-mooncake-dsv41-flash.md`](PROGRESS-mooncake-dsv41-flash.md) 第 6 节，主要是容器的 RDMA 问题。
 5. 兼容问题（见 5.4）：
    - UMBP standalone 不支持 VMM 内存，所以新 main 的 extensible KV cache 下注册会失败；
    - lazy offload 在 DSv4.1 上存不进任何数据。

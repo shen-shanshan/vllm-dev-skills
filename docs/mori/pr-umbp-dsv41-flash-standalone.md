@@ -10,7 +10,9 @@ Run DeepSeek-V4.1-Flash on ROCm with the standalone `UMBPStoreConnector`, which 
 - With UMBP, the DeepSeek-V4.1 ROCm attention keeps `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA` and the NaN-free extra-cache path. Before this PR, any KV connector disabled them.
 - With standalone UMBP at TP > 1, each MLA-style group (compressed KV, SWA, indexer K) is stored once under a TP-agnostic key. Before this PR it was stored `tp_size` times.
 - GSM8K accuracy is unchanged with UMBP, including when almost every prompt is restored from the pool (93% of prompt tokens).
-- On the full InferenceX AgentX workload at TP2 and concurrency 128, UMBP adds no overhead: throughput is within 1% of the no-connector baseline. It also brings no material gain there, because the GPU prefix cache already serves 94.7% of prompt tokens.
+- On the full InferenceX AgentX workload at TP2, UMBP's effect depends on whether the working set fits in GPU KV:
+  - At concurrency 192 the sessions no longer fit. UMBP raises total throughput by 46% and cuts mean TTFT by 78%, because it restores prefixes the GPU prefix cache had evicted (prefill compute −42%).
+  - At concurrency 128 the GPU prefix cache already serves 94.7% of prompt tokens. UMBP adds no overhead there (throughput within 1%) and no material gain.
 - No behavior change for other connectors, for embedded UMBP, or for non-ROCm platforms.
 
 ## Validation
@@ -69,13 +71,15 @@ lm_eval --model local-completions \
 E2E performance on the InferenceX AgentX workload:
 - Branch: `main` @ `51c6dfd8c8`, plus the cherry-picked #61795 and #61797, plus this PR.
 - Engine: the recipe above with these changes, identical on both arms:
-  - the client drives it at `CONC=128`. The recipe's own TP2 points stop at c64, where the GPU KV cache leaves no room for offloading;
+  - the client drives it at `CONC=128` and `CONC=192`. The recipe's own TP2 points stop at c64, where the GPU KV cache leaves no room for offloading;
   - `rejection_sample_method=synthetic` with `synthetic_acceptance_length=3.51`, the golden AL that InferenceX substitutes for throughput runs;
   - `VLLM_USE_RUST_FRONTEND=1`;
   - `--no-enable-extensible-kv-cache` (see Limitations). With it, the GPU KV cache is 67.59 GiB per rank, 29.4M tokens.
 - Arms: the baseline has no connector. The UMBP arm adds only `--kv-transfer-config`, with a 128 GiB standalone pool and default options.
 - Each arm is a fresh deployment, run once.
 - Client: `python3 -m infx.bench agentic` (AgentX trace `semianalysis_cc_traces_weka_062126`), `DURATION=3600`, sending straight to the engine.
+
+**Concurrency 128**
 
 | Metric | Baseline | UMBP | Δ |
 |---|---|---|---|
@@ -96,6 +100,34 @@ E2E performance on the InferenceX AgentX workload:
 - UMBP has little to restore here. At c128 the concurrent sessions fit in the 29.4M-token GPU KV cache, and the GPU prefix cache already serves 94.7% of prompt tokens. The UMBP pool never filled and evicted nothing.
 - Offloading pays off only where the working set exceeds the GPU KV cache, for example at higher concurrency or with longer sessions.
 - Failed requests: none on the baseline, and 1 of 14,746 on UMBP. That one was a client-side `ClientOSError` while writing the request body.
+
+**Concurrency 192**
+
+The baseline and UMBP arms ran on different days, with a container restart in between. Both used the same code, the same `vllm-rs` build, and the same host. Above roughly 170 running requests, decode steps exceed the CUDA graph capture size and run eagerly; this hits both arms equally.
+
+| Metric | Baseline | UMBP | Δ |
+|---|---|---|---|
+| Requests (profiled) | 11,300 | 15,289 | +35% |
+| Total throughput / GPU (tok/s) | 179,305 | 262,518 | **+46%** |
+| Output throughput (tok/s) | 2,778 | 3,954 | **+42%** |
+| TTFT mean / p50 / p90 / p95 (s) | 7.12 / 2.45 / 19.46 / 25.75 | 1.59 / 0.42 / 4.18 / 8.19 | **−78% / −83% / −79% / −68%** |
+| TPOT mean / p90 (ms) | 58.0 / 88.5 | 37.0 / 54.2 | −36% / −39% |
+| E2E latency mean / p90 (s) | 59.9 / 135.0 | 36.3 / 81.5 | −39% / −40% |
+| Interactivity p50 (tok/s/user) | 16.98 | 28.39 | +67% |
+| Prompt tokens from GPU prefix cache | 87.8% | 88.1% | |
+| Prompt tokens from UMBP | 0 | 4.8% (109.4M) | |
+| Prompt tokens computed | 12.2% | 7.1% | −42% |
+| Mean acceptance length | 3.51 | 3.51 | |
+| Preemptions | 0 | 0 | |
+
+- Workload: ISL mean 114K (baseline) and 124K (UMBP) tokens, p90 about 255K; OSL mean about 900. The two arms ran a similar mix.
+- At c192 the concurrent sessions overflow the 29.4M-token GPU KV cache. The GPU prefix cache serves only 88% of prompt tokens, and the prefill-bound baseline is overloaded: its throughput is below the c128 run (which used an older `vllm-rs` build, so the cross-concurrency comparison is approximate).
+- UMBP restores 4.8% of prompt tokens: prefixes the GPU prefix cache had evicted while their sessions sat between turns. That cuts computed prefill by 42% and drains the queue.
+- AgentX replays sessions in a closed loop, so a faster turn issues the next one sooner. The latency gain therefore also shows up as throughput.
+- The UMBP pool never filled and evicted nothing. The engine log has no Traceback or NaN, and no `is ignored` warning.
+- Each arm ran once. The gains are far beyond the roughly 3% run-to-run noise.
+- Failed requests: 3 of 11,303 on the baseline and 5 of 15,294 on UMBP, all client-side `ClientOSError`.
+  - The first UMBP attempt hit this error during AgentX warmup, which aborts the run. It was rerun unchanged.
 
 ## Details
 

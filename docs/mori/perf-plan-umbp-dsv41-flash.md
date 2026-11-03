@@ -1,6 +1,6 @@
 # 性能测试方案：DeepSeek-V4.1-Flash 不开 KV offloading vs UMBP standalone 各配置（AgentX TP2 c128）
 
-> 状态：**B0 和 S1 已跑完（2026-11-02），结果见 §7.6**；是否继续由用户决定。制定日期 2026-11-02，同日按用户意见修订。
+> 状态：c128（§7.6）和 c192（§7.7）的 B0 和 S1 都已完成；之后是否继续，由用户决定。
 > - 已确认：synthetic AL 3.51、开启 rust 前端。
 > - 用户决定：只测 c128，不测 c64 和 c192；只测 UMBP standalone，不测 embedded。
 > 参照：DeepSeek-V4-Pro 的同类方案，见 [`umbp-perf-tuning.md`](umbp-perf-tuning.md) §8。
@@ -201,6 +201,54 @@ TAG=s3_lazy_c128   UMBP=1 UMBP_EXTRA=',"lazy_offload":true' bash run_config.sh
 - `agentic_c128_workload_b0.txt`
 
 完整产物在 `/tmp/umbp_runs/agentic_dsv41/{b0,s1}_c128/`，不长期保留。
+
+## 7.7 c192：B0 vs S1（TP2，c192，DURATION=3600）
+
+- 条件与 §7.6 相同，只把 `CONC` 改成 192。
+- 两个臂不是同一天跑的：B0 是 2026-11-02 跑的，S1 是 2026-11-03 跑的，中间容器重启过。不过两边的代码（`3c14ef42b6`）和 `vllm-rs`（`76c6f3f2a`）都相同，机器也是同一台。
+- 和 c128 的结果不能严格对比，因为 c128 当时用的 `vllm-rs` 是 `e0d00e4b8`。
+- c192 超出了 cudagraph 的覆盖范围（约 170 个请求），超出的步骤走 eager 模式。两个臂受到的影响相同。
+- 每个臂只跑了一次。
+
+| 指标 | B0 | S1（UMBP 128GiB，默认配置） | Δ |
+|---|---|---|---|
+| 请求数（计入统计的） | 11,300 | 15,289 | +35% |
+| 每 GPU 总吞吐（tok/s） | 179,305 | 262,518 | **+46%** |
+| 输出吞吐（tok/s） | 2,778 | 3,954 | **+42%** |
+| TTFT mean / p50 / p90 / p95（s） | 7.12 / 2.45 / 19.46 / 25.75 | 1.59 / 0.42 / 4.18 / 8.19 | **−78% / −83% / −79% / −68%** |
+| TPOT mean / p90（ms） | 58.0 / 88.5 | 37.0 / 54.2 | −36% / −39% |
+| E2E mean / p90（s） | 59.9 / 135.0 | 36.3 / 81.5 | −39% / −40% |
+| interactivity p50（tok/s/user） | 16.98 | 28.39 | +67% |
+| GPU prefix 命中（整个运行） | 87.8% | 88.1% | |
+| UMBP 恢复的 prompt（整个运行） | 0 | 4.8%（109.4M token） | |
+| 实际计算的 prompt 比例 | 12.2% | 7.1% | −42% |
+| 平均接受长度 | 3.51 | 3.51 | |
+| preemption | 0 | 0 | |
+| 失败请求 | 3 / 11,303 | 5 / 15,294 | 都是 client 侧的 `ClientOSError` |
+
+- 负载（S1）：ISL mean 124K，median 88K，p90 258K；OSL mean 939。B0 为 114K / 78K / 252K / 892，两者接近。
+- S1：
+  - UMBP server 没有发生淘汰（日志里没有 eviction 记录），128GiB 池没有写满；
+  - 引擎日志里没有 Traceback，也没有 "is ignored"；
+  - S1 的引擎冷启动用了约 38 min，因为权重不在 page cache 里。这不影响测量。
+- 第一次尝试（2026-11-02）在 warmup 阶段被 client 侧的 `ClientOSError` 终止。这次重跑时同样的错误只出现在 profiling 阶段，共 5 次，在允许范围内。
+
+**结论**：
+1. **c192 下 UMBP 收益显著。** 吞吐提升 46%，TTFT 的 mean 和 p90 都下降了约 80%，TPOT 下降 36%。
+2. **原因：**
+   - c192 时 GPU KV 装不下所有会话的前缀，GPU prefix 命中率只有 88%，需要实际计算的 prompt 达到 12.2%。这个负载下引擎是 prefill-bound 并且过载。
+   - UMBP 恢复了 4.8% 的 prompt token，使实际计算的 prefill 减少了 42%。
+   - 请求排队随之大幅缓解。AgentX 是闭环负载，前一轮完成得越快，下一轮就发得越早，所以吞吐也跟着上升。
+3. **和 c128 对比：** c128 时 GPU KV 足够用，UMBP 只恢复了 0.14%，收益接近 0。所以 offloading 的价值取决于工作集是否超过 GPU KV 容量。
+4. **注意事项：**
+   - 每个臂只跑了一次，而且两个臂跨了容器重启。但 +46% 远大于约 3% 的噪声阈值，这个结论是可靠的。
+   - B0 在 c192 下的吞吐比 c128 还低，说明 c192 对不开 offloading 的部署已经过载；开 UMBP 后，c192 的吞吐反而超过了 c128。
+
+结果文件：`umbp-dsv41-flash/results/` 下的
+- `agentic_c192_compare.md`
+- `dsv41flash_vllm_tp2_c192_{b0,s1}_c192.json`
+- `agentic_c192_engine_metrics_{b0,s1}_c192.txt`
+- `agentic_c192_workload_{b0,s1}.txt`
 
 ## 8. 不在本轮范围内（待办）
 
