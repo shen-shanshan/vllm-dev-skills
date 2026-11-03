@@ -2,7 +2,7 @@
 
 ## Overview
 
-Run DeepSeek-V4.1-Flash on ROCm with the standalone `UMBPStoreConnector`, which uses a node-local MORI UMBP server for a single node. The aiter sparse MLA fast paths stay on, and the pool keeps one copy of the TP-replicated MLA KV. RFC: #57187. Depends on #61795 (`[UMBP][7/10]`) and #61797 (`[UMBP][9/10]`). The connector-side changes match the shared part of #63002 (DeepSeek-V4-Pro).
+Run DeepSeek-V4.1-Flash on ROCm with the standalone `UMBPStoreConnector`, which uses a node-local MORI UMBP server for a single node. The aiter sparse MLA fast paths stay on, and the pool keeps one copy of the TP-replicated MLA KV. RFC: #57187. Depends on #61797 (`[UMBP][9/10]`, lazy offload); #61795 (`[UMBP][7/10]`, standalone mode) has merged. The connector-side changes match the shared part of #63002 (DeepSeek-V4-Pro).
 
 ## Claims
 

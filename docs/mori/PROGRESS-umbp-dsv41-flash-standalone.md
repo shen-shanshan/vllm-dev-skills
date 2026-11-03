@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4.1-Flash 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-11-03（c128 和 c192 的 B0 和 S1 都已跑完，见 5.3；c192 下 UMBP 吞吐 +46%）
+> 最后更新：2026-11-03。已 rebase 到 main `77d2790e78`，冲突已解决，见第 2 节。c128 和 c192 的 B0、S1 都已跑完（5.3），c192 下 UMBP 吞吐 +46%。
 > 每次推进后，同步更新以下几节：「代码与分支状态」「当前结论」「测试进展」「未完成事项」。
 
 ## 1. 任务概述
@@ -23,20 +23,27 @@
 |---|---|
 | 仓库 | `/home/shashen/vllm/vllm` |
 | 分支 | `rocm-dsv41-flash-umbp`，尚未 push |
-| base | main `51c6dfd8c8`（2026-11-02 用户再次 rebase；更早依次是 `410ab341a8`、`5cae6fd0c9`），已包含 `[UMBP][1/10]`–`[6/10]` |
-| cherry-pick：`[UMBP][7/10]` #61795 standalone | `366891897a` `c5eefb447d` `e3a67672e9` `6d9a315e88` `bbe1a941fb` |
-| cherry-pick：`[UMBP][9/10]` #61797 lazy offload | `8b7a7adac5` `1bcdf81a43` `18baaefc3c` |
-| 本任务改动 | 已由用户 commit：`3c14ef42b6 support umbp for dsv41-flash`（2026-11-02 再次 rebase 后的 hash） |
+| base | main `77d2790e78`（2026-11-03 由用户 rebase，冲突由我解决）。main 已合入 `[UMBP][1/10]`–`[7/10]`，其中 7/10（#61795）是 `32d6ddea18` |
+| `[UMBP][9/10]` #61797 lazy offload | `a5dcf0a81f`。取自 PR 最新 head 中的非测试 commit `47a1beb0c8`，是一个 squash 过的 commit |
+| 本任务改动 | `3be8e20c17 support umbp for dsv41-flash`。和 rebase 前的 `3c14ef42b6` 相比，patch 完全一致（`git range-diff` 显示 `=`） |
 
-cherry-pick 的说明：
-- 用了 `-x`，所以每个 commit 都记录了原 hash。
-- 只挑了非测试 commit，所有 `[Test]` 和 `[CI]` commit 都跳过了，#61794（6/10）、#61796（8/10）、#61798（10/10）整个没拿。这样做是为了减少后续 rebase 时的冲突。
-- `79d3181336` 和 PR9 中的 `50e01f2a42` patch-id 相同，只取了一次。
-- 拿完之后，UMBP 目录和 `docs/features/umbp_store_connector_usage.md` 都与 #61797 head 完全一致。
+2026-11-03 rebase 时这样解决冲突（以 main 上已合入的 UMBP 代码为准）：
+- 旧的 7/10 cherry-pick（`366891897a` `c5eefb447d` `e3a67672e9` `6d9a315e88` `bbe1a941fb`）已被 main 上的 `32d6ddea18` 完全覆盖，所以全部丢弃。冲突文件 `runtime/standalone.py` 取 main 的版本。
+  - main 版本更新：可选的 lookup deadline、server 卡住时的处理、关闭流程修复都已经包含在内。
+- 旧的 9/10 cherry-pick（`8b7a7adac5` `1bcdf81a43` `18baaefc3c`）换成了 #61797 最新 head 中的 `47a1beb0c8`。
+  - 这个 PR 已经 rebase 到合入后的 7/10 之上；`fc90f92301` 相对 main 只多出 lazy offload 的改动（`scheduler.py` 和 doc）。
+  - 原先单独 cherry-pick 的 "Require every rank to be resident" 修复，已经包含在这个 commit 里。
+  - 应用时没有冲突。
+- 验证：
+  - 相关模块都能正常 import；
+  - `tests/v1/kv_connector/unit/test_umbp_*.py` 全部通过，共 230 个（main 已带测试；新容器需要先 `uv pip install tblib`）；
+  - 改动文件的 pre-commit 全部通过；
+  - `rocm.py` 中 4 处守卫仍然由 `_has_foreign_kv_writer()` 统一处理。
+- **还没有重新跑 E2E**（smoke、GSM8K、AgentX）。之前的结果都是在旧 base 上测的。
 
 注意：
-- 本地没有 `gh`。PR 用 `git fetch upstream pull/<N>/head:<branch>` 拉取，已拉取的有 `umbp-pr-6/7/8/9`。
-- 等 7/10 和 9/10 合入 main 后，rebase 时这些 cherry-pick 应该会自动消掉；如有冲突，以 main 为准。
+- 本地没有 `gh`。PR 用 `git fetch upstream pull/<N>/head:<branch>` 拉取，最新的 #61797 拉到了 `umbp-pr-9-new`。
+- 9/10 合入 main 后，`a5dcf0a81f` 在 rebase 时应该会自动消掉；如果有冲突，以 main 为准。
 
 ## 3. 当前结论
 
