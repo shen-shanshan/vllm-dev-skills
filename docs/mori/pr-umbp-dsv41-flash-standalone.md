@@ -64,6 +64,46 @@ vllm serve deepseek-ai/DeepSeek-V4.1-Flash --tensor-parallel-size 2 --language-m
 | TP2 c128 / c192 | `main` @ `51c6dfd8c8` | Recipe flags as above. GPU KV is 29.4M tokens. |
 | DP2 c256 | `main` @ `77d2790e78` | `--tensor-parallel-size 1 --data-parallel-size 2`, without expert parallelism, so attention runs DP2 and MoE runs TP2. `--monokernel` is dropped because mono decode rejects DP. A `vllm-router` `consistent_hash` front end keeps each session on one rank. GPU KV is 26.8M tokens per rank. |
 
+The DP2 c256 deployment as run, UMBP arm. The baseline drops `--kv-transfer-config`, and the UMBP server is started as above:
+
+```bash
+# Engine: attention DP2 + MoE TP2 on 2x MI355X
+VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_MOE=1 VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4 \
+VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=True VLLM_USE_BREAKABLE_CUDAGRAPH=1 \
+VLLM_USE_RUST_FRONTEND=1 OMP_NUM_THREADS=1 HIP_VISIBLE_DEVICES=0,1 \
+vllm serve deepseek-ai/DeepSeek-V4.1-Flash --port 8333 \
+  --tensor-parallel-size 1 --data-parallel-size 2 \
+  --language-model-only --tokenizer-mode deepseek_v41 --tool-call-parser deepseek_v41 \
+  --enable-auto-tool-choice --reasoning-parser deepseek_v41 --moe-backend aiter \
+  --gpu-memory-utilization 0.9 --block-size 128 --max-model-len 1048576 \
+  --attention-config '{"indexer_kv_dtype":"mxfp4","indexer_sparse_logits":true}' \
+  --speculative-config '{"method":"dspark","num_speculative_tokens":5,"draft_sample_method":"probabilistic","rejection_sample_method":"synthetic","synthetic_acceptance_length":3.51,"enable_adaptive_verification":false}' \
+  --engram-config '{"cpu_offload":true}' --max-cudagraph-capture-size 1024 \
+  --max-num-batched-tokens 16384 --no-enable-extensible-kv-cache \
+  --kv-transfer-config '{"kv_connector":"UMBPStoreConnector","kv_role":"kv_both","kv_load_failure_policy":"recompute","kv_connector_extra_config":{"mode":"standalone","endpoint":"unix:///tmp/umbp/standalone.grpc.sock"}}'
+
+# Front end: session-affine router over the two DP ranks (vllm-router==0.1.14)
+vllm-router --worker-urls http://localhost:8333 --intra-node-data-parallel-size 2 \
+  --host 0.0.0.0 --port 30000 --policy consistent_hash \
+  --request-timeout-secs 14400 --disable-retries
+
+# Client: InferenceX AgentX replay through the router
+# (from InferenceX/inferencex-e2e, after `source benchmarks/runtime_settings.sh`)
+IS_AGENTIC=1 SCENARIO_TYPE=agentic-coding KV_OFFLOADING=dram KV_OFFLOAD_BACKEND=umbp \
+TOTAL_CPU_DRAM_GB=128 KV_OFFLOAD_BACKEND_METADATA='{"name":"umbp","version":"mori-1.2.3.post1"}' \
+CONC=256 DURATION=3600 TP=2 EP_SIZE=1 DP_ATTENTION=true SPEC_DECODING=mtp \
+MODEL=deepseek-ai/DeepSeek-V4.1-Flash SERVED_MODEL_NAME=deepseek-ai/DeepSeek-V4.1-Flash \
+MODEL_PREFIX=dsv41flash FRAMEWORK=vllm PRECISION=fp4 \
+AIPERF_SERVER_URL=http://localhost:30000 AIPERF_SERVER_METRICS_URLS=http://localhost:8333/metrics \
+AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=1 AIPERF_REQUIRED_SERVER_METRIC_PREFIX='vllm:' \
+  python3 -m infx.bench agentic
+```
+
+For the baseline arm, the client sets `KV_OFFLOADING=none` and drops `KV_OFFLOAD_BACKEND`, `KV_OFFLOAD_BACKEND_METADATA` and `TOTAL_CPU_DRAM_GB`. The TP2 runs differ in three ways:
+- the engine uses `--tensor-parallel-size 2 --monokernel`;
+- there is no router;
+- the client uses `CONC=128` or `CONC=192` and `DP_ATTENTION=false`, and sends to the engine at `:8333`.
+
 Each cell is baseline → UMBP (Δ).
 
 | Metric | TP2 c128 | TP2 c192 | DP2 c256 |
