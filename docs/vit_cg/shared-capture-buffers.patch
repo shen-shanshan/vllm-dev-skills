@@ -1,184 +1,155 @@
+diff --git a/docs/design/cuda_graphs_multimodal.md b/docs/design/cuda_graphs_multimodal.md
+index b1a85ce2da..912d85a412 100644
+--- a/docs/design/cuda_graphs_multimodal.md
++++ b/docs/design/cuda_graphs_multimodal.md
+@@ -71,6 +71,8 @@ class BudgetGraphMetadata:
+ 
+ Budgets are auto-generated as power-of-2 levels from a model-provided range via `get_encoder_cudagraph_budget_range()`, with the maximum budget always included even if it does not fall on a power-of-2 boundary. Budgets can also be explicitly specified by the user via `encoder_cudagraph_token_budgets` in `CompilationConfig`.
+ 
++**Shared capture buffers.** Graphs of the same path and capture-axis keys never replay concurrently, so they share their buffers. Budgets are captured largest first, and each smaller budget records a leading-dim prefix view of the largest budget's buffer instead of allocating its own. With power-of-2 budgets, this halves the persistent buffer memory. Sharing applies to the output buffer and to the `buffer_keys` inputs that are contiguous, non-scalar device tensors differing only in the leading dim; others, such as the CPU `max_seqlen` scalar, stay per budget. Because a shared buffer's capture-time contents are overwritten by other budgets, replay must provide values for every shared key.
++
+ Each entry in `EncoderCudaGraphConfig.paths` defines an independently captured encoder path. A path can provide its own minimum token budget and opt into zero-token batches; the manager generates and stores a separate budget graph set for every configured path.
+ 
+ ### Multi-Path Graph Capture
+@@ -111,7 +113,7 @@ For each graph replay:
+ 1. Call `prepare_encoder_cudagraph_replay_buffers()` to compute buffer values (including `pixel_values` and precomputed metadata) from actual batch inputs.
+ 2. Zero the pre-allocated `input_buffers`, then slice-copy the replay values into them.
+ 3. Replay the CUDA Graph.
+-4. Clone outputs from `output_buffer` (cloning is necessary since the buffer is reused across replays).
++4. Clone outputs from `output_buffer` (cloning is necessary since the buffer is reused across replays, including replays of other budgets on the same path).
+ 
+ **Budget-cliff deferral:**
+ 
+@@ -155,7 +157,7 @@ Models opt-in to encoder CUDA Graphs by implementing the [SupportsEncoderCudaGra
+ * `prepare_encoder_cudagraph_replay_buffers(mm_kwargs, max_batch_size, max_frames_per_batch, path="default")` — computes buffer values from actual batch inputs. The `path` parameter selects which modality keys to extract from `mm_kwargs`. Returns `EncoderCudaGraphReplayBuffers` with a `values` dict whose keys match the captured graph's `input_buffers.keys()`.
+ * `encoder_cudagraph_forward(inputs: dict[str, torch.Tensor], path="default")` — forward pass accepting only fixed-shaped input tensors (the captured `values` dict). Called during both capture and replay. The `path` parameter dispatches to the correct encoder sub-module (e.g., global vs. local path for DeepSeek-OCR).
+ * `encoder_eager_forward(mm_kwargs, path="default")` — fallback eager forward when no graph fits. When `path` is `"global"` or `"local"`, runs only that encoder path without graph capture.
+-* `postprocess_encoder_output(outputs, ...)` — post-process encoder outputs keyed by path name, enabling multi-path models to assemble their path-specific features into the final per-item embedding.
++* `postprocess_encoder_output(outputs, ...)` — post-process encoder outputs keyed by path name, enabling multi-path models to assemble their path-specific features into the final per-item embedding. With `clone=True`, the per-item results must not be views of `outputs`, since the next replay overwrites the shared output buffer.
+ 
+ !!! note
+     The `SupportsEncoderCudaGraph` protocol is designed to be model-agnostic. New vision encoder models can opt-in by implementing the protocol methods without modifying the manager.
 diff --git a/tests/v1/cudagraph/test_encoder_cudagraph.py b/tests/v1/cudagraph/test_encoder_cudagraph.py
-index db40abad44..2584b71547 100644
+index db40abad44..df02b65ac6 100644
 --- a/tests/v1/cudagraph/test_encoder_cudagraph.py
 +++ b/tests/v1/cudagraph/test_encoder_cudagraph.py
-@@ -9,6 +9,7 @@ Test organization:
-     - TestGetInputModality     — modality routing from mm_kwargs keys
-   GPU required:
-     - TestEncoderCudaGraphCaptureReplay — capture, replay, fallback, counters, chunking
-+    - TestEncoderCudaGraphSharedBuffers — capture buffers shared across budgets
-     - TestEncoderCudaGraphVideoReplay   — video modality capture, replay
+@@ -13,6 +13,7 @@ Test organization:
  """
  
-@@ -173,6 +174,7 @@ def _make_manager_with_budgets(budgets: list[int]) -> EncoderCudaGraphManager:
-         out_hidden_size=32,
-     )
-     mgr.budget_graphs = {"default": {}}
-+    mgr._shared_buffers = {}
-     mgr.graph_pool = None
-     mgr._capture_axes = ()
-     mgr.graph_hits = 0
-@@ -622,6 +624,7 @@ def _make_manager_for_gpu(
+ from collections.abc import Hashable
++from contextlib import nullcontext
+ from types import SimpleNamespace
+ from typing import Any, cast
+ from unittest.mock import MagicMock, patch
+@@ -622,6 +623,8 @@ def _make_manager_for_gpu(
      )
      mgr.use_dp = False
      mgr.budget_graphs = {"default": {}}
 +    mgr._shared_buffers = {}
++    mgr._aliased_slots = set()
      mgr.graph_pool = None
      mgr._capture_axes = ()
      mgr.graph_hits = 0
-@@ -762,6 +765,139 @@ class TestEncoderCudaGraphCaptureReplay:
+@@ -762,6 +765,62 @@ class TestEncoderCudaGraphCaptureReplay:
              assert out.shape == (4, _HIDDEN)
  
  
-+# ---------------------------------------------------------------------------
-+# Capture buffers shared across token budgets
-+# ---------------------------------------------------------------------------
-+
-+_SHARED_BUDGETS = [16, 32, 64]
-+
-+
-+class SharedBufferMockViTModel(SimpleMockViTModel):
-+    """Lists pixel_values as a buffer key, plus keys that must not be shared:
-+    a CPU scalar and a buffer whose trailing dim depends on the budget."""
-+
-+    def get_encoder_cudagraph_config(self) -> EncoderCudaGraphConfig:
-+        return EncoderCudaGraphConfig(
-+            modalities=["image"],
-+            buffer_keys=["pixel_values", "dummy_buf", "max_seqlen", "row_buf"],
-+            out_hidden_size=_HIDDEN,
-+        )
-+
-+    def prepare_encoder_cudagraph_capture_inputs(
-+        self,
-+        token_budget: int,
-+        max_batch_size: int,
-+        max_frames_per_batch: int,
-+        device: torch.device,
-+        dtype: torch.dtype,
-+        path: str = "default",
-+        axis_keys: tuple[Hashable, ...] | None = None,
-+    ) -> EncoderCudaGraphCaptureInputs:
-+        inputs = super().prepare_encoder_cudagraph_capture_inputs(
-+            token_budget, max_batch_size, max_frames_per_batch, device, dtype
-+        )
-+        inputs.values["max_seqlen"] = torch.tensor(token_budget, dtype=torch.int32)
-+        inputs.values["row_buf"] = torch.zeros(
-+            1, token_budget, device=device, dtype=dtype
-+        )
-+        return inputs
-+
-+
-+class _NoReplayDummyBufModel(SharedBufferMockViTModel):
-+    """Omits the shared dummy_buf from replay values."""
-+
-+    def prepare_encoder_cudagraph_replay_buffers(
-+        self,
-+        mm_kwargs: dict[str, Any],
-+        max_batch_size: int,
-+        max_frames_per_batch: int,
-+        path: str = "default",
-+    ) -> EncoderCudaGraphReplayBuffers:
-+        replay = super().prepare_encoder_cudagraph_replay_buffers(
-+            mm_kwargs, max_batch_size, max_frames_per_batch, path
-+        )
-+        replay.values["dummy_buf"] = None
-+        return replay
-+
-+
 +@pytest.mark.skipif(not HAS_DEVICE_GRAPH, reason="Requires CUDA, ROCm or XPU graph")
-+class TestEncoderCudaGraphSharedBuffers:
-+    def setup_method(self):
-+        self.device = torch.device(current_platform.device_type, 0)
-+        self.dtype = torch.float16
-+        torch.manual_seed(0)
-+        self.model = SharedBufferMockViTModel().to(self.device).half()
++def test_shared_capture_buffers_match_unshared_capture():
++    """Smaller budgets view the largest budget's buffers. One execute() whose
++    batches replay budget 64 then 16 rewrites the shared output prefix before
++    returning the first batch, and must still match an unshared capture."""
++    device, dtype = torch.device(current_platform.device_type, 0), torch.float16
++    model = SimpleMockViTModel().to(device, dtype)
 +
-+    def _capture(self, model=None, share: bool = True) -> EncoderCudaGraphManager:
-+        mgr = _make_manager_for_gpu(
-+            model or self.model,
-+            _SHARED_BUDGETS,
-+            _MAX_BATCH,
-+            self.device,
-+            self.dtype,
-+        )
-+        graph_pool = current_platform.graph_pool_handle()
-+        if share:
-+            mgr.capture(graph_pool=graph_pool)
-+        else:
-+            with patch.object(mgr, "_get_shared_buffer", return_value=None):
-+                mgr.capture(graph_pool=graph_pool)
++    def capture(share: bool) -> EncoderCudaGraphManager:
++        mgr = _make_manager_for_gpu(model, [16, 32, 64], _MAX_BATCH, device, dtype)
++        mgr.config.buffer_keys = ["pixel_values", "dummy_buf"]
++        unshared = patch.object(mgr, "_get_shared_buffer", return_value=None)
++        with nullcontext() if share else unshared:
++            mgr.capture(graph_pool=current_platform.graph_pool_handle())
 +        return mgr
 +
-+    def test_smaller_budgets_view_largest_budget_buffers(self):
-+        mgr = self._capture()
-+        graphs = mgr.budget_graphs["default"]
-+        largest = graphs[max(_SHARED_BUDGETS)]
-+        for meta in graphs.values():
-+            budget = meta.token_budget
-+            assert meta.shared_keys == {"pixel_values", "dummy_buf"}
-+            for key in meta.shared_keys:
-+                buf = meta.input_buffers[key]
-+                assert buf.data_ptr() == largest.input_buffers[key].data_ptr()
-+                # Each graph records a prefix view sized for its own budget.
-+                assert buf.shape[0] == budget // _MAX_BATCH * _MAX_BATCH * (
-+                    _SPATIAL_MERGE**2 if key == "pixel_values" else 1
-+                )
-+            assert meta.output_buffer.data_ptr() == largest.output_buffer.data_ptr()
-+            assert meta.output_buffer.shape[0] == budget
++    shared, reference = capture(share=True), capture(share=False)
++    small, large = (shared.budget_graphs["default"][b] for b in (16, 64))
++    for a, b in zip(
++        [*small.input_buffers.values(), small.output_buffer],
++        [*large.input_buffers.values(), large.output_buffer],
++        strict=True,
++    ):
++        assert a.data_ptr() == b.data_ptr()
 +
-+    def test_ineligible_buffers_stay_per_budget(self):
-+        mgr = self._capture()
-+        graphs = mgr.budget_graphs["default"]
-+        # CPU scalar keeps the budget value baked at capture.
-+        assert {int(m.input_buffers["max_seqlen"]) for m in graphs.values()} == set(
-+            _SHARED_BUDGETS
-+        )
-+        # A trailing dim that varies with the budget cannot be a prefix view.
-+        row_ptrs = {m.input_buffers["row_buf"].data_ptr() for m in graphs.values()}
-+        assert len(row_ptrs) == len(_SHARED_BUDGETS)
++    grid_thw = [[1, 8, 8]] * _MAX_BATCH + [[1, 4, 4]]
++    mm_kwargs = _make_mm_kwargs(grid_thw, device, dtype)
++    run = patch.object(shared, "_run_budget_graph", wraps=shared._run_budget_graph)
++    with run as run_budget_graph:
++        out = shared.execute(mm_kwargs)
++    assert [c.args[1] for c in run_budget_graph.call_args_list] == [64, 16]
++    for o, r in zip(out, reference.execute(mm_kwargs), strict=True):
++        assert torch.equal(o, r)
 +
-+    def test_interleaved_budget_replay_matches_unshared_capture(self):
-+        shared = self._capture()
-+        reference = self._capture(share=False)
-+        # 49, 4, 25, 16, 4, 49 tokens: alternate between the largest budget,
-+        # whose buffers the others view, and the smaller budgets.
-+        sizes = [14, 4, 10, 8, 4, 14]
-+        for size in sizes:
-+            mm_kwargs = _make_mm_kwargs([[1, size, size]], self.device, self.dtype)
-+            out = shared.execute(mm_kwargs)
-+            ref = reference.execute(mm_kwargs)
-+            assert torch.equal(out[0], ref[0])
-+        assert shared.graph_misses == 0
 +
-+    def test_replay_without_shared_key_values_raises(self):
-+        mgr = self._capture(model=_NoReplayDummyBufModel().to(self.device).half())
-+        mm_kwargs = _make_mm_kwargs([[1, 4, 4]], self.device, self.dtype)
-+        with pytest.raises(RuntimeError, match="'dummy_buf' is shared"):
-+            mgr.execute(mm_kwargs)
++def test_step3_vl_postprocess_clones_global_only_item():
++    """With clone=True, an image without local patches must not alias the
++    global graph output, which later replays overwrite."""
++    from vllm.model_executor.models.step3_vl import Step3VLForConditionalGeneration
 +
-+    def test_clear_releases_shared_buffers(self):
-+        mgr = self._capture()
-+        assert mgr._shared_buffers
-+        mgr.clear()
-+        assert mgr._shared_buffers == {}
++    model = SimpleNamespace(img_output_tokens=4, patch_output_tokens=1)
++    global_out = torch.randn(4, _HIDDEN)
++    dest: dict[int, torch.Tensor] = {}
++    Step3VLForConditionalGeneration.postprocess_encoder_output(
++        model,  # type: ignore[arg-type]
++        {"global": global_out},
++        indices=[0],
++        per_item_out_tokens=[],
++        dest=dest,
++        clone=True,
++        batch_mm_kwargs={"num_patches": [0]},
++    )
++    assert torch.equal(dest[0], global_out)
++    assert dest[0].data_ptr() != global_out.data_ptr()
 +
 +
  # ---------------------------------------------------------------------------
  # E-only capture and output lifecycle
  # ---------------------------------------------------------------------------
+diff --git a/vllm/model_executor/models/interfaces.py b/vllm/model_executor/models/interfaces.py
+index 3635a637bc..4da2805f51 100644
+--- a/vllm/model_executor/models/interfaces.py
++++ b/vllm/model_executor/models/interfaces.py
+@@ -1946,6 +1946,10 @@ class SupportsEncoderCudaGraph(Protocol):
+         Override this for models that require additional processing on the raw
+         encoder output prior to scattering, e.g. Step3-VL, which merges features
+         according to dynamic patch counts before scattering.
++
++        With ``clone=True``, the tensors written to ``dest`` must not alias
++        ``outputs``: they are graph output buffers, shared across token budgets,
++        that the next replay overwrites.
+         """
+         from vllm.model_executor.models.utils import scatter_output_slices
+ 
+diff --git a/vllm/model_executor/models/step3_vl.py b/vllm/model_executor/models/step3_vl.py
+index ac747a7ecb..7635e1cd71 100644
+--- a/vllm/model_executor/models/step3_vl.py
++++ b/vllm/model_executor/models/step3_vl.py
+@@ -935,7 +935,11 @@ class Step3VLForConditionalGeneration(
+                 parts.append(patch_part[cur_patch : cur_patch + np].reshape(-1, hidden))
+                 cur_patch += np
+             parts.append(global_part[i].reshape(-1, hidden))
+-            merged[idx] = torch.cat(parts, dim=0) if len(parts) > 1 else parts[0]
++            if len(parts) > 1:
++                merged[idx] = torch.cat(parts, dim=0)
++            else:
++                # A view of the graph output, which later replays overwrite.
++                merged[idx] = parts[0].clone() if clone else parts[0]
+ 
+         out = [merged[i] for i in indices]
+         for i, idx in enumerate(indices):
 diff --git a/vllm/v1/worker/encoder_cudagraph.py b/vllm/v1/worker/encoder_cudagraph.py
-index 51c832001c..b435cdd440 100644
+index 51c832001c..b828d437c9 100644
 --- a/vllm/v1/worker/encoder_cudagraph.py
 +++ b/vllm/v1/worker/encoder_cudagraph.py
-@@ -4,6 +4,7 @@
- 
- import itertools
- import math
-+from collections import Counter
- from collections.abc import Hashable
- from dataclasses import dataclass
- from typing import Any, TypeAlias
-@@ -37,6 +38,10 @@ CaptureAxisKeys: TypeAlias = tuple[Hashable, ...]
+@@ -37,6 +37,10 @@ CaptureAxisKeys: TypeAlias = tuple[Hashable, ...]
  
  BudgetGraphMapKey: TypeAlias = int | tuple[int, CaptureAxisKeys]
  
@@ -189,62 +160,32 @@ index 51c832001c..b435cdd440 100644
  # Warn when capture axes multiply the captured graph count past this point.
  _CAPTURE_GRAPH_COUNT_WARNING_THRESHOLD = 64
  
-@@ -64,6 +69,9 @@ class BudgetGraphMetadata:
-     output_buffer: torch.Tensor
-     # Per-axis capture keys, empty when no extra capture axis is used.
-     axis_keys: CaptureAxisKeys = ()
-+    # Input buffer keys whose buffer other budgets also record, so replay must
-+    # refill them rather than rely on capture-time contents.
-+    shared_keys: frozenset[str] = frozenset()
- 
- 
- class EncoderCudaGraphManager:
-@@ -181,6 +189,10 @@ class EncoderCudaGraphManager:
+@@ -181,6 +185,14 @@ class EncoderCudaGraphManager:
          )
  
          self.budget_graphs: dict[str, dict[BudgetGraphMapKey, BudgetGraphMetadata]] = {}
 +        # Graphs of one path and axis keys never replay concurrently, so they
 +        # share each capture buffer: budgets are captured largest first, and
-+        # smaller budgets record leading-dim prefix views of its buffers.
++        # smaller budgets record leading-dim prefix views of its buffers. This
++        # relies on postprocess_encoder_output copying outputs when clone=True.
 +        self._shared_buffers: dict[SharedBufferSlot, torch.Tensor] = {}
++        # Slots whose buffer several graphs record, so replay must refill them
++        # rather than rely on capture-time contents.
++        self._aliased_slots: set[SharedBufferSlot] = set()
          self.graph_pool: Any | None = None
          self.graph_hits = 0
          self.graph_misses = 0
-@@ -241,6 +253,7 @@ class EncoderCudaGraphManager:
+@@ -241,6 +253,8 @@ class EncoderCudaGraphManager:
          """Release captured encoder CUDA graphs and the manager-local pool."""
          for graph_set in self.budget_graphs.values():
              graph_set.clear()
 +        self._shared_buffers.clear()
++        self._aliased_slots.clear()
          self.graph_pool = None
  
      def capture(self, graph_pool: Any):
-@@ -266,6 +279,21 @@ class EncoderCudaGraphManager:
-                         axis_keys=axis_keys,
-                     )
- 
-+        # A buffer is only shared once a smaller budget records a view of it.
-+        num_users = Counter(
-+            (path, meta.axis_keys, key)
-+            for path, graph_set in self.budget_graphs.items()
-+            for meta in graph_set.values()
-+            for key in meta.shared_keys
-+        )
-+        for path, graph_set in self.budget_graphs.items():
-+            for meta in graph_set.values():
-+                meta.shared_keys = frozenset(
-+                    key
-+                    for key in meta.shared_keys
-+                    if num_users[(path, meta.axis_keys, key)] > 1
-+                )
-+
-         logger.info(
-             "Encoder CUDA graph capture complete. Captured %d graphs across %d paths.",
-             num_graphs,
-@@ -319,10 +347,27 @@ class EncoderCudaGraphManager:
-         )
- 
+@@ -321,8 +335,21 @@ class EncoderCudaGraphManager:
          values = capture_inputs.values
-+        shared_keys: set[str] = set()
  
          with torch.inference_mode():
 +            for key in self.config.buffer_keys:
@@ -252,12 +193,9 @@ index 51c832001c..b435cdd440 100644
 +                if buf is None:
 +                    continue
 +                shared = self._get_shared_buffer((path, axis_keys, key), buf)
-+                if shared is None:
-+                    continue
-+                if shared is not buf:
++                if shared is not None and shared is not buf:
 +                    shared.copy_(buf)
 +                    values[key] = shared
-+                shared_keys.add(key)
 +
              output = self.model.encoder_cudagraph_forward({**values}, path=path)
 -            output_buffer = torch.empty_like(output)
@@ -269,11 +207,8 @@ index 51c832001c..b435cdd440 100644
  
          graph = torch.cuda.CUDAGraph()
          with (
-@@ -343,8 +388,39 @@ class EncoderCudaGraphManager:
-             input_buffers=values,
-             output_buffer=output_buffer,
+@@ -345,6 +372,37 @@ class EncoderCudaGraphManager:
              axis_keys=axis_keys,
-+            shared_keys=frozenset(shared_keys),
          )
  
 +    def _get_shared_buffer(
@@ -304,16 +239,17 @@ index 51c832001c..b435cdd440 100644
 +            or shared.shape[0] < like.shape[0]
 +        ):
 +            return None
++        self._aliased_slots.add(slot)
 +        return shared[: like.shape[0]]
 +
      def _find_smallest_fitting_budget_given_tokens(
          self, total_tokens: int, budgets: list[int] | None = None
      ) -> int | None:
-@@ -442,6 +518,11 @@ class EncoderCudaGraphManager:
+@@ -442,6 +500,11 @@ class EncoderCudaGraphManager:
          for key, buf in graph_meta.input_buffers.items():
              src = replay.values.get(key)
              if src is None:
-+                if key in graph_meta.shared_keys:
++                if (path, axis_keys, key) in self._aliased_slots:
 +                    raise RuntimeError(
 +                        f"Encoder CUDA graph buffer {key!r} is shared across "
 +                        "token budgets, so replay must provide its values."

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh <qwen3_vl|dsv41> <tag> [eager_vit]
+# run.sh <qwen3_vl|dsv41|step3_vl|gemma4|deepseek_ocr> <tag> [eager_vit]
 # Writes out/<model>_<tag>.{json,log} next to this script.
 set -u
 which=$1; tag=$2; mode=${3:-}

@@ -2,97 +2,72 @@
 
 ## Overview
 
-`EncoderCudaGraphManager` keeps a full set of input and output buffers for every captured token budget. This PR lets the smaller budgets record prefix views of the largest budget's buffers, which halves the persistent capture-buffer memory for every model that implements `SupportsEncoderCudaGraph`. Follow-up to the ViT CUDA graph RFC #38175.
+`EncoderCudaGraphManager` allocates a full set of input/output buffers per token budget. This PR makes smaller budgets use prefix views of the largest budget's buffers, which roughly halves persistent capture-buffer memory for every `SupportsEncoderCudaGraph` model. It also fixes Step3-VL returning graph-output views despite `clone=True`. Follow-up to RFC #38175.
 
 ## Claims
 
-- Encoder CUDA graph capture buffers (inputs listed in `buffer_keys`, plus the output buffer) are shared across the token budgets of the same path and capture-axis keys. Their memory drops by about half because budgets are powers of two. Measured on MI355X:
-  - Qwen3-VL-2B-Instruct: 974.1 → 488.0 MiB.
-  - DeepSeek-V4.1-Flash: 724.1 → 362.8 MiB per TP rank.
-- The freed memory goes to the KV cache: +5,120 tokens on Qwen3-VL-2B and +8,927 tokens on DeepSeek-V4.1-Flash TP2.
-- Encoder outputs are bit-identical to unshared capture. This holds for every replayed batch, in any replay order across budgets.
-- No model code changes; the change is confined to `vllm/v1/worker/encoder_cudagraph.py`.
+- Capture buffer memory is roughly halved, and the freed memory goes to the KV cache (MI355X):
+
+  | Model | Capture buffers | KV cache tokens |
+  |---|---|---|
+  | Qwen3-VL-2B-Instruct | 974.1 → 488.0 MiB | +5,120 |
+  | DeepSeek-V4.1-Flash (TP2, per rank) | 724.1 → 362.8 MiB | +8,927 |
+  | Gemma4-E2B-it (capture axes) | 1356.3 → 539.7 MiB | +54,202 |
+  | Step3-VL-10B (dual path) | 1018.7 → 430.1 MiB | +11,264 |
+
+- Encoder outputs match unshared capture: bit-exact for Qwen3-VL, DeepSeek-V4.1 and Gemma4, and within Step3-VL's own replay noise.
+- Fixes Step3-VL: an image without local patches got a view of the `global` graph output. A later batch in the same `execute()` overwrote it before it was returned. This already happens on main when both batches hit the same budget; sharing would extend it to any budget.
 
 ## Validation
 
-**Unit tests.** New `TestEncoderCudaGraphSharedBuffers` in `tests/v1/cudagraph/test_encoder_cudagraph.py` covers five cases:
-- Smaller budgets record prefix views of the largest budget's buffers.
-- Ineligible buffers stay separate per budget: CPU scalars and buffers whose trailing dims vary with the budget.
-- Interleaved-budget replay is bit-identical to a manager captured without sharing.
-- Replay that omits a shared key raises.
-- `clear()` releases the shared buffers.
+**Unit tests** (`tests/v1/cudagraph/test_encoder_cudagraph.py`, +59 lines). Each new test fails when its fix is reverted:
+
+- `test_shared_capture_buffers_match_unshared_capture` checks two things:
+  - smaller budgets alias the largest budget's buffers;
+  - one `execute()` that replays budget 64 then 16 returns every item bit-identical to an unshared capture.
+
+  It fails if sharing is disabled or if the manager stops cloning outputs.
+- `test_step3_vl_postprocess_clones_global_only_item` covers the Step3-VL fix.
 
 ```bash
-pytest tests/v1/cudagraph/test_encoder_cudagraph.py tests/v1/worker/test_encoder_runner.py
-# 100 passed, 7 skipped (MI355X, ROCm)
+pytest tests/v1/cudagraph/test_encoder_cudagraph.py tests/v1/worker/test_encoder_runner.py  # 97 passed, 7 skipped
 ```
 
-**End-to-end A/B on MI355X (Model Runner V2, `cudagraph_mm_encoder=True`, auto-inferred budgets 64 … 16384, 9 encoder graphs).** The harness first sends 7 image prompts at 5 resolutions, including one 3-image prompt, as a batch. It then sends 7 more prompts with different images one at a time, so each image replays its own budget graph.
+**End-to-end A/B on MI355X** (Model Runner V2, auto-inferred budgets).
 
-Memory comes from the unique storages behind every captured graph's buffers. KV cache size comes from the startup log and is identical across repeated runs.
+Greedy outputs vary between runs of the same build because batch composition differs, so the harness compares the encoder directly, inside each worker:
+1. Record every replayed batch and every `execute()` call during generation.
+2. Capture a second manager with sharing disabled.
+3. Rerun the recorded inputs on both managers and compare with `torch.equal`:
+   - each batch, in five orders across budgets;
+   - each `execute()` call as a whole.
 
-| Model / config | Capture buffers, before → after | KV cache tokens, before → after | Encoder graph capture log |
+| Model | Batches / budgets | Batch A/B | `execute()` A/B |
 |---|---|---|---|
-| Qwen3-VL-2B-Instruct, TP1, `max_num_batched_tokens=16384` | 974.1 → **488.0 MiB** | 1,508,352 → **1,513,472** | 4.00 → 3.48 GiB (3/3 runs) |
-| DeepSeek-V4.1-Flash, TP2, aiter MoE, `max_num_batched_tokens=16384` | 724.1 → **362.8 MiB** per rank | 3,468,391 → **3,477,318** | 5.94 / 5.44 → 5.71 / 5.21 GiB in 2 of 3 runs; under TP this device-level number varies by ±0.5 GiB between runs |
+| Qwen3-VL-2B-Instruct | 11 / 7 | exact | — |
+| DeepSeek-V4.1-Flash (both ranks) | 9 / 3 | exact | — |
+| Gemma4-E2B-it | 13 / 2 | exact | exact (9 calls, 1 multi-budget) |
+| Step3-VL-10B | 21 / 6 | max \|Δ\| 0.031 | max \|Δ\| 0.031; **14.13 with the fix reverted** |
 
-**Bit-exactness.** End-to-end greedy outputs are not a usable signal here: two runs of the same build already disagree on 3 of 14 Qwen3-VL prompts and 12 of 14 DeepSeek-V4.1 prompts, because the batch composition varies between runs. So the harness compares the encoder directly:
-1. Record the inputs of every batch that was replayed during generation.
-2. Capture a second manager in the same worker with sharing disabled.
-3. Replay every batch on both managers in five orders (forward, reverse, budget-descending, budget-ascending, shuffled) and compare the outputs with `torch.equal`.
+Gemma4 and Step3-VL ran with `encoder_cudagraph_max_vision_items_per_batch=2`, so a 3-image prompt spans two budgets.
 
-| Model | Replayed batches | Budgets hit | Mismatches |
-|---|---|---|---|
-| Qwen3-VL-2B-Instruct | 16 | 64, 128, 256, 512, 1024, 2048 | 0 in all 5 orders |
-| DeepSeek-V4.1-Flash (both TP ranks) | 9 | 256, 1024, 4096 | 0 in all 5 orders |
+Step3-VL's 0.031 is not caused by sharing. Replaying one unshared graph twice on the same input differs by the same amount, on the same smallest budgets.
 
-<details>
-<summary>Reproduce</summary>
-
-The harness builds the `LLM`, reads buffer stats and installs the recorder through `collective_rpc`, generates, then runs the A/B replay check.
-
-```bash
-# build under test (with this PR) and baseline (without it)
-VLLM_ALLOW_INSECURE_SERIALIZATION=1 python harness.py qwen3_vl out/qwen3_vl_final.json
-VLLM_ALLOW_INSECURE_SERIALIZATION=1 python harness.py dsv41 out/dsv41_final.json   # TP2
-python compare.py qwen3_vl base final
-```
-
-DeepSeek-V4.1-Flash engine args: `tokenizer_mode=deepseek_v41, tensor_parallel_size=2, moe_backend=aiter, block_size=128, attention_config={"indexer_kv_dtype":"mxfp4","indexer_sparse_logits":true}, engram_config={"cpu_offload":true}, max_model_len=32768`. Environment: `VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_MOE=1 VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=True`.
-</details>
-
-**Not validated here.** NVIDIA GPUs (CI covers the unit tests), and models other than Qwen3-VL and DeepSeek-V4.1. The sharing logic is model-agnostic, but only those two were run end to end.
+**Not covered:**
+- NVIDIA beyond CI unit tests.
+- DeepSeek-OCR, which fails on ROCm before capture, independent of this PR (`deepencoder.py` Triton kernel does not compile).
 
 ## Details
 
-**Why sharing is safe.**
-- Graphs of one path and capture-axis keys never replay concurrently.
-- Before every replay, `_run_budget_graph` zeroes or pads each input buffer and copies the batch into it.
-- `_execute_local` clones the output (`clone=True`) before the next replay.
+**Why sharing is safe.** Graphs of one path and capture-axis keys never replay concurrently. Every input is rewritten before each replay, and `_execute_local` asks `postprocess_encoder_output` to clone outputs. Budgets are already captured largest first, so smaller budgets get `shared[:n]` views keyed by `(path, axis_keys, key)`.
 
-So no graph depends on buffer contents left by another budget. Budgets are already captured largest first, so the first buffer seen for a slot is the largest, and smaller budgets get `shared[:n]` views. The smaller budget's dummy capture data is copied into its view before capture.
+**What is shared.** Only the output buffer and `buffer_keys` inputs that are contiguous, non-0-dim device tensors with matching dtype and trailing dims. Everything else stays per budget, e.g. the CPU `max_seqlen` scalar baked into the graph, or per-axis-key shapes.
 
-**What is shared.** A buffer is shared only if:
-- its key is in `EncoderCudaGraphConfig.buffer_keys`;
-- it is a contiguous, non-0-dim tensor on the device;
-- it differs from the shared buffer only by a shorter leading dim, with the same dtype and device.
+**Guard.** Slots handed out as views are recorded in `_aliased_slots`. `_run_budget_graph` raises if replay omits a value for one, since its capture-time contents now belong to another budget.
 
-Everything else keeps its own buffer as before. This covers:
-- CPU scalars such as `max_seqlen`, whose value is baked into the graph;
-- buffers whose trailing dims vary with the budget;
-- per-axis-key shapes (Gemma4 pixel grids, MiniCPM-V patch grids), since slots are keyed by `(path, axis_keys, key)`.
+**`clone` contract.** Sharing the output buffer requires `postprocess_encoder_output(clone=True)` to return copies. All in-tree implementations already did, except Step3-VL's single-part branch, which this PR fixes. The requirement is now documented in the protocol docstring and in `docs/design/cuda_graphs_multimodal.md`.
 
-The output buffer uses the same slot scheme. Paths never alias each other, so dual-path encoders (Step3-VL, DeepSeek-OCR) are unaffected.
-
-**Guard.** A buffer counts as shared only after a second graph records a view of it; this is computed after all budgets are captured. A model that relied on capture-time contents of such a buffer would read another budget's data. So `_run_budget_graph` raises if replay omits a shared key, instead of silently using stale data. No in-tree model omits one today; MiniMax-M3 drops `max_seqlen`, which is a CPU scalar and never shared.
-
-**Why not `WorkspaceManager`.** Its `get_persistent` resources outlive `EncoderCudaGraphManager.clear()`. V1's `profile_cudagraph_memory` captures into a throwaway manager and clears it, so persistent resources would skew that estimate. A manager-owned dict keeps the buffers' lifetime tied to the graphs.
-
-**Key changes** (`vllm/v1/worker/encoder_cudagraph.py`):
-- `_get_shared_buffer()` returns a prefix view of a slot's shared buffer, or `None` when the buffer is ineligible.
-- `_capture_budget_graph()` routes `buffer_keys` inputs and the output buffer through `_get_shared_buffer()`.
-- `capture()` finalizes `BudgetGraphMetadata.shared_keys`.
-- `_run_budget_graph()` adds the guard; `clear()` drops the shared buffers.
+**Why not `WorkspaceManager`.** Its persistent resources outlive `EncoderCudaGraphManager.clear()`, which would skew V1's `profile_cudagraph_memory` (it captures into a throwaway manager and clears it).
 
 ---
 

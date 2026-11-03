@@ -1,9 +1,18 @@
 """A/B harness for shared encoder CUDA graph capture buffers.
 
-Usage: python harness.py <qwen3_vl|dsv41> <out.json>
+Usage: python harness.py <model> <out.json> [eager_vit]
+  model: qwen3_vl | dsv41 | step3_vl | gemma4 | deepseek_ocr
+
+After generation, each worker captures a second EncoderCudaGraphManager with
+buffer sharing disabled and compares it with the live (shared) manager:
+  - "batch" A/B: every recorded batch replayed alone, in five orders.
+  - "execute" A/B: every recorded execute() call rerun whole, so a later batch
+    overwriting an earlier batch's not-yet-returned outputs shows up.
 """
 
 import json
+import os
+import random
 import sys
 from collections import Counter
 
@@ -22,59 +31,6 @@ def _find_manager(worker):
     return runner, mgr
 
 
-def rpc_stats(worker):
-    import torch
-
-    runner, mgr = _find_manager(worker)
-    if mgr is None:
-        return {"runner": type(runner).__module__, "manager": None}
-    storages = {}
-    naive = 0
-    graphs = []
-    for path, gset in mgr.budget_graphs.items():
-        for key, meta in gset.items():
-            bufs = [
-                b
-                for b in [*meta.input_buffers.values(), meta.output_buffer]
-                if isinstance(b, torch.Tensor) and b.device.type != "cpu"
-            ]
-            for b in bufs:
-                naive += b.numel() * b.element_size()
-                st = b.untyped_storage()
-                storages[st.data_ptr()] = st.nbytes()
-            graphs.append(
-                {
-                    "path": path,
-                    "key": str(key),
-                    "shared_keys": sorted(getattr(meta, "shared_keys", ())),
-                }
-            )
-    return {
-        "runner": type(runner).__module__,
-        "budgets": {p: b for p, b in mgr.path_token_budgets.items()},
-        "max_batch_size": mgr.max_batch_size,
-        "num_graphs": len(graphs),
-        "graphs": graphs,
-        "view_bytes": naive,
-        "unique_storage_bytes": sum(storages.values()),
-    }
-
-
-def rpc_install_counter(worker):
-    _, mgr = _find_manager(worker)
-    if mgr is None or hasattr(mgr, "_hit_budgets"):
-        return False
-    mgr._hit_budgets = Counter()
-    orig = mgr._run_budget_graph
-
-    def wrapped(mm_kwargs, token_budget, path="default", axis_keys=()):
-        mgr._hit_budgets[f"{path}:{token_budget}"] += 1
-        return orig(mm_kwargs, token_budget, path=path, axis_keys=axis_keys)
-
-    mgr._run_budget_graph = wrapped
-    return True
-
-
 def _clone_kwargs(obj):
     import torch
 
@@ -87,84 +43,60 @@ def _clone_kwargs(obj):
     return obj
 
 
+def rpc_stats(worker):
+    import torch
+
+    runner, mgr = _find_manager(worker)
+    if mgr is None:
+        return {"runner": type(runner).__module__, "manager": None}
+    storages = {}
+    naive = 0
+    graphs = []
+    for path, gset in mgr.budget_graphs.items():
+        for key, meta in gset.items():
+            for b in [*meta.input_buffers.values(), meta.output_buffer]:
+                if not isinstance(b, torch.Tensor) or b.device.type == "cpu":
+                    continue
+                naive += b.numel() * b.element_size()
+                st = b.untyped_storage()
+                storages[st.data_ptr()] = st.nbytes()
+            graphs.append({"path": path, "key": str(key)})
+    return {
+        "runner": type(runner).__module__,
+        "budgets": dict(mgr.path_token_budgets),
+        "capture_axes": [list(map(str, a)) for a in mgr._capture_axes],
+        "max_batch_size": mgr.max_batch_size,
+        "num_graphs": len(graphs),
+        "graphs": graphs,
+        "aliased_slots": sorted(map(str, getattr(mgr, "_aliased_slots", ()))),
+        "view_bytes": naive,
+        "unique_storage_bytes": sum(storages.values()),
+    }
+
+
 def rpc_install_recorder(worker):
+    """Count budget hits and record the inputs of every batch and execute()."""
     _, mgr = _find_manager(worker)
     if mgr is None:
         return False
+    mgr._hit_budgets = Counter()
     mgr._recorded = []
-    orig = mgr._run_budget_graph
-    mgr._orig_run_budget_graph = orig
+    mgr._recorded_execs = []
+    run_budget_graph = mgr._run_budget_graph
+    execute = mgr.execute
 
-    def wrapped(mm_kwargs, token_budget, path="default", axis_keys=()):
+    def recording_run_budget_graph(mm_kwargs, token_budget, path="default", axis_keys=()):
+        mgr._hit_budgets[f"{path}:{token_budget}"] += 1
         mgr._recorded.append((_clone_kwargs(mm_kwargs), token_budget, path, axis_keys))
-        return orig(mm_kwargs, token_budget, path=path, axis_keys=axis_keys)
+        return run_budget_graph(mm_kwargs, token_budget, path=path, axis_keys=axis_keys)
 
-    mgr._run_budget_graph = wrapped
+    def recording_execute(mm_kwargs):
+        mgr._recorded_execs.append(_clone_kwargs(mm_kwargs))
+        return execute(mm_kwargs)
+
+    mgr._run_budget_graph = recording_run_budget_graph
+    mgr.execute = recording_execute
     return True
-
-
-def rpc_ab_check(worker):
-    """Replay every recorded batch on the shared-buffer graphs and on a fresh
-    manager captured without sharing; compare outputs bit for bit."""
-    import torch
-
-    with torch.inference_mode():
-        return _ab_check(worker)
-
-
-def _ab_check(worker):
-    import random
-
-    import torch
-
-    from vllm.distributed.parallel_state import graph_capture
-    from vllm.platforms import current_platform
-    from vllm.v1.worker.encoder_cudagraph import EncoderCudaGraphManager
-
-    _, mgr = _find_manager(worker)
-    if mgr is None:
-        return None
-    base = EncoderCudaGraphManager(mgr.vllm_config, mgr.device, mgr.dtype, mgr.model)
-    base._get_shared_buffer = lambda *a, **k: None
-    with graph_capture(device=mgr.device):
-        base.capture(graph_pool=current_platform.graph_pool_handle())
-        torch.accelerator.synchronize()
-    base_unique = {
-        b.untyped_storage().data_ptr()
-        for g in base.budget_graphs.values()
-        for m in g.values()
-        for b in [*m.input_buffers.values(), m.output_buffer]
-        if isinstance(b, torch.Tensor) and b.device.type != "cpu"
-    }
-
-    run_shared = mgr._orig_run_budget_graph
-    recs = mgr._recorded
-    order = list(range(len(recs)))
-    orders = {
-        "forward": order,
-        "reverse": order[::-1],
-        "by_budget_desc": sorted(order, key=lambda i: -recs[i][1]),
-        "by_budget_asc": sorted(order, key=lambda i: recs[i][1]),
-        "shuffled": random.Random(0).sample(order, len(order)),
-    }
-    ref = {}
-    for i, (kw, budget, path, axis) in enumerate(recs):
-        ref[i] = base._run_budget_graph(kw, budget, path=path, axis_keys=axis).clone()
-    report = {"num_batches": len(recs), "budgets": sorted({r[1] for r in recs})}
-    for name, idxs in orders.items():
-        mism = []
-        for i in idxs:
-            kw, budget, path, axis = recs[i]
-            out = run_shared(kw, budget, path=path, axis_keys=axis)
-            n_tok = sum(mgr._get_per_item_out_tokens(kw))
-            if not torch.equal(out[:n_tok], ref[i][:n_tok]):
-                mism.append((i, budget, float((out[:n_tok] - ref[i][:n_tok]).abs().max())))
-            # also check the replay matches the baseline graph of the same budget
-            # when baseline replays right after (cross-budget contamination)
-        report[name] = {"mismatches": mism}
-    report["base_buffer_storages"] = len(base_unique)
-    base.clear()
-    return report
 
 
 def rpc_hits(worker):
@@ -178,20 +110,196 @@ def rpc_hits(worker):
     }
 
 
-QWEN_IMG = "<|vision_start|><|image_pad|><|vision_end|>"
-DS_IMG = "<｜deepseek_image｜>\n\n"
+def rpc_ab_check(worker):
+    import torch
+
+    with torch.inference_mode():
+        return _ab_check(worker)
 
 
-def qwen_prompt(n_img: int, q: str) -> str:
-    return (
-        f"<|im_start|>user\n{QWEN_IMG * n_img}{q}<|im_end|>\n<|im_start|>assistant\n"
-    )
+def _ab_check(worker):
+    import torch
+
+    from vllm.distributed.parallel_state import graph_capture
+    from vllm.platforms import current_platform
+    from vllm.v1.worker.encoder_cudagraph import EncoderCudaGraphManager
+
+    _, mgr = _find_manager(worker)
+    if mgr is None:
+        return None
+    # Drop the instance-level recorders so the class methods run below.
+    for name in ("_run_budget_graph", "execute"):
+        mgr.__dict__.pop(name, None)
+
+    def capture_unshared():
+        m = EncoderCudaGraphManager(mgr.vllm_config, mgr.device, mgr.dtype, mgr.model)
+        m._get_shared_buffer = lambda *a, **k: None
+        with graph_capture(device=mgr.device):
+            m.capture(graph_pool=current_platform.graph_pool_handle())
+            torch.accelerator.synchronize()
+        return m
+
+    base = capture_unshared()
+
+    # Batch A/B: each recorded batch alone, in several orders across budgets.
+    recs = mgr._recorded
+    order = list(range(len(recs)))
+    orders = {
+        "forward": order,
+        "reverse": order[::-1],
+        "by_budget_desc": sorted(order, key=lambda i: -recs[i][1]),
+        "by_budget_asc": sorted(order, key=lambda i: recs[i][1]),
+        "shuffled": random.Random(0).sample(order, len(order)),
+    }
+
+    def path_tokens(kw, path):
+        return sum(spec.get_path_output_tokens(path) for spec in mgr._get_item_specs(kw))
+
+    ref = {}
+    for i, (kw, budget, path, axis) in enumerate(recs):
+        ref[i] = base._run_budget_graph(kw, budget, path=path, axis_keys=axis).clone()
+    report = {
+        "num_batches": len(recs),
+        "budgets": sorted({f"{r[2]}:{r[1]}" for r in recs}),
+        "axis_keys": sorted({str(r[3]) for r in recs if r[3]}),
+    }
+    for name, idxs in orders.items():
+        mism = []
+        for i in idxs:
+            kw, budget, path, axis = recs[i]
+            out = mgr._run_budget_graph(kw, budget, path=path, axis_keys=axis)
+            n = path_tokens(kw, path)
+            if not torch.equal(out[:n], ref[i][:n]):
+                mism.append((i, path, budget, float((out[:n] - ref[i][:n]).abs().max())))
+        report[name] = {"mismatches": mism}
+
+    # Execute A/B: whole execute() calls, every item compared after all of the
+    # call's batches ran.
+    exec_mism = []
+    multi_budget = 0
+    for i, kw in enumerate(mgr._recorded_execs):
+        budgets_used = []
+        run = mgr._run_budget_graph
+
+        def counting_run(mm_kwargs, token_budget, path="default", axis_keys=()):
+            budgets_used.append((path, token_budget))
+            return run(mm_kwargs, token_budget, path=path, axis_keys=axis_keys)
+
+        mgr._run_budget_graph = counting_run
+        out = mgr.execute(kw)
+        mgr.__dict__.pop("_run_budget_graph")
+        ref_out = base.execute(kw)
+        # Several batches of one path on different budgets in a single call.
+        per_path = Counter(p for p, _ in set(budgets_used))
+        if any(n > 1 for n in per_path.values()):
+            multi_budget += 1
+        for j, (a, b) in enumerate(zip(out, ref_out, strict=True)):
+            if not torch.equal(a, b):
+                exec_mism.append((i, j, float((a.float() - b.float()).abs().max())))
+    # Control: a second unshared capture against the first. Differences here
+    # come from capture itself (e.g. kernel selection), not from sharing.
+    if os.environ.get("AB_CONTROL") == "1":
+        base2 = capture_unshared()
+        ctrl = []
+        for i, (kw, budget, path, axis) in enumerate(recs):
+            out = base2._run_budget_graph(kw, budget, path=path, axis_keys=axis)
+            n = path_tokens(kw, path)
+            if not torch.equal(out[:n], ref[i][:n]):
+                ctrl.append((i, path, budget, float((out[:n] - ref[i][:n]).abs().max())))
+        # Same graph replayed twice: replay itself is deterministic.
+        again = []
+        for i, (kw, budget, path, axis) in enumerate(recs):
+            a = base._run_budget_graph(kw, budget, path=path, axis_keys=axis).clone()
+            b = base._run_budget_graph(kw, budget, path=path, axis_keys=axis)
+            n = path_tokens(kw, path)
+            if not torch.equal(a[:n], b[:n]):
+                again.append((i, path, budget))
+        report["control_unshared_vs_unshared"] = {"mismatches": ctrl}
+        report["control_replay_twice"] = {"mismatches": again}
+        base2.clear()
+    report["execute"] = {
+        "num_executes": len(mgr._recorded_execs),
+        "num_multi_budget_executes": multi_budget,
+        "num_items": sum(len(mgr._get_item_specs(kw)) for kw in mgr._recorded_execs),
+        "mismatches": exec_mism,
+    }
+    base.clear()
+    return report
 
 
-def ds_prompt(n_img: int, q: str) -> str:
-    return (
-        f"<｜begin▁of▁sentence｜><｜User｜>{DS_IMG * n_img}{q}<｜Assistant｜></think>"
-    )
+PROMPTS = {
+    "qwen3_vl": lambda n, q: (
+        "<|im_start|>user\n"
+        + "<|vision_start|><|image_pad|><|vision_end|>" * n
+        + f"{q}<|im_end|>\n<|im_start|>assistant\n"
+    ),
+    "dsv41": lambda n, q: (
+        "<｜begin▁of▁sentence｜><｜User｜>"
+        + "<｜deepseek_image｜>\n\n" * n
+        + f"{q}<｜Assistant｜></think>"
+    ),
+    "step3_vl": lambda n, q: (
+        "<｜begin▁of▁sentence｜> You are a helpful assistant.<|BOT|>user\n "
+        + "<im_patch>" * n
+        + f"{q} <|EOT|><|BOT|>assistant\n"
+    ),
+    "gemma4": lambda n, q: (
+        "<bos><start_of_turn>user\n"
+        + "<|image|>" * n
+        + f"\n{q}<end_of_turn>\n<start_of_turn>model\n"
+    ),
+    "deepseek_ocr": lambda n, q: "<image>" * n + f"\n{q}",
+}
+
+ENGINES = {
+    "qwen3_vl": dict(
+        model="Qwen/Qwen3-VL-2B-Instruct",
+        max_model_len=16384,
+        max_num_batched_tokens=16384,
+        gpu_memory_utilization=0.6,
+    ),
+    "dsv41": dict(
+        model="/shared/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/"
+        "314113f8a7dadb388215396ba5fbee2c610a04d6",
+        tokenizer_mode="deepseek_v41",
+        tensor_parallel_size=2,
+        moe_backend="aiter",
+        block_size=128,
+        attention_config={"indexer_kv_dtype": "mxfp4", "indexer_sparse_logits": True},
+        engram_config={"cpu_offload": True},
+        max_model_len=32768,
+        max_num_batched_tokens=16384,
+        gpu_memory_utilization=0.85,
+    ),
+    # Dual-path encoder (global / local patches). Two items per batch makes
+    # a 3-image prompt split into batches on different global budgets.
+    "step3_vl": dict(
+        model="stepfun-ai/Step3-VL-10B",
+        trust_remote_code=True,
+        max_model_len=16384,
+        max_num_batched_tokens=16384,
+        # Leaves room for the two extra unshared captures of AB_CONTROL=1.
+        gpu_memory_utilization=0.5,
+        compilation_config={"encoder_cudagraph_max_vision_items_per_batch": 2},
+    ),
+    # Capture axes (one graph per budget per pooled row width); two items
+    # per batch as for Step3-VL.
+    "gemma4": dict(
+        model="google/gemma-4-E2B-it",
+        max_model_len=16384,
+        max_num_batched_tokens=16384,
+        gpu_memory_utilization=0.6,
+        compilation_config={"encoder_cudagraph_max_vision_items_per_batch": 2},
+    ),
+    # Dual-path encoder (global / local tiles).
+    "deepseek_ocr": dict(
+        model="deepseek-ai/DeepSeek-OCR",
+        trust_remote_code=True,
+        max_model_len=8192,
+        max_num_batched_tokens=8192,
+        gpu_memory_utilization=0.6,
+    ),
+}
 
 
 def build_requests(make_prompt, variant=0):
@@ -234,50 +342,22 @@ def build_requests(make_prompt, variant=0):
 def main():
     which, out_path = sys.argv[1], sys.argv[2]
     eager_vit = len(sys.argv) > 3 and sys.argv[3] == "eager_vit"
-    cc = {"cudagraph_mm_encoder": not eager_vit}
-    if which == "qwen3_vl":
-        kwargs = dict(
-            model="/root/.cache/huggingface/hub/models--Qwen--Qwen3-VL-2B-Instruct/"
-            "snapshots/89644892e4d85e24eaac8bacfd4f463576704203",
-            max_model_len=16384,
-            max_num_batched_tokens=16384,
-            max_num_seqs=8,
-            gpu_memory_utilization=0.6,
-        )
-        make_prompt = qwen_prompt
-    else:
-        kwargs = dict(
-            model="/shared/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/"
-            "314113f8a7dadb388215396ba5fbee2c610a04d6",
-            tokenizer_mode="deepseek_v41",
-            tensor_parallel_size=2,
-            moe_backend="aiter",
-            block_size=128,
-            attention_config={
-                "indexer_kv_dtype": "mxfp4",
-                "indexer_sparse_logits": True,
-            },
-            engram_config={"cpu_offload": True},
-            max_model_len=32768,
-            max_num_batched_tokens=16384,
-            max_num_seqs=8,
-            gpu_memory_utilization=0.85,
-        )
-        make_prompt = ds_prompt
+    kwargs = dict(ENGINES[which])
+    cc = {"cudagraph_mm_encoder": not eager_vit, **kwargs.pop("compilation_config", {})}
+    make_prompt = PROMPTS[which]
 
     llm = LLM(
         compilation_config=cc,
         limit_mm_per_prompt={"image": 3},
         enable_prefix_caching=False,
+        max_num_seqs=8,
         **kwargs,
     )
     stats = llm.collective_rpc(rpc_stats)
-    llm.collective_rpc(rpc_install_counter)
     llm.collective_rpc(rpc_install_recorder)
 
-    reqs = build_requests(make_prompt)
     sp = SamplingParams(temperature=0.0, max_tokens=48, logprobs=5)
-    outs = llm.generate(reqs, sp)
+    outs = llm.generate(build_requests(make_prompt), sp)
     # One request at a time so each image size replays its own budget graph.
     for req in build_requests(make_prompt, variant=1):
         outs += llm.generate([req], sp)
@@ -298,9 +378,7 @@ def main():
             }
         )
     with open(out_path, "w") as f:
-        json.dump(
-            {"stats": stats, "hits": hits, "ab": ab, "results": results}, f, indent=1
-        )
+        json.dump({"stats": stats, "hits": hits, "ab": ab, "results": results}, f, indent=1)
     print("WROTE", out_path)
     print(json.dumps({"hits": hits, "ab": ab}, indent=1)[:6000])
 
