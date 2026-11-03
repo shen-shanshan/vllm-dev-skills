@@ -10,7 +10,7 @@ TAGS = sys.argv[2:] or ["b0_c128", "s1_c128", "s2_decode_c128", "s3_lazy_c128"]
 
 def load(tag):
     out = ROOT / tag
-    agg = json.loads(next(out.glob("dsv41flash_vllm_tp2_c*.json")).read_text())
+    agg = json.loads(next(out.glob("dsv41flash_vllm_*_c*.json")).read_text())
     eng = dict(
         line.split() for line in (out / "engine_metrics.txt").read_text().splitlines()
     )

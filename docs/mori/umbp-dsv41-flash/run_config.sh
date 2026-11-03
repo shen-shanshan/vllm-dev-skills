@@ -14,7 +14,10 @@ export UMBP_DRAM_CAPACITY=${UMBP_DRAM_CAPACITY:-$((128 * 1024**3))}
 export GPUS=${GPUS:-0,1}
 OUT=${RUNS_DIR}/${TAG}
 mkdir -p "${OUT}"
+ROUTER_PID=
 cleanup() {
+  [[ -n "${ROUTER_PID}" ]] && kill "${ROUTER_PID}" 2>/dev/null || true
+  pkill -x vllm-router || true
   pkill -f "bin/vllm serve /shared" || true
   pkill -x umbp_standalone || true
   pkill -f "mori/umbp_standalone_server" || true
@@ -40,6 +43,12 @@ until curl -sf localhost:8333/health >/dev/null; do
   kill -0 "${ENGINE_PID}" 2>/dev/null || { echo "engine died" >&2; exit 1; }
   sleep 10
 done
+if [[ "${DP:-1}" -gt 1 ]]; then
+  ROUTER_DP_SIZE=${DP} nohup bash "${HERE}/../umbp-dsv4-mtp/run_router.sh" >/dev/null 2>&1 &
+  ROUTER_PID=$!
+  until curl -sf localhost:30000/health >/dev/null; do sleep 5; done
+  export DP_LABEL=dp${DP}
+fi
 bash "${HERE}/../umbp-dsv4-mtp/snapshot_metrics.sh" > "${OUT}/engine_metrics_start.txt"
 if [[ "${UMBP}" == "1" ]]; then
   # InferenceX aggregation requires backend metadata whenever KV offload is on.
@@ -51,4 +60,5 @@ TAG=${TAG} OUT=${OUT} bash "${HERE}/run_agentic.sh" >/dev/null 2>&1 || echo "cli
 bash "${HERE}/../umbp-dsv4-mtp/snapshot_metrics.sh" > "${OUT}/engine_metrics.txt"
 cp "${RUNS_DIR}/agentic_${TAG}.log" "${OUT}/engine.log" 2>/dev/null || true
 [[ "${UMBP}" == "1" ]] && cp "${RUNS_DIR}/umbp_server.log" "${OUT}/umbp_server.log" || true
+[[ -n "${ROUTER_PID}" ]] && cp "${RUNS_DIR}/router.log" "${OUT}/router.log" 2>/dev/null || true
 echo "done ${TAG}"

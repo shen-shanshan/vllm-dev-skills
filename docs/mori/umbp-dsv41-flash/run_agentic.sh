@@ -24,6 +24,12 @@ export CONC=${CONC:-128}
 # Matrix shape (amd-master.yaml dsv41flash-fp4-mi355x-vllm-agentic-dspark:
 # tp 2, kv-offloading none, spec-decoding mtp).
 export TP=2 EP_SIZE=1 DP_ATTENTION=false SPEC_DECODING=mtp
+CLIENT_PORT=${ENGINE_PORT:-8333}
+if [[ "${DP:-1}" -gt 1 ]]; then
+  # Attention DP behind the session-affine router: keep each session on one rank.
+  export DP_ATTENTION=true AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=1
+  CLIENT_PORT=${ROUTER_PORT:-30000}
+fi
 # InferenceX matrix default (DEFAULT_AGENTIC_DURATION_SECONDS).
 export DURATION=${DURATION:-3600}
 
@@ -31,10 +37,10 @@ export MODEL=deepseek-ai/DeepSeek-V4.1-Flash
 export SERVED_MODEL_NAME=deepseek-ai/DeepSeek-V4.1-Flash
 export TOKENIZER=${TOKENIZER:-/shared/models--deepseek-ai--DeepSeek-V4.1-Flash/snapshots/314113f8a7dadb388215396ba5fbee2c610a04d6}
 export MODEL_PREFIX=dsv41flash FRAMEWORK=vllm PRECISION=fp4
-export AIPERF_SERVER_URL=http://localhost:${ENGINE_PORT:-8333}
+export AIPERF_SERVER_URL=http://localhost:${CLIENT_PORT}
 export AIPERF_SERVER_METRICS_URLS=http://localhost:${ENGINE_PORT:-8333}/metrics
 export RESULT_DIR="${OUT}" AGENTIC_OUTPUT_DIR="${OUT}"
-export RESULT_FILENAME=dsv41flash_vllm_tp2_c${CONC}_${TAG}
+export RESULT_FILENAME=dsv41flash_vllm_${DP_LABEL:-tp2}_c${CONC}_${TAG}
 export HF_HOME=${HF_HOME:-/home/shashen/vllm/hf_cache}
 export AIPERF_RUNTIME_DIR="${RUNTIME}"
 

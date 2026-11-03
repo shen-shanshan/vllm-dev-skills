@@ -14,6 +14,10 @@ UMBP=${UMBP:-1}
 ENDPOINT=${ENDPOINT:-unix:///tmp/umbp/standalone.grpc.sock}
 # Extra kv_connector_extra_config entries, e.g. UMBP_EXTRA=',"lazy_offload":true'
 UMBP_EXTRA=${UMBP_EXTRA:-}
+# DP=2: attention DP2 with the MoE TP-sharded across both ranks (no expert
+# parallelism). The mono decode kernels need TP 2/4/8 without DP and fail on
+# an explicit opt-in, so DP>1 drops --monokernel.
+DP=${DP:-1}
 SYNTHETIC_AL=${SYNTHETIC_AL:-}
 # main's extensible KV cache (#56492, on by default on ROCm) backs the KV cache
 # with VMM pages, which hipIpcGetMemHandle rejects, so the standalone UMBP
@@ -46,6 +50,11 @@ if [[ -n "${SYNTHETIC_AL}" ]]; then
 fi
 
 EXTRA=()
+if [[ "${DP}" -gt 1 ]]; then
+  EXTRA+=(--tensor-parallel-size 1 --data-parallel-size "${DP}")
+else
+  EXTRA+=(--tensor-parallel-size 2 --monokernel)
+fi
 if [[ "${EXTENSIBLE_KV_CACHE}" != "1" ]]; then
   EXTRA+=(--no-enable-extensible-kv-cache)
 fi
@@ -67,9 +76,7 @@ exec "${VLLM_BIN}" serve "${MODEL}" \
   --block-size 128 \
   --speculative-config "{\"method\":\"dspark\",\"num_speculative_tokens\":5,\"draft_sample_method\":\"probabilistic\",${REJECTION},\"enable_adaptive_verification\":false}" \
   --max-model-len 1048576 \
-  --monokernel \
   --disable-uvicorn-access-log \
-  --tensor-parallel-size 2 \
   --engram-config '{"cpu_offload":true}' \
   --max-cudagraph-capture-size 1024 \
   --max-num-batched-tokens 16384 \

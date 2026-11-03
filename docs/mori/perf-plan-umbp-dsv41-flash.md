@@ -1,6 +1,6 @@
 # 性能测试方案：DeepSeek-V4.1-Flash 不开 KV offloading vs UMBP standalone 各配置（AgentX TP2 c128）
 
-> 状态：c128（§7.6）和 c192（§7.7）的 B0 和 S1 都已完成；之后是否继续，由用户决定。
+> 状态：TP2 c128（§7.6）、TP2 c192（§7.7）、DP2 c256（§9.6）的 B0 和 S1 都已完成；之后是否继续，由用户决定。
 > - 已确认：synthetic AL 3.51、开启 rust 前端。
 > - 用户决定：只测 c128，不测 c64 和 c192；只测 UMBP standalone，不测 embedded。
 > 参照：DeepSeek-V4-Pro 的同类方案，见 [`umbp-perf-tuning.md`](umbp-perf-tuning.md) §8。
@@ -258,3 +258,122 @@ TAG=s3_lazy_c128   UMBP=1 UMBP_EXTRA=',"lazy_offload":true' bash run_config.sh
 - 以下各项视本轮观察再决定是否补测：hugepages、`lookup_async`、`num_workers`、关闭去重的对照。
 - 用户决定不测：c64、c192、UMBP embedded 模式、TP4、用 `--kv-cache-memory-bytes` 压缩 GPU KV。
 - lazy offload（S3）在 DSv4.1 上不生效：扫描时找不到带 hash 的空闲块。根因待查。
+
+## 9. 2 卡 attention DP2 + expert TP2，AgentX c256 的 B0 vs S1（2026-11-03，已完成，结果见 9.6）
+
+### 9.1 部署形态
+
+| 项 | 取值 | 说明 |
+|---|---|---|
+| 并行 | `--tensor-parallel-size 1 --data-parallel-size 2`，**不加** `--enable-expert-parallel` | attention 按 DP2 切：每张卡一个 DP rank，各自持有完整的 attention 和 KV。vLLM 在未开 EP 时，MoE 用 DP×TP=2 做 TP 切分，也就是 expert TP2 |
+| 代码 | `rocm-dsv41-flash-umbp` `3be8e20c17`，base 是 main `77d2790e78` | 这个 base 还没跑过 E2E，所以冒烟要多验一些项（见 9.4） |
+| 引擎参数 | 与 TP2 的点相同：block 128、mxfp4 indexer、DSpark 5（synthetic AL 3.51）、`max-num-batched-tokens 16384`（每个 rank）、`max-cudagraph-capture-size 1024`、`gpu-memory-utilization 0.9`、engram `cpu_offload=true`、`--no-enable-extensible-kv-cache`、rust 前端 | 例外见下一行 |
+| **去掉 `--monokernel`** | 两个臂都不加 | `mono_decode.py` 要求 TP 为 2/4/8，且不能有 DP 或 EP，显式打开但跑不了时会直接报错。所以 DP2 下 decode 走常规路径，这和 TP2 recipe 不同 |
+| engram | `{"cpu_offload":true}`，`embedding_across_dp` 保持默认 false | 每个 DP rank 各有一份 TP 切分的 embedding；`dp_shared_memory` 默认开启，同一节点上的 host 表共用一份 |
+| 前端 | `vllm-router==0.1.14`，`--policy consistent_hash --intra-node-data-parallel-size 2`，client 带 `X-Session-ID` | 写法与 InferenceX 的 DEP recipe（B200 的 `zip_override_dep2`）以及 v4-Pro 的 DEP8 测试一致。同一个会话固定落在同一个 DP rank 上。rust 前端支持 router 发来的 `X-data-parallel-rank` header（`rust/src/server/src/utils.rs`），冒烟时会验证 |
+| client | `CONC=256`，`DURATION=3600`，`AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=1`；matrix 标记为 `TP=2 EP_SIZE=1 DP_ATTENTION=true` | 平均每个 DP rank 128 个会话 |
+| UMBP（S1） | standalone 128GiB，默认开关，两个 DP rank 共用一个 server | TP1 下没有 TP 复制，去重不起作用。key 里不含 DP 编号，所以一个 rank 存进去的前缀，另一个 rank 也能读到；但 router 让会话固定在同一个 rank 上，这种跨 rank 复用会很少 |
+| GPU | 0、1 | |
+
+### 9.2 预期与风险
+
+- **KV 压力可能不够**：
+  - DP2 下每个 rank 都要存完整的 MLA latent。TP2 下 latent 本来也是每个 rank 复制一份，所以每个 rank 每个 token 的 KV 占用和 TP2 差不多，而两个 rank 存的是不同会话，总容量大约翻倍。
+  - c256 平均到每个 rank 是 128 个会话，KV 压力和 TP2 c128 差不多，而 TP2 c128 时 GPU KV 是够用的。
+  - 另一方面，attention 不再切分，每个 rank 的 prefill 算力更紧张，而且 MoE TP2 要求两个 rank 同步 step，一个 rank 做 prefill 会拖慢另一个 rank 的 decode。
+  - 所以 UMBP 的收益可能和 TP2 c128 一样接近 0，也可能因为过载而像 c192 那样明显，要靠实测确定。按用户要求，B0 和 S1 都会跑，不设中途检查点。B0 跑完后我会先汇报 GPU prefix 命中率。
+- **DP2 路径在 ROCm 上没跑过**：aiter MoE 在 DP2 不开 EP 的情况、DSpark 加 DP、mxfp4 indexer 加 DP 都没验证过，新 base 也还没跑过 E2E。这些都放在冒烟里检查。
+- **cudagraph**：每个 rank 128 个会话 × 6 token = 768，在 capture 上限 1024 以内。
+- 结果**不能和 TP2 的点直接比**：部署形态、有没有 monokernel、base 都不同。只比较 DP2 下的 B0 和 S1。
+
+### 9.3 测试点（2 次完整运行，每次约 1.5 h）
+
+| # | ID | 配置 |
+|---|---|---|
+| 1 | **B0-dp2** | DP2 + expert TP2，不开 KV offloading |
+| 2 | **S1-dp2** | B0-dp2 加 UMBP standalone 128GiB，默认开关 |
+
+### 9.4 冒烟（不计入 2 次，约 1 h）
+
+1. **起 B0-dp2 引擎和 router**，检查以下几项：
+   - 两个 DP rank 都就绪；
+   - 日志里没有 monokernel 报错，也没有 "is ignored"；
+   - 通过 router 发几条带不同 `X-Session-ID` 的请求，确认两个 rank 都分到了请求，同一个 session 始终落在同一个 rank 上（看各 rank 的 `vllm:prompt_tokens_total`）。
+2. **S1-dp2 恢复检查**：
+   - 先通过 router 发一段约 20K token 的两轮对话，然后 `/reset_prefix_cache`（直接打到引擎端口，所有 DP rank 都会被重置），再发一次第二轮；
+   - 期望 external hit > 0，没有 Traceback 或 NaN；
+   - 同时确认新 base 上 standalone 仍然需要 `--no-enable-extensible-kv-cache`。如果 main 已经修好了，两个臂都恢复默认值，并在结果里注明。
+3. **c256 的短 agentic**（S1，DURATION=300）：确认 router、session header、结果 JSON 整个流程能跑通。
+
+### 9.5 需要修改的脚本（`umbp-dsv41-flash/`）
+
+| 脚本 | 改动 |
+|---|---|
+| `run_vllm_dsv41_flash.sh` | 新增 `DP` 变量，默认 1。`DP=2` 时用 `--tensor-parallel-size 1 --data-parallel-size 2`，并去掉 `--monokernel`。`DP=1` 时行为不变 |
+| `run_config.sh` | `DP>1` 时，引擎就绪后启动 router（复用 `../umbp-dsv4-mtp/run_router.sh`，新增参数控制 `--intra-node-data-parallel-size`），client 改为连 router 的 30000 端口；清理时按 PID 关掉 router |
+| `run_agentic.sh` | `DP>1` 时设置 `DP_ATTENTION=true`、`AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=1`、`AIPERF_SERVER_URL=http://localhost:30000`；engine metrics 仍从 8333 端口抓取 |
+
+命令（确认后执行）：
+
+```bash
+cd /home/shashen/vllm/vllm-dev-skills/docs/mori/umbp-dsv41-flash
+export GPUS=0,1 DP=2 SYNTHETIC_AL=3.51 CONC=256 DURATION=3600 RUNS_DIR=/tmp/umbp_runs/agentic_dsv41
+export UMBP_DRAM_CAPACITY=$((128 * 1024**3))
+TAG=b0_dp2_c256 UMBP=0 bash run_config.sh
+TAG=s1_dp2_c256 UMBP=1 bash run_config.sh
+```
+
+总耗时：冒烟约 1 h，2 个点约 3 h，合计约 4 h。
+
+指标和判断规则与 §6 相同。另外分别统计两个 DP rank 的 prefix 命中和 UMBP 命中，看负载是否均衡。
+
+### 9.6 结果（2026-11-03）
+
+**冒烟**全部通过：
+- S1 在 DP2 下从 UMBP 恢复了 24,320 token，日志里没有 monokernel 报错，也没有 Traceback 或 NaN。每个 rank 的 GPU KV 为 26.8M token。
+- c256 跑了 300 s：1,424 个请求全部成功，两个 rank 的 prompt token 为 54.2M / 53.0M，prefix 命中 93%。这说明 router 的会话亲和生效，rust 前端也认 `X-data-parallel-rank`。
+- extensible KV cache：新 main 在 ROCm 上会对需要注册 KV 内存的 connector（包括 UMBP）**自动关闭** extensible KV（`vllm/config/vllm.py` 的 `_resolve_extensible_kv_cache`），所以 S1 默认就能起来。但不带 connector 的 B0 仍会开启 extensible KV，导致 KV 容量和 S1 不一样，所以两个臂照旧都显式加了 `--no-enable-extensible-kv-cache`。
+- 注意：AIPerf 同时抓了 router（30000）和引擎（8333）的 `/metrics`，而 router 只是把引擎的指标转发过来，所以服务端指标每项都会出现两份。比例类指标不受影响；吞吐和延迟是 client 侧测的，也不受影响。
+
+**正式运行**的条件：
+- 代码 `3be8e20c17`，base 是 main `77d2790e78`，`vllm-rs` 为 `40941f2c4`；
+- GPU 0/1，两个臂在同一天连续跑完；
+- 每个臂只跑了一次。
+
+| 指标 | B0-dp2 | S1-dp2（UMBP 128GiB，默认开关） | Δ |
+|---|---|---|---|
+| 请求数（计入统计的） | 16,344 | 16,846 | +3.1% |
+| 每 GPU 总吞吐（tok/s） | 270,323 | 280,607 | **+3.8%** |
+| 输出吞吐（tok/s） | 4,053 | 4,194 | +3.5% |
+| TTFT mean / p50 / p90 / p95（s） | 1.69 / 0.62 / 2.66 / 5.36 | 1.40 / 0.59 / 2.47 / 4.83 | −17% / −5% / −7% / −10% |
+| TPOT mean / p90（ms） | 54.8 / 77.0 | 52.4 / 72.2 | −4.4% / −6.2% |
+| E2E mean / p90（s） | 50.2 / 115.6 | 48.0 / 109.7 | −4.4% / −5.1% |
+| interactivity p50（tok/s/user） | 19.36 | 19.75 | +2.0% |
+| GPU prefix 命中（整个运行） | 92.9% | 93.1% | |
+| UMBP 恢复的 prompt token（整个运行） | 0 | 0.2%（5.5M token） | |
+| 实际计算的 prompt 比例 | 7.1% | 6.7% | −6% |
+| 两个 rank 的 prompt token 占比（profiling 阶段） | 48.7% / 51.3% | 51.5% / 48.5% | 负载均衡 |
+| preemption / 失败请求 | 0 / 0 | 0 / 0 | |
+
+- 负载：ISL mean 119K / 120K，p90 249K / 250K；OSL mean 900 / 904。两个臂的负载基本一样。
+- S1：UMBP server 没有发生淘汰，128GiB 池没有写满；引擎日志里没有 Traceback，也没有 "is ignored"。
+- 两个 DP rank 都从 UMBP 恢复了 KV：rank 0 为 2.24M token，rank 1 为 1.95M token（profiling 阶段）。
+
+**结论**：
+1. **DP2 c256 下 UMBP 收益不大，但方向一致。**
+   - 吞吐 +3.8%，刚好超过约 3% 的单次噪声阈值。
+   - TTFT mean −17%，p90 −7%；TPOT 和 E2E 各降约 4–6%。
+   - 每个臂只跑了一次，吞吐上的差异还需要重复测量才能确认。
+2. **GPU KV 压力介于 TP2 c128 和 TP2 c192 之间**：GPU prefix 命中 92.9%，TP2 c128 是 94.7%，c192 是 87.8%。
+   - DP2 下两个 rank 各存不同的会话，总 KV 约 53.7M token，大约是 TP2 的 1.8 倍。c256 平均到每个 rank 只有 128 个会话，所以前缀大多还在 GPU 上。
+   - UMBP 只恢复了 0.2% 的 prompt，把实际计算的 prefill 减少了 6%，收益和这个比例相符。
+3. 这个部署形态和 TP2 不能直接比较：没有 monokernel，base 和 `vllm-rs` 也不同。只看形态内部的对比：DP2 c256 的 B0 吞吐（270K）和 TP2 c128 的 B0（245K，旧 base）在同一个量级，TPOT 高很多（54.8 ms vs 19.5 ms）。
+4. 想让 DP2 下的 offloading 发挥更大作用，需要更高的并发，或者更长的会话，让每个 rank 的工作集超过 26.8M token。是否继续由用户决定。
+
+结果文件在 `umbp-dsv41-flash/results/`：
+- `agentic_dp2_c256_compare.md`
+- `dsv41flash_vllm_dp2_c256_{b0,s1}_dp2_c256.json`
+- `agentic_dp2_c256_engine_metrics_*.txt`
+- `agentic_dp2_c256_workload_{b0,s1}.txt`
+
+完整产物在 `/tmp/umbp_runs/agentic_dsv41/{b0,s1}_dp2_c256/`，不长期保留。

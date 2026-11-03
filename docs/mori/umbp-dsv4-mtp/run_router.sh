@@ -4,11 +4,12 @@
 set -euo pipefail
 ENGINE_PORT=${ENGINE_PORT:-8333}
 ROUTER_PORT=${ROUTER_PORT:-30000}
+ROUTER_DP_SIZE=${ROUTER_DP_SIZE:-8}
 LOG_DIR=${LOG_DIR:-/tmp/umbp_runs}
 mkdir -p "${LOG_DIR}"
 exec /home/shashen/vllm/vllm_router_venv/bin/vllm-router \
   --worker-urls "http://localhost:${ENGINE_PORT}" \
-  --intra-node-data-parallel-size 8 \
+  --intra-node-data-parallel-size "${ROUTER_DP_SIZE}" \
   --host 0.0.0.0 --port "${ROUTER_PORT}" \
   --policy consistent_hash \
   --request-timeout-secs 14400 \

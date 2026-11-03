@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4.1-Flash 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-11-03。已 rebase 到 main `77d2790e78`，冲突已解决，见第 2 节。c128 和 c192 的 B0、S1 都已跑完（5.3），c192 下 UMBP 吞吐 +46%。
+> 最后更新：2026-11-03。DP2 + expert TP2 c256 的 B0 和 S1 已跑完，吞吐 +3.8%，见 5.3。
 > 每次推进后，同步更新以下几节：「代码与分支状态」「当前结论」「测试进展」「未完成事项」。
 
 ## 1. 任务概述
@@ -157,9 +157,22 @@
 - c192 时 GPU KV 装不下，引擎 prefill 过载。UMBP 恢复了 4.8% 的 prompt，把需要计算的 prefill 减少了 42%，吞吐和延迟都大幅改善。
 - 每个臂只跑了一次，但收益远超噪声。详见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md) §7.7。
 
+**DP2 + expert TP2，c256**（2026-11-03，base `77d2790e78`；不能开 monokernel；前端为 vllm-router consistent_hash）：
+
+| 指标 | B0-dp2 | S1-dp2（UMBP） | Δ |
+|---|---|---|---|
+| 每 GPU 总吞吐（tok/s） | 270,323 | 280,607 | +3.8% |
+| TTFT mean / p90（s） | 1.69 / 2.66 | 1.40 / 2.47 | −17% / −7% |
+| TPOT mean（ms） | 54.8 | 52.4 | −4.4% |
+| GPU prefix 命中 / UMBP 恢复的 prompt | 92.9% / 0 | 93.1% / 0.2% | |
+| 实际计算的 prompt 比例 | 7.1% | 6.7% | −6% |
+
+- DP2 的总 KV 约 53.7M token。c256 平均每个 rank 128 个会话，GPU KV 基本够用，所以 UMBP 收益不大（吞吐 +3.8%，TTFT mean −17%），刚超过噪声阈值。
+- 详见 [`perf-plan-umbp-dsv41-flash.md`](perf-plan-umbp-dsv41-flash.md) §9.6。
+
 ### 5.4 新 base 的兼容问题（2026-11-02 冒烟时发现）
 
-- **extensible KV cache**：main 的 #56492 在 ROCm 上默认开启，用 VMM 分配 KV cache。`hipIpcGetMemHandle` 不接受这种内存，返回 invalid argument，导致 UMBP standalone 注册 KV 失败、引擎起不来。
+- **extensible KV cache**（2026-11-03 更新）：main `77d2790e78` 在 ROCm 上会对 UMBP 这类需要注册 KV 内存的 connector 自动关闭 extensible KV，所以 S1 不加参数也能起来。但 B0（不带 connector）仍会开启，为了让两个臂的 KV 大小一致，性能测试仍统一加 `--no-enable-extensible-kv-cache`。下面是原先的记录：main 的 #56492 在 ROCm 上默认开启，用 VMM 分配 KV cache。`hipIpcGetMemHandle` 不接受这种内存，返回 invalid argument，导致 UMBP standalone 注册 KV 失败、引擎起不来。
   - 目前的绕过方法：所有测试点都加 `--no-enable-extensible-kv-cache`。
   - 正式修复需要 MORI 或 connector 支持 VMM 内存（例如走 dma-buf 或 `hipMemExportToShareableHandle`），待办。
 - **lazy offload 在 DSv4.1 上存不进任何数据**：扫描空闲队列时找不到带 hash 的块。同样的配置在 Qwen3-0.6B 上正常。待办。
@@ -188,6 +201,7 @@
    - c128 的 B0 和 S1 已完成（5.3）。
    - c192 的 B0 和 S1 已完成（5.3）。
    - c192 的结果已写进 PR 描述（2026-11-03）。
+   - DP2 + expert TP2 c256 的 B0 和 S1 已完成（5.3），已写进 PR 描述；PR 描述已精简，三组性能测试合并成一张表（2026-11-03）。
    - S2 是否要测，由用户决定。之后再按 InferenceX 默认 `DURATION=3600`，和 Mooncake 对比（同一个 base、同一份 recipe、池子都是 128GB）。用户说"先不测"。前提条件见 [`PROGRESS-mooncake-dsv41-flash.md`](PROGRESS-mooncake-dsv41-flash.md) 第 6 节，主要是容器的 RDMA 问题。
 5. 兼容问题（见 5.4）：
    - UMBP standalone 不支持 VMM 内存，所以新 main 的 extensible KV cache 下注册会失败；
