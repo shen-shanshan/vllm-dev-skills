@@ -131,9 +131,17 @@ def _ab_check(worker):
     for name in ("_run_budget_graph", "execute"):
         mgr.__dict__.pop(name, None)
 
+    class _NeverShared(dict):
+        def get(self, *args, **kwargs):
+            return None
+
     def capture_unshared():
         m = EncoderCudaGraphManager(mgr.vllm_config, mgr.device, mgr.dtype, mgr.model)
         m._get_shared_buffer = lambda *a, **k: None
+        # PR #65084's implementation keeps its shared buffers in these dicts.
+        for name in ("_shared_input_buffers", "_shared_output_buffers"):
+            if hasattr(m, name):
+                setattr(m, name, _NeverShared())
         with graph_capture(device=mgr.device):
             m.capture(graph_pool=current_platform.graph_pool_handle())
             torch.accelerator.synchronize()
@@ -176,6 +184,8 @@ def _ab_check(worker):
     # Execute A/B: whole execute() calls, every item compared after all of the
     # call's batches ran.
     exec_mism = []
+    single_item_max = []
+    replays = []
     multi_budget = 0
     for i, kw in enumerate(mgr._recorded_execs):
         budgets_used = []
@@ -186,9 +196,11 @@ def _ab_check(worker):
             return run(mm_kwargs, token_budget, path=path, axis_keys=axis_keys)
 
         mgr._run_budget_graph = counting_run
-        out = mgr.execute(kw)
+        # Clone right away: a model that ignores clone=True returns views of
+        # the graph output, which the runs below would overwrite.
+        out = [o.clone() for o in mgr.execute(kw)]
         mgr.__dict__.pop("_run_budget_graph")
-        ref_out = base.execute(kw)
+        ref_out = [o.clone() for o in base.execute(kw)]
         # Several batches of one path on different budgets in a single call.
         per_path = Counter(p for p, _ in set(budgets_used))
         if any(n > 1 for n in per_path.values()):
@@ -196,6 +208,15 @@ def _ab_check(worker):
         for j, (a, b) in enumerate(zip(out, ref_out, strict=True)):
             if not torch.equal(a, b):
                 exec_mism.append((i, j, float((a.float() - b.float()).abs().max())))
+        # Each item alone in its own execute(): no later batch can overwrite
+        # it, so this catches overwrites that the unshared manager shares too
+        # (several batches replaying the same budget graph).
+        if len(out) > 1:
+            for j in range(len(out)):
+                single = mgr.execute(mgr._select_items(kw, [j])[0])[0].float()
+                rel = float((out[j].float() - single).norm() / single.norm())
+                single_item_max.append((i, j, rel))
+            replays.append((i, budgets_used))
     # Control: a second unshared capture against the first. Differences here
     # come from capture itself (e.g. kernel selection), not from sharing.
     if os.environ.get("AB_CONTROL") == "1":
@@ -222,6 +243,11 @@ def _ab_check(worker):
         "num_multi_budget_executes": multi_budget,
         "num_items": sum(len(mgr._get_item_specs(kw)) for kw in mgr._recorded_execs),
         "mismatches": exec_mism,
+        # (execute, item, relative L2 error) of multi-item calls vs. the item
+        # run alone; bf16 noise from a different budget graph stays ~1e-2.
+        "vs_single_item": sorted(single_item_max, key=lambda m: -m[2]),
+        # (path, budget) replays of each multi-item call, in order.
+        "multi_item_replays": replays,
     }
     base.clear()
     return report

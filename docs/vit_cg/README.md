@@ -38,6 +38,9 @@
 | `gemma4_shared_autobatch` | 最终版，batch 大小自动推断 | 只命中单 budget，仅作参考 |
 | `step3_vl_control` | 最终版，`AB_CONTROL=1` | Step3-VL（双路径）的显存、KV、A/B 和对照组数据 |
 | `step3_vl_nofix` | 共享实现，撤掉 Step3-VL 修复 | 复现 bug：execute 级 A/B 最大偏差 14.13 |
+| `step3_vl_main` | main（`dd4e40142a`），不共享，未修复 Step3 | 与单独执行对比：2/11 个 item 被污染（相对误差 0.62），证明 main 上已有此 bug |
+| `step3_vl_pr65084` | PR #65084 的 `encoder_cudagraph.py`，未修复 Step3 | 与单独执行对比：6/11 个 item 被污染（相对误差 1.34） |
+| `step3_vl_pr65351` | PR #65351 head | 与单独执行对比：0/11 |
 | `step3_vl_shared` | 最终版，`gpu_memory_utilization=0.85` | 早期运行，KV 与其他 Step3 运行不可比 |
 | `step3_vl_eager` | 最终版，`cudagraph_mm_encoder=False` | 证明 Step3-VL 的乱码输出与 CUDA graph 无关 |
 | `deepseek_ocr_shared` | 最终版 | 启动失败（ROCm 上 Triton kernel 编译错误，与本改动无关） |
