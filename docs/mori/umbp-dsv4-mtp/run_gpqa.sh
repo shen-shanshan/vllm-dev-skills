@@ -9,7 +9,7 @@ export HF_HOME=${HF_HOME:-/home/shashen/vllm/hf_cache}
 export HF_DATASETS_OFFLINE=1
 PORT=${PORT:-8333}
 # 32K truncates many reasoning traces before the answer; see
-# docs/tasks/dsv4_mxfp4_indexer_gpqa_results.md.
+# docs/tasks/mxfp4/dsv4_mxfp4_indexer_gpqa_results.md.
 MAX_GEN=${MAX_GEN:-131072}
 CONC=${CONC:-64}
 OUT=${OUT:-/tmp/umbp_runs/gpqa/manual}

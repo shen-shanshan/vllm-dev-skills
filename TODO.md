@@ -24,6 +24,7 @@
 - [ ] skills/vllm-feature-tutorial/outputs/workspace_manager.md (Generated: ✅ / Read: )
 - [ ] skills/vllm-feature-tutorial/outputs/jit_kernel_warmup.md (Generated: ✅ / Read: )
 - [ ] skills/vllm-feature-tutorial/outputs/fast_start.md (Generated: ✅ / Read: )
+- [ ] skills/vllm-feature-tutorial/outputs/atom_prefill_delayer.md (Generated: ✅ / Read: )
 
 ## Blog Writing
 
