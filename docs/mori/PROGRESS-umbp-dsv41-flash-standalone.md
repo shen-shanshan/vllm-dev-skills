@@ -23,9 +23,9 @@
 |---|---|
 | 仓库 | `/home/shashen/vllm/vllm` |
 | 分支 | `rocm-dsv41-flash-umbp`，尚未 push |
-| base | main `77d2790e78`（2026-11-03 由用户 rebase，冲突由我解决）。main 已合入 `[UMBP][1/10]`–`[7/10]`，其中 7/10（#61795）是 `32d6ddea18` |
-| `[UMBP][9/10]` #61797 lazy offload | `a5dcf0a81f`。取自 PR 最新 head 中的非测试 commit `47a1beb0c8`，是一个 squash 过的 commit |
-| 本任务改动 | `3be8e20c17 support umbp for dsv41-flash`。和 rebase 前的 `3c14ef42b6` 相比，patch 完全一致（`git range-diff` 显示 `=`） |
+| base | main `db914cad5b`（2026-11-05 由用户 rebase，冲突由我解决；之前是 `77d2790e78`）。新 base 带来 #64677（UMBP 按 layout 拷贝 per-head runs）和 #65319（满 batch 时启动受限的异步 KV 加载）。main 已合入 `[UMBP][1/10]`–`[7/10]`，其中 7/10（#61795）是 `32d6ddea18` |
+| `[UMBP][9/10]` #61797 lazy offload | 2026-11-05 按用户要求已移出本分支（原 commit `cce8732fdf`，备份在本地分支 `rocm-dsv41-flash-umbp-with-lazy`）。本 PR 不再包含、也不依赖它。取自 PR 最新 head 中的非测试 commit `47a1beb0c8`，是一个 squash 过的 commit |
+| 本任务改动 | `f30eb996b0 support umbp for dsv41-flash`，直接基于 main（移出 lazy 前是 `0f8e45b34b`，再之前是 `3be8e20c17`）。移出 lazy 时丢掉了改在 `_prepare_lazy_store_plans` 里的 `keys_per_object` 那一处，其余 patch 不变。唯一冲突在 `umbp/data.py`：import 列表和 main 新增的 `_page_segments` 与本 PR 的 `tp_replicated_group_ids` 相邻，两边都保留，逻辑不变。UMBP 单测 242 个通过，pre-commit 通过；新 base 上还没跑 E2E |
 
 2026-11-03 rebase 时这样解决冲突（以 main 上已合入的 UMBP 代码为准）：
 - 旧的 7/10 cherry-pick（`366891897a` `c5eefb447d` `e3a67672e9` `6d9a315e88` `bbe1a941fb`）已被 main 上的 `32d6ddea18` 完全覆盖，所以全部丢弃。冲突文件 `runtime/standalone.py` 取 main 的版本。
@@ -43,7 +43,14 @@
 
 注意：
 - 本地没有 `gh`。PR 用 `git fetch upstream pull/<N>/head:<branch>` 拉取，最新的 #61797 拉到了 `umbp-pr-9-new`。
-- 9/10 合入 main 后，`a5dcf0a81f` 在 rebase 时应该会自动消掉；如果有冲突，以 main 为准。
+- 9/10 合入 main 后，需要在它的 `_prepare_lazy_store_plans` 里把按 `rank_count` 计算的 key 宽度改成 `codec.keys_per_object(...)`（备份分支里有现成的改法）。
+
+- **2026-11-05 按 ROCm review 修改（未 commit，叠在 `f30eb996b0` 上）**：
+  - TP 复制判定改为组内每层 `max_tp_shards == 1`（main 已有约定，#57652），不再用 `isinstance(MLA…)`；`deepseek_v41/attention.py` 的压缩 KV 和 indexer `MLAAttentionSpec` 补上 `max_tp_shards=1`，与 V4 一致。V4.1 被去重的组不变（压缩 KV、SWA、indexer）。副作用：V4.1 的 `kv_tp_replicas` 变成 tp_size，OffloadingConnector 对 V4.1 可用复制布局；V4.1 的 UMBP namespace 变化，旧对象失效一次。
+  - UMBP 的 `only_restores_canonical_kv` 只在 `key_namespace` 为 auto 时返回 True。
+  - 文档 `umbp_store_connector_usage.md` 补 `dedup_tp_replicated_kv` 选项、TP 无关 key 说明和 `key_namespace` 的限制。
+  - `rocm.py` 两个函数的参数名改为 `has_foreign_kv_writer`，connector 注释去掉平台限定。
+  - `test_umbp_core.py` 新增 5 个测试（14 个用例）。UMBP 单测 256 passed，planning + offloading config 144 passed，pre-commit 通过。改动后还没跑 E2E。
 
 ## 3. 当前结论
 

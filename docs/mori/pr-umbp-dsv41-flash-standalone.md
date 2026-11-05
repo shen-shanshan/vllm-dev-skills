@@ -2,16 +2,16 @@
 
 ## Overview
 
-Run DeepSeek-V4.1-Flash on ROCm with the standalone `UMBPStoreConnector`, backed by a node-local MORI UMBP server. The aiter sparse MLA fast paths stay on, and the pool keeps a single copy of the TP-replicated MLA KV. RFC: #57187. Depends on #61797 (`[UMBP][9/10]`); #61795 (`[UMBP][7/10]`) has merged. The connector changes match the shared part of #63002 (DeepSeek-V4-Pro).
+Run DeepSeek-V4.1-Flash on ROCm with the standalone `UMBPStoreConnector`, backed by a node-local MORI UMBP server. The aiter sparse MLA fast paths stay on, and the pool keeps a single copy of the TP-replicated MLA KV. RFC: #57187. Builds only on the `[UMBP]` series already on `main` (up to #61795, `[UMBP][7/10]`); it does not include or depend on #61797 (`[UMBP][9/10]`, lazy offload). The connector changes match the shared part of #63002 (DeepSeek-V4-Pro).
 
 ## Claims
 
 - On MI355X, DeepSeek-V4.1-Flash runs the InferenceX agentic recipe with standalone UMBP (DSpark MTP, monokernel, mxfp4 indexer). Prefixes evicted from the GPU prefix cache are restored from the pool.
 - With UMBP, the ROCm attention keeps `VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA` and the NaN-free extra-cache path. Before this PR, any KV connector turned them off.
-- At TP > 1, each MLA-style group (compressed KV, SWA, indexer K) is stored once instead of `tp_size` times.
+- At TP > 1, each group whose layers declare `max_tp_shards=1` (on V4.1: compressed KV, SWA, indexer K) is stored once instead of `tp_size` times.
 - GSM8K accuracy is unchanged, even with 93% of prompt tokens restored from the pool.
 - On AgentX, the gain grows with how far the working set exceeds GPU KV: +46% throughput when it does not fit (TP2 c192), +3.8% when it barely fits (DP2 c256). UMBP adds no overhead when everything fits (TP2 c128).
-- No behavior change for other connectors, embedded UMBP, or non-ROCm platforms.
+- No behavior change for other connectors, embedded UMBP, or non-ROCm platforms, except that V4.1's KV specs now declare `max_tp_shards=1` like V4's (see Details).
 
 ## Validation
 
@@ -35,6 +35,8 @@ vllm serve deepseek-ai/DeepSeek-V4.1-Flash --tensor-parallel-size 2 --language-m
 - Procedure: send a ~20K-token two-turn chat, call `/reset_prefix_cache`, then resend turn 2.
 - Result: 24,320 tokens are restored from the pool, and the greedy answer is identical to the GPU-served one.
 - In every run below, the engine log has no NaN, no Traceback, and no `AITER_TRITON_SPARSE_MLA is ignored` warning.
+
+**Unit tests.** `pytest tests/v1/kv_connector/unit/test_umbp_*.py`: 256 passed. That includes new tests for replicated-group detection, `tp*` keys and key counts, TP rank > 0 skipping replicated stores, handshake agreement, and the canonical-KV hook. `pytest tests/v1/core/test_kv_cache_planning.py tests/v1/kv_connector/unit/offloading_connector/test_config.py`: 144 passed.
 
 **Accuracy: GSM8K.**
 - `lm_eval` 0.4.13, 5-shot, all 1319 questions, `local-completions`, `num_concurrent=64`, `max_gen_toks=2048`.
@@ -135,15 +137,17 @@ Each cell is baseline → UMBP (Δ).
 **Key changes.**
 - **`KVConnectorBase_V1.only_restores_canonical_kv`** (`base.py`): a new classmethod hook, default `False`.
   - `MultiConnector` returns `True` only when every child does.
-  - `UMBPStoreConnector` returns `True`: its objects are whole blocks written by this cache layout, and the key namespace fingerprints every per-layer spec.
+  - `UMBPStoreConnector` returns `True` only with the derived key namespace (`key_namespace: auto`, the default). Its objects are whole blocks written by this cache layout, and the derived namespace fingerprints every per-layer spec. An explicit `key_namespace` skips that fingerprint, so it keeps the fast paths off.
 - **`deepseek_v41/amd/rocm.py`**: `_has_foreign_kv_writer()` replaces the four `kv_transfer_config is not None` guards on the aiter sparse MLA and NaN-free extra-cache paths. The aiter kernel does not scrub NaNs, so these paths stay off for connectors that may load foreign bytes.
 - **UMBP TP dedup** (`umbp/{connector,data,scheduler,worker}.py`, `runtime/{base,standalone}.py`):
   - The standalone runtime sets `shares_pool_across_ranks = True`, and workers report the TP-replicated groups in the handshake.
+  - A group is TP-replicated when every layer's spec has `max_tp_shards == 1`, the existing contract behind `KVCacheConfig.kv_tp_replicas`. `deepseek_v41/attention.py` now sets it on the compressed-KV and indexer `MLAAttentionSpec`s, as V4 does; the V4.1 SWA spec already did.
   - Those groups get one `tp*` key. TP rank 0 stores it and every rank loads it.
   - Residency checks use `keys_per_object()`.
   - Opt out with `dedup_tp_replicated_kv: false`. Dedup is skipped under PCP/DCP.
+  - `docs/features/umbp_store_connector_usage.md` documents the option, the TP-agnostic keys, and the `key_namespace` caveat.
 
-**Other backends are unaffected.** The hook's only caller is the ROCm-only `deepseek_v41/amd/rocm.py`. Embedded UMBP keeps per-rank keys. Every other connector still turns the ROCm fast paths off.
+**Other backends are unaffected.** The hook's only caller is the ROCm-only `deepseek_v41/amd/rocm.py`. Embedded UMBP keeps per-rank keys. Every other connector still turns the ROCm fast paths off. The one shared change is `max_tp_shards=1` on V4.1's specs: V4.1's `kv_tp_replicas` becomes `tp_size`, so `OffloadingConnector` can use its TP-replicated layout for V4.1, as it already does for V4. It also changes V4.1's UMBP namespace, so objects stored before this PR miss once.
 
 **Limitations.**
 - Single node only.
@@ -153,7 +157,7 @@ Each cell is baseline → UMBP (Δ).
   - It allocates through VMM, which the standalone server cannot map over HIP IPC.
   - Current main turns the extensible KV cache off automatically for UMBP on ROCm.
   - The perf runs still pass `--no-enable-extensible-kv-cache` on both arms. Otherwise the connector-free baseline would get a larger KV cache than the UMBP arm.
-- `lazy_offload` stores nothing on V4.1 in our tests, because its scan finds no hashed free blocks. The default eager store is unaffected. This is left as follow-up.
+- Lazy offload (#61797) is not part of this PR. Once it lands, its residency check needs `keys_per_object()` for TP-replicated groups. In our tests with it applied, its scan found no hashed free blocks on V4.1 and stored nothing; this is left as follow-up. The perf runs used the default eager store, which this does not affect.
 
 ---
 
