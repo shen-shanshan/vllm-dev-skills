@@ -107,6 +107,7 @@ print("restored:", restored[:300])
 if hits <= 0:
     sys.exit("FAIL: no external prefix hits; the restore path did not run")
 EOF
+curl -sf localhost:8333/metrics > "${OUT}/metrics.txt" || true
 cp "${RUNS_DIR}/smoke_${TAG}.log" "${OUT}/engine.log" 2>/dev/null || true
 cp "${RUNS_DIR}/umbp_server.log" "${OUT}/umbp_server.log" 2>/dev/null || true
 grep -i -E "nan|Traceback|ERROR" "${OUT}/engine.log" | head -5 || true

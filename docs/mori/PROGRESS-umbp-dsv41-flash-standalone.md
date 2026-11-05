@@ -50,7 +50,9 @@
   - UMBP 的 `only_restores_canonical_kv` 只在 `key_namespace` 为 auto 时返回 True。
   - 文档 `umbp_store_connector_usage.md` 补 `dedup_tp_replicated_kv` 选项、TP 无关 key 说明和 `key_namespace` 的限制。
   - `rocm.py` 两个函数的参数名改为 `has_foreign_kv_writer`，connector 注释去掉平台限定。
-  - `test_umbp_core.py` 新增 5 个测试（14 个用例）。UMBP 单测 256 passed，planning + offloading config 144 passed，pre-commit 通过。改动后还没跑 E2E。
+  - `test_umbp_core.py` 新增 5 个测试（14 个用例）。UMBP 单测 256 passed，planning + offloading config 144 passed，pre-commit 通过。
+  - 冒烟（2026-11-05，base main `7dca18e206` + `e00beeac38` + 上述修改，TP2，Python 前端）：恢复 24,320 token，与改动前的 S1 冒烟相同；store 379 个对象（奇数，说明只有 TP0 在写），load 380 个（两个 rank 各读 190），失败 0；无 Traceback、NaN、"is ignored"。旧代码对照组被用户叫停，没有跑。
+  - 新 main 上 rust 前端 `vllm-rs` 需要重新编译：旧二进制和新 engine 的 ndarray 序列化格式不一致，第一个请求就报 `msgspec.ValidationError`。`/home/shashen` 所在 NFS 卷已满（10T，我们只占 11G）。
 
 ## 3. 当前结论
 
