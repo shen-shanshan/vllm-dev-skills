@@ -54,6 +54,8 @@
   - 冒烟（2026-11-05，base main `7dca18e206` + `e00beeac38` + 上述修改，TP2，Python 前端）：恢复 24,320 token，与改动前的 S1 冒烟相同；store 379 个对象（奇数，说明只有 TP0 在写），load 380 个（两个 rank 各读 190），失败 0；无 Traceback、NaN、"is ignored"。旧代码对照组被用户叫停，没有跑。
   - 新 main 上 rust 前端 `vllm-rs` 需要重新编译：旧二进制和新 engine 的 ndarray 序列化格式不一致，第一个请求就报 `msgspec.ValidationError`。`/home/shashen` 所在 NFS 卷已满（10T，我们只占 11G）。
 
+- **2026-11-06（已 commit 为 `dfce3b411f`，叠在 `43e71e1814` 上，未 push；分支已由用户 rebase 到 main `405aaa3d51`）**：按用户意见，把 `rocm.py` 里的 `_has_foreign_kv_writer()` 移到 `vllm/distributed/kv_transfer/kv_connector/utils.py`，改名为通用的 `kv_connector_may_load_foreign_kv(vllm_config)`（与同文件 `get_kv_connector_cache_layout` 同风格）。`rocm.py` 改为顶层 import，并在 attention 的赋值处加一行 ROCm 注释。验证：模块 import 正常，pre-commit 通过，`tests/v1/kv_connector/unit/test_umbp_*.py` 256 passed（venv 需要先 `uv pip install tblib`）。PR 描述已同步。
+
 ## 3. 当前结论
 
 - **跑通了**：TP2 单机 standalone 端到端可用。restore 路径命中 24320 token，恢复后的回答与 GPU 直出完全一致，aiter sparse MLA 快路径也保留了。详见 5.1。
@@ -70,7 +72,7 @@
 - `base.py` 新增 hook `KVConnectorBase_V1.only_restores_canonical_kv`，默认返回 `False`。
 - `MultiConnector`：所有子 connector 都返回 True 时，它才返回 True。
 - `UMBPStoreConnector` 返回 True。
-- `deepseek_v41/amd/rocm.py` 新增 `_has_foreign_kv_writer()`，替换掉 4 处 `kv_transfer_config is not None`：
+- `kv_connector/utils.py` 新增通用 helper `kv_connector_may_load_foreign_kv(vllm_config)`（2026-11-06 从 `rocm.py` 的 `_has_foreign_kv_writer()` 移过来），`deepseek_v41/amd/rocm.py` 用它替换掉 4 处 `kv_transfer_config is not None`：
   - metadata builder 和 attention 的 `_aiter_sparse_mla_enabled`；
   - `_trust_dsv4_extra_cache_nan_free`。
 

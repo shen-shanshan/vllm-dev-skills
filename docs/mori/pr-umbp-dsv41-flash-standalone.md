@@ -138,7 +138,8 @@ Each cell is baseline → UMBP (Δ).
 - **`KVConnectorBase_V1.only_restores_canonical_kv`** (`base.py`): a new classmethod hook, default `False`.
   - `MultiConnector` returns `True` only when every child does.
   - `UMBPStoreConnector` returns `True` only with the derived key namespace (`key_namespace: auto`, the default). Its objects are whole blocks written by this cache layout, and the derived namespace fingerprints every per-layer spec. An explicit `key_namespace` skips that fingerprint, so it keeps the fast paths off.
-- **`deepseek_v41/amd/rocm.py`**: `_has_foreign_kv_writer()` replaces the four `kv_transfer_config is not None` guards on the aiter sparse MLA and NaN-free extra-cache paths. The aiter kernel does not scrub NaNs, so these paths stay off for connectors that may load foreign bytes.
+- **`kv_connector_may_load_foreign_kv(vllm_config)`** (`kv_connector/utils.py`): a connector-agnostic helper, `not only_restores_canonical_kv(...)` of the configured connector, `False` without one.
+- **`deepseek_v41/amd/rocm.py`**: the helper replaces the four `kv_transfer_config is not None` guards on the aiter sparse MLA and NaN-free extra-cache paths. The aiter kernel does not scrub NaNs, so these paths stay off for connectors that may load foreign bytes.
 - **UMBP TP dedup** (`umbp/{connector,data,scheduler,worker}.py`, `runtime/{base,standalone}.py`):
   - The standalone runtime sets `shares_pool_across_ranks = True`, and workers report the TP-replicated groups in the handshake.
   - A group is TP-replicated when every layer's spec has `max_tp_shards == 1`, the existing contract behind `KVCacheConfig.kv_tp_replicas`. `deepseek_v41/attention.py` now sets it on the compressed-KV and indexer `MLAAttentionSpec`s, as V4 does; the V4.1 SWA spec already did.
@@ -147,7 +148,7 @@ Each cell is baseline → UMBP (Δ).
   - Opt out with `dedup_tp_replicated_kv: false`. Dedup is skipped under PCP/DCP.
   - `docs/features/umbp_store_connector_usage.md` documents the option, the TP-agnostic keys, and the `key_namespace` caveat.
 
-**Other backends are unaffected.** The hook's only caller is the ROCm-only `deepseek_v41/amd/rocm.py`. Embedded UMBP keeps per-rank keys. Every other connector still turns the ROCm fast paths off. The one shared change is `max_tp_shards=1` on V4.1's specs: V4.1's `kv_tp_replicas` becomes `tp_size`, so `OffloadingConnector` can use its TP-replicated layout for V4.1, as it already does for V4. It also changes V4.1's UMBP namespace, so objects stored before this PR miss once.
+**Other backends are unaffected.** The hook's only caller is the new helper, used only by the ROCm-only `deepseek_v41/amd/rocm.py`. Embedded UMBP keeps per-rank keys. Every other connector still turns the ROCm fast paths off. The one shared change is `max_tp_shards=1` on V4.1's specs: V4.1's `kv_tp_replicas` becomes `tp_size`, so `OffloadingConnector` can use its TP-replicated layout for V4.1, as it already does for V4. It also changes V4.1's UMBP namespace, so objects stored before this PR miss once.
 
 **Limitations.**
 - Single node only.
