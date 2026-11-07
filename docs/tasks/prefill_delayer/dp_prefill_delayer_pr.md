@@ -16,13 +16,13 @@ Adds an opt-in `--prefill-schedule-policy delayer` for MoE data parallelism. The
 
 ## Validation
 
-**Unit tests (CPU)**, branch based on main `790be385c8`:
+**Unit tests (CPU)**, branch based on main `fd77011424`:
 
 ```bash
 pytest tests/v1/core/test_prefill_delayer.py   # 21 passed
 pytest tests/v1/core/test_prefill_delayer.py tests/v1/core/test_scheduler.py \
        tests/v1/core/test_async_scheduler.py tests/engine/test_arg_utils.py \
-       tests/distributed/test_cpu_all_reduce.py   # 451 passed
+       tests/distributed/test_cpu_all_reduce.py   # 477 passed
 pre-commit run --files <changed files>          # all hooks pass, mypy included
 ```
 
@@ -34,15 +34,78 @@ pre-commit run --files <changed files>          # all hooks pass, mypy included
 - the engine core syncing every step with the delayer's state;
 - a multi-process gloo test (2 and 3 ranks, 300 steps of per-rank random states) that checks `sync_dp_state(extra=...)` returns the exact per-field sums and that every rank takes the decision a single reference delayer takes from those sums.
 
-**End-to-end (not run yet):**
+**GSM8K smoke test** (5-shot, lm_eval `local-completions`, 1319 questions, concurrency 64), DeepSeek-V4.1-Flash on 2x MI355X:
+- DP2 with the MoE TP-sharded across both ranks.
+- DSpark MTP (5 draft tokens).
+- Async scheduling and Model Runner V2, the combination in which #61834 once hung.
+
+| Policy | Flags | GSM8K (strict / flexible) | Mean waiting / running over both ranks |
+|---|---|---:|---:|
+| `cadence` (default) | — | 0.9303 ± 0.0070 / 0.9303 | 2.5 / 60.5 |
+| `delayer` | `--prefill-schedule-interval 10 --prefill-max-wait-ms 5000` | 0.9242 ± 0.0073 / 0.9242 | 15.9 / 45.9 |
+| `delayer`, 3 repeats | same | 0.9249 ± 0.0073, 0.9409 ± 0.0065, 0.9303 ± 0.0070 | — |
+
+Across the 4 delayer runs the mean is 0.9301, the same as `cadence`. The difference of any single run is within one standard error, and earlier GSM8K baselines of this model on this node were 0.9204–0.9212. No errors or hangs with the delayer. The higher waiting count shows it holding prefill. Reproduce:
+
+<details>
+<summary>Serve and eval commands</summary>
+
+```bash
+export VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_MOE=1 \
+       VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4 \
+       VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=True VLLM_USE_BREAKABLE_CUDAGRAPH=1 \
+       OMP_NUM_THREADS=1 HIP_VISIBLE_DEVICES=0,1
+vllm serve deepseek-ai/DeepSeek-V4.1-Flash \
+  --port 8333 \
+  --language-model-only \
+  --tokenizer-mode deepseek_v41 \
+  --tool-call-parser deepseek_v41 \
+  --enable-auto-tool-choice \
+  --reasoning-parser deepseek_v41 \
+  --moe-backend aiter \
+  --gpu-memory-utilization 0.9 \
+  --attention-config '{"indexer_kv_dtype":"mxfp4","indexer_sparse_logits":true}' \
+  --block-size 128 \
+  --speculative-config '{"method":"dspark","num_speculative_tokens":5,"draft_sample_method":"probabilistic","rejection_sample_method":"block","enable_adaptive_verification":false}' \
+  --max-model-len 1048576 \
+  --engram-config '{"cpu_offload":true}' \
+  --max-cudagraph-capture-size 1024 \
+  --max-num-batched-tokens 16384 \
+  --tensor-parallel-size 1 --data-parallel-size 2 \
+  --prefill-schedule-policy delayer --prefill-schedule-interval 10 \
+  --prefill-max-wait-ms 5000
+# The cadence arm omits the three --prefill-* flags.
+
+lm_eval --model local-completions \
+  --model_args "model=deepseek-ai/DeepSeek-V4.1-Flash,base_url=http://0.0.0.0:8333/v1/completions,num_concurrent=64,max_retries=10,max_gen_toks=2048,tokenized_requests=False" \
+  --tasks gsm8k --num_fewshot 5 --batch_size auto
+```
+</details>
+
+
+**GSM8K on Model Runner V1** (`VLLM_USE_V2_MODEL_RUNNER=0`, otherwise the same command). Speculative decoding is off: DSpark is V2-only, and the V4.1 checkpoint has no classic-MTP draft.
+
+| Policy | Run | GSM8K (strict) | Mean waiting / running | Outcome |
+|---|---|---:|---:|---|
+| `cadence` | 1 | 0.8984 ± 0.0083 | 1.2 / 61.6 | completed |
+| `cadence` | 2 | 0.9030 ± 0.0082 | 1.2 / 61.9 | completed |
+| `delayer` | 1 | 0.9242 ± 0.0073 | 15.5 / 46.8 | completed |
+| `delayer` | 2 | — | — | **hung** after 3 requests (see below) |
+
+The completed delayer run shows no accuracy loss. Both DP ranks logged identical decision counters (`fill` 1669, `protected` 257, `no_prefill` 54, `align` 14, `stall` 4, `max_wait` 2), which shows the ranks stayed in lockstep. Those counters predate the `hold_` prefix: `fill` covered both releases and holds, and is now split into `fill` and `hold_fill`.
+
+**Known issue, Model Runner V1 only:** delayer run 2 on V1 hung after 3 requests. The same delayer config on V2 completed 4 times out of 4. Since V1 is deprecated, this is recorded but not pursued. What was observed:
+- Both EngineCores timed out in `execute_model`.
+- On both workers, the async output-copy thread was blocked in `Event.synchronize`, which points to a collective mismatch across the DP ranks.
+- The last dumped `SchedulerOutput` was decode-only on both ranks.
+
+**End-to-end performance (not run yet):**
 - <TODO: GPU serving benchmark on DeepSeek-V3/V4-class MoE, DP8 + EP8, multi-turn agentic trace, same node, ≥2 runs per arm with variance.>
   - Arms: `cadence` with interval ∈ {1, 8, 16, 32} vs `delayer` with interval ∈ {1, 10, 20}, with and without `--prefill-max-wait-ms`.
   - Concurrency: 16 / 64 / 128 / 256.
   - Metrics: output throughput vs E2E-normalized interactivity, TTFT p50/p90, ITL p50/p90.
-- <TODO: gsm8k smoke test with `--prefill-schedule-policy delayer` (scheduling only; outputs should match).>
-- <TODO: run with async scheduling and MTP (V1 and V2 model runner), the combination in which #61834 once hung.>
 
-**CI coverage:** the new tests are CPU tests (`pytest.mark.cpu_test`). The GPU serving path is not exercised in CI; validation outside CI is the TODO above.
+**CI coverage:** the new tests are CPU tests (`pytest.mark.cpu_test`). The GPU serving path is not exercised in CI; validation outside CI is the GSM8K smoke test above; the performance runs are still TODO.
 
 ## Details
 
