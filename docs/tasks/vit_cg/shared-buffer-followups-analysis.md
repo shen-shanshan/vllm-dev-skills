@@ -2,7 +2,7 @@
 
 > **背景**：PR [#65084](https://github.com/vllm-project/vllm/pull/65084)（encoder CUDA graph 跨 token budget 共享 capture buffer）已合入 main（`ebc97ad8d0`），最终采用的是 @Isotr0py 的版本。本文分析 review 报告 `skills/vllm-rocm-pr-review/outputs/pr-65084-review.md` 中留下的两个正确性问题，并给出准备在 follow-up PR 中实施的修复方案。
 >
-> **状态**：方案待确认，尚未开始修改代码。
+> **状态**：已按本方案实施，replay 保护也已加上。代码改动见 `shared-buffer-followups.patch`（基于 main `ebc97ad8d0`），PR 描述见 `pr-encoder-cg-shared-buffer-followups.md`，验证结果见 `validation/out/*_main.*` 和 `*_fixed.*`。
 
 ---
 

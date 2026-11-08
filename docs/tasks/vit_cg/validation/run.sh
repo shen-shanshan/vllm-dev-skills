@@ -7,9 +7,10 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 VLLM_PY=${VLLM_PY:-/home/shashen/vllm/vllm/.venv/bin/python}
 mkdir -p "$HERE/out"
 cd /tmp
-if [[ "$which" == dsv41 ]]; then
-  export VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_MOE=1 VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4 \
+if [[ "$which" == dsv41 || "$which" == minimax_m3 ]]; then
+  export VLLM_ROCM_USE_AITER=1 VLLM_ROCM_USE_AITER_MOE=1 \
     AITER_TRITON_LOG_LEVEL=ERROR VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=True OMP_NUM_THREADS=1
+  [[ "$which" == dsv41 ]] && export VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4
   export HIP_VISIBLE_DEVICES=${GPUS:-6,7}
 else
   export HIP_VISIBLE_DEVICES=${GPUS:-0}

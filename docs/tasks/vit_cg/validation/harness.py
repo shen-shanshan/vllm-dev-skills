@@ -10,6 +10,7 @@ buffer sharing disabled and compares it with the live (shared) manager:
     overwriting an earlier batch's not-yet-returned outputs shows up.
 """
 
+import glob
 import json
 import os
 import random
@@ -69,6 +70,9 @@ def rpc_stats(worker):
         "num_graphs": len(graphs),
         "graphs": graphs,
         "aliased_slots": sorted(map(str, getattr(mgr, "_aliased_slots", ()))),
+        "aliased_input_keys": {
+            str(k): sorted(v) for k, v in getattr(mgr, "_aliased_input_keys", {}).items()
+        },
         "view_bytes": naive,
         "unique_storage_bytes": sum(storages.values()),
     }
@@ -108,6 +112,12 @@ def rpc_hits(worker):
         "graph_hits": mgr.graph_hits,
         "graph_misses": mgr.graph_misses,
     }
+
+
+def _rel_err(a, b) -> float:
+    """Relative L2 error; bf16 noise stays ~1e-2, a swapped embedding ~1."""
+    a, b = a.float(), b.float()
+    return float((a - b).norm() / b.norm().clamp_min(1e-12))
 
 
 def rpc_ab_check(worker):
@@ -178,7 +188,7 @@ def _ab_check(worker):
             out = mgr._run_budget_graph(kw, budget, path=path, axis_keys=axis)
             n = path_tokens(kw, path)
             if not torch.equal(out[:n], ref[i][:n]):
-                mism.append((i, path, budget, float((out[:n] - ref[i][:n]).abs().max())))
+                mism.append((i, path, budget, _rel_err(out[:n], ref[i][:n])))
         report[name] = {"mismatches": mism}
 
     # Execute A/B: whole execute() calls, every item compared after all of the
@@ -207,7 +217,7 @@ def _ab_check(worker):
             multi_budget += 1
         for j, (a, b) in enumerate(zip(out, ref_out, strict=True)):
             if not torch.equal(a, b):
-                exec_mism.append((i, j, float((a.float() - b.float()).abs().max())))
+                exec_mism.append((i, j, _rel_err(a, b)))
         # Each item alone in its own execute(): no later batch can overwrite
         # it, so this catches overwrites that the unshared manager shares too
         # (several batches replaying the same budget graph).
@@ -226,7 +236,7 @@ def _ab_check(worker):
             out = base2._run_budget_graph(kw, budget, path=path, axis_keys=axis)
             n = path_tokens(kw, path)
             if not torch.equal(out[:n], ref[i][:n]):
-                ctrl.append((i, path, budget, float((out[:n] - ref[i][:n]).abs().max())))
+                ctrl.append((i, path, budget, _rel_err(out[:n], ref[i][:n])))
         # Same graph replayed twice: replay itself is deterministic.
         again = []
         for i, (kw, budget, path, axis) in enumerate(recs):
@@ -275,6 +285,7 @@ PROMPTS = {
         + f"\n{q}<end_of_turn>\n<start_of_turn>model\n"
     ),
     "deepseek_ocr": lambda n, q: "<image>" * n + f"\n{q}",
+    "minimax_m3": lambda n, q: "]~b]user\n" + "]<]image[>[" * n + f"{q}[e~[\n]~b]ai\n",
 }
 
 ENGINES = {
@@ -316,6 +327,16 @@ ENGINES = {
         max_num_batched_tokens=16384,
         gpu_memory_utilization=0.6,
         compilation_config={"encoder_cudagraph_max_vision_items_per_batch": 2},
+    ),
+    # Replay drops the CPU max_seqlen scalar; ViT runs data-parallel.
+    "minimax_m3": dict(
+        model=glob.glob("/shared/models--amd--MiniMax-M3-MXFP4/snapshots/*")[0],
+        trust_remote_code=True,
+        tensor_parallel_size=2,
+        mm_encoder_tp_mode="data",
+        max_model_len=32768,
+        max_num_batched_tokens=16384,
+        gpu_memory_utilization=0.85,
     ),
     # Dual-path encoder (global / local tiles).
     "deepseek_ocr": dict(
