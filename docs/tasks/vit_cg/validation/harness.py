@@ -70,8 +70,8 @@ def rpc_stats(worker):
         "num_graphs": len(graphs),
         "graphs": graphs,
         "aliased_slots": sorted(map(str, getattr(mgr, "_aliased_slots", ()))),
-        "aliased_input_keys": {
-            str(k): sorted(v) for k, v in getattr(mgr, "_aliased_input_keys", {}).items()
+        "shared_input_keys": {
+            str(k): sorted(v) for k, v in getattr(mgr, "_shared_input_keys", {}).items()
         },
         "view_bytes": naive,
         "unique_storage_bytes": sum(storages.values()),

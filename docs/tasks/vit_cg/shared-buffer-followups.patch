@@ -32,14 +32,14 @@ index 2d9e755798..97bcf54f37 100644
  !!! note
      The `SupportsEncoderCudaGraph` protocol is designed to be model-agnostic. New vision encoder models can opt-in by implementing the protocol methods without modifying the manager.
 diff --git a/tests/v1/cudagraph/test_encoder_cudagraph.py b/tests/v1/cudagraph/test_encoder_cudagraph.py
-index b6765514a1..ad7a9e97a6 100644
+index b6765514a1..a38ca332f8 100644
 --- a/tests/v1/cudagraph/test_encoder_cudagraph.py
 +++ b/tests/v1/cudagraph/test_encoder_cudagraph.py
 @@ -179,6 +179,7 @@ def _make_manager_with_budgets(budgets: list[int]) -> EncoderCudaGraphManager:
      mgr.graph_pool = None
      mgr._shared_input_buffers = {}
      mgr._shared_output_buffers = {}
-+    mgr._aliased_input_keys = {}
++    mgr._shared_input_keys = {}
      mgr._capture_axes = ()
      mgr.graph_hits = 0
      mgr.graph_misses = 0
@@ -47,7 +47,7 @@ index b6765514a1..ad7a9e97a6 100644
      mgr.graph_pool = None
      mgr._shared_input_buffers = {}
      mgr._shared_output_buffers = {}
-+    mgr._aliased_input_keys = {}
++    mgr._shared_input_keys = {}
      mgr._capture_axes = ()
      mgr.graph_hits = 0
      mgr.graph_misses = 0
@@ -80,7 +80,7 @@ index b6765514a1..ad7a9e97a6 100644
          self.mgr.clear()
          assert self.mgr._shared_input_buffers == {}
          assert self.mgr._shared_output_buffers == {}
-+        assert self.mgr._aliased_input_keys == {}
++        assert self.mgr._shared_input_keys == {}
  
  
  class VarShapeMockViTModel(SimpleMockViTModel):
@@ -182,7 +182,7 @@ index ac747a7ecb..7635e1cd71 100644
          out = [merged[i] for i in indices]
          for i, idx in enumerate(indices):
 diff --git a/vllm/v1/worker/encoder_cudagraph.py b/vllm/v1/worker/encoder_cudagraph.py
-index 08bb37fe73..f749aa62a5 100644
+index 08bb37fe73..eba04b1106 100644
 --- a/vllm/v1/worker/encoder_cudagraph.py
 +++ b/vllm/v1/worker/encoder_cudagraph.py
 @@ -198,6 +198,9 @@ class EncoderCudaGraphManager:
@@ -191,7 +191,7 @@ index 08bb37fe73..f749aa62a5 100644
          ] = {}
 +        # Input keys whose shared buffer smaller budgets view. Other budgets'
 +        # captures overwrite it, so replay must refill these keys.
-+        self._aliased_input_keys: dict[tuple[str, CaptureAxisKeys], set[str]] = {}
++        self._shared_input_keys: dict[tuple[str, CaptureAxisKeys], set[str]] = {}
          self.graph_hits = 0
          self.graph_misses = 0
          self.log_stats_interval = 100
@@ -199,7 +199,7 @@ index 08bb37fe73..f749aa62a5 100644
          self.graph_pool = None
          self._shared_input_buffers.clear()
          self._shared_output_buffers.clear()
-+        self._aliased_input_keys.clear()
++        self._shared_input_keys.clear()
  
      def capture(self, graph_pool: Any):
          """Capture CUDA graphs for every configured path and token budget."""
@@ -231,7 +231,7 @@ index 08bb37fe73..f749aa62a5 100644
              self._shared_input_buffers[share_key] = values
          else:
              values = self._share_prefix_compatible(capture_inputs.values, shared)
-+            self._aliased_input_keys.setdefault(share_key, set()).update(
++            self._shared_input_keys.setdefault(share_key, set()).update(
 +                key
 +                for key, buf in values.items()
 +                if buf is not capture_inputs.values[key]
@@ -243,11 +243,11 @@ index 08bb37fe73..f749aa62a5 100644
          )
  
          # Copy replay values into the buffers recorded for this path.
-+        aliased_keys = self._aliased_input_keys.get((path, graph_meta.axis_keys), ())
++        shared_keys = self._shared_input_keys.get((path, graph_meta.axis_keys), ())
          for key, buf in graph_meta.input_buffers.items():
              src = replay.values.get(key)
              if src is None:
-+                if key in aliased_keys:
++                if key in shared_keys:
 +                    raise RuntimeError(
 +                        f"Encoder CUDA graph buffer {key!r} is shared across "
 +                        "token budgets, so its capture-time contents may come "

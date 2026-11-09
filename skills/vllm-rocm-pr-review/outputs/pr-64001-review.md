@@ -1,9 +1,9 @@
 ---
 pr: 64001
 repo: vllm-project/vllm
-head_sha: ba871ce17445c5e4ca10963fe27eb4e8c853a409
+head_sha: 276dc4069e3fc29826d4497ed192782ea4da79a1
 verdict: lgtm
-reviewed_at: 2026-11-05T07:04:34Z
+reviewed_at: 2026-11-09T08:10:29Z
 skill: vllm-rocm-pr-review
 ---
 
@@ -13,6 +13,7 @@ skill: vllm-rocm-pr-review
 > **Branch**: `feature/yunkai/dsv41-rocm-jit-warmup` → `main` | **Labels**: rocm, deepseek, verified, DSv4.1
 > **Changes**: +114 -28 lines across 2 files | **ROCm 相关性**: 部分相关。改动的 `vllm/models/deepseek_v41/common/ops/cache_utils.py` 是 DSv4.1 的公共算子，ROCm（`ROCM_FLASHMLA_SPARSE_DSV41`）和 NVIDIA（`FLASHMLA_SPARSE_DSV41`、`FLASHMLA_MEGA_ATTN_DSV41`）的 chunked sparse prefill 都会调用它
 > 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
+> **增量复核（2026-11-09）**：自上次 review（`ba871ce1`）以来只新增 1 个 commit `276dc406`，把 warmup 测试第 100 行的 `torch.cuda.synchronize()` 换成设备无关的 `torch.accelerator.synchronize()`，不影响任何结论和行号；与当前 main 仍无冲突。新评论因 GitHub API 限流未能拉取。
 
 ---
 
