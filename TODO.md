@@ -15,19 +15,21 @@
 
 ## Technical Reports（个人学习计划）
 
+- [ ] How to write triton/flydsl kernel tutorial (Generated: / Read: )
+- [ ] Attention: MQA / GQA / MLA / DSA ... (Generated: / Read: )
+- [ ] KV Cache, especially Hybrid Memory Allocator (Generated: / Read: )
+- [ ] TP / DP / EP / PP / SP / CP (通信方式 / 通信量计算 / 适用场景) (Generated: / Read: )
 - [ ] PCP / DCP (Generated: ✅ / Read: )
 - [ ] MTP / DFlash / DSpark (Generated: ✅ / Read: )
-- [ ] Attention: MQA / GQA / MLA / DSA ... (Generated: / Read: )
-- [ ] KV Cache (Generated: / Read: )
-- [ ] TP / DP / EP / PP / SP / CP (通信方式 / 通信量计算 / 适用场景) (Generated: / Read: )
 - [ ] docs/triton/amd_pointer_range_and_jit_warmup.md (Generated: ✅ / Read: )
-- [ ] skills/vllm-feature-tutorial/outputs/workspace_manager.md (Generated: ✅ / Read: )
 - [ ] skills/vllm-feature-tutorial/outputs/jit_kernel_warmup.md (Generated: ✅ / Read: )
 - [ ] skills/vllm-feature-tutorial/outputs/fast_start.md (Generated: ✅ / Read: )
-- [ ] skills/vllm-feature-tutorial/outputs/atom_prefill_delayer.md (Generated: ✅ / Read: )
 - [ ] skills/vllm-feature-tutorial/outputs/umbp_store_connector.md (Generated: ✅ / Read: )
+- [x] skills/vllm-feature-tutorial/outputs/atom_prefill_delayer.md (Generated: ✅ / Read: ✅)
+- [x] skills/vllm-feature-tutorial/outputs/workspace_manager.md (Generated: ✅ / Read: ✅)
 
 ## Blog Writing
 
-- [ ] Update vLLM ViT CG report -> draw with `archify`.
-- [x] Update blog writing skill (learn image color style from previous blogs, learn from vllm official blogs)
+- [ ] Write vLLM ViT cuda graph blog.
+- [x] Write agentic workload inference optimization blog.
+- [x] Update blog writing skill (learn image color style from my previous blogs).
