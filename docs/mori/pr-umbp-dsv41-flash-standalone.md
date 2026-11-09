@@ -36,7 +36,7 @@ vllm serve deepseek-ai/DeepSeek-V4.1-Flash --tensor-parallel-size 2 --language-m
 - Result: 24,320 tokens are restored from the pool, and the greedy answer is identical to the GPU-served one.
 - In every run below, the engine log has no NaN, no Traceback, and no `AITER_TRITON_SPARSE_MLA is ignored` warning.
 
-**Unit tests.** `pytest tests/v1/kv_connector/unit/test_umbp_*.py`: 256 passed. That includes new tests for replicated-group detection, `tp*` keys and key counts, TP rank > 0 skipping replicated stores, handshake agreement, and the canonical-KV hook. `pytest tests/v1/core/test_kv_cache_planning.py tests/v1/kv_connector/unit/offloading_connector/test_config.py`: 144 passed.
+**Unit tests.** `pytest tests/v1/kv_connector/unit/test_umbp_*.py`: 341 passed. That includes new tests for replicated-group detection, `tp*` keys and key counts, TP rank > 0 skipping replicated stores, handshake agreement, the canonical-KV hook, and the separate namespace of engines whose other connectors may load foreign KV. `pytest tests/v1/core/test_kv_cache_planning.py tests/v1/kv_connector/unit/offloading_connector/test_config.py`: 144 passed.
 
 **Accuracy: GSM8K.**
 - `lm_eval` 0.4.13, 5-shot, all 1319 questions, `local-completions`, `num_concurrent=64`, `max_gen_toks=2048`.
@@ -138,6 +138,7 @@ Each cell is baseline → UMBP (Δ).
 - **`KVConnectorBase_V1.only_restores_canonical_kv`** (`base.py`): a new classmethod hook, default `False`.
   - `MultiConnector` returns `True` only when every child does.
   - `UMBPStoreConnector` returns `True` only with the derived key namespace (`key_namespace: auto`, the default). Its objects are whole blocks written by this cache layout, and the derived namespace fingerprints every per-layer spec. An explicit `key_namespace` skips that fingerprint, so it keeps the fast paths off.
+  - **Provenance.** The derived namespace also records whether any connector of the engine may load foreign KV, for example a `MultiConnector` sibling of UMBP. If so, `"foreign_kv": true` joins the fingerprint, so bytes such an engine stores can never be restored by a UMBP-only engine that trusts the pool. The child UMBP connector only sees its own `kv_transfer_config`, so it reads the engine config, which workers set while they create their connector. The field is added only when set, so UMBP-only namespaces are unchanged.
 - **`kv_connector_may_load_foreign_kv(vllm_config)`** (`kv_connector/utils.py`): a connector-agnostic helper, `not only_restores_canonical_kv(...)` of the configured connector, `False` without one.
 - **`deepseek_v41/amd/rocm.py`**: the helper replaces the four `kv_transfer_config is not None` guards on the aiter sparse MLA and NaN-free extra-cache paths. The aiter kernel does not scrub NaNs, so these paths stay off for connectors that may load foreign bytes.
 - **UMBP TP dedup** (`umbp/{connector,data,scheduler,worker}.py`, `runtime/{base,standalone}.py`):
@@ -148,7 +149,7 @@ Each cell is baseline → UMBP (Δ).
   - Opt out with `dedup_tp_replicated_kv: false`. Dedup is skipped under PCP/DCP.
   - `docs/features/umbp_store_connector_usage.md` documents the option, the TP-agnostic keys, and the `key_namespace` caveat.
 
-**Other backends are unaffected.** The hook's only caller is the new helper, used only by the ROCm-only `deepseek_v41/amd/rocm.py`. Embedded UMBP keeps per-rank keys. Every other connector still turns the ROCm fast paths off. The one shared change is `max_tp_shards=1` on V4.1's specs: V4.1's `kv_tp_replicas` becomes `tp_size`, so `OffloadingConnector` can use its TP-replicated layout for V4.1, as it already does for V4. It also changes V4.1's UMBP namespace, so objects stored before this PR miss once.
+**Other backends are unaffected.** The hook's only caller is the new helper, used only by the ROCm-only `deepseek_v41/amd/rocm.py`. Embedded UMBP keeps per-rank keys. Every other connector still turns the ROCm fast paths off. The one shared change is `max_tp_shards=1` on V4.1's specs: V4.1's `kv_tp_replicas` becomes `tp_size`, so `OffloadingConnector` can use its TP-replicated layout for V4.1, as it already does for V4. It also changes V4.1's UMBP namespace, so objects stored before this PR miss once. Engines that pair UMBP with a connector that may load foreign KV get their own namespace and no longer share objects with UMBP-only engines.
 
 **Limitations.**
 - Single node only.

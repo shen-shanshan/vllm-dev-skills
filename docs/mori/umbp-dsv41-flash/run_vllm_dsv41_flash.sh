@@ -31,7 +31,9 @@ mkdir -p "${LOG_DIR}"
 # roles.agg.env
 export VLLM_ROCM_USE_AITER=1
 export VLLM_ROCM_USE_AITER_MOE=1
-export VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=INT4
+# INT4 needs an aiter with QuickAllReduceInt4.compile() on main since #59478;
+# override (e.g. INT8) on older aiter builds.
+export VLLM_ROCM_QUICK_REDUCE_QUANTIZATION=${QR_QUANT:-INT4}
 export AITER_TRITON_LOG_LEVEL=ERROR
 export VLLM_ROCM_USE_AITER_TRITON_SPARSE_MLA=True
 export VLLM_USE_BREAKABLE_CUDAGRAPH=1

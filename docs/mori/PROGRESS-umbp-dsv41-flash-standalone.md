@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4.1-Flash 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-11-03。DP2 + expert TP2 c256 的 B0 和 S1 已跑完，吞吐 +3.8%，见 5.3。
+> 最后更新：2026-11-09，处理 review r4490119163。上一次：2026-11-03。DP2 + expert TP2 c256 的 B0 和 S1 已跑完，吞吐 +3.8%，见 5.3。
 > 每次推进后，同步更新以下几节：「代码与分支状态」「当前结论」「测试进展」「未完成事项」。
 
 ## 1. 任务概述
@@ -55,6 +55,18 @@
   - 新 main 上 rust 前端 `vllm-rs` 需要重新编译：旧二进制和新 engine 的 ndarray 序列化格式不一致，第一个请求就报 `msgspec.ValidationError`。`/home/shashen` 所在 NFS 卷已满（10T，我们只占 11G）。
 
 - **2026-11-06（已 commit 为 `dfce3b411f`，叠在 `43e71e1814` 上，未 push；分支已由用户 rebase 到 main `405aaa3d51`）**：按用户意见，把 `rocm.py` 里的 `_has_foreign_kv_writer()` 移到 `vllm/distributed/kv_transfer/kv_connector/utils.py`，改名为通用的 `kv_connector_may_load_foreign_kv(vllm_config)`（与同文件 `get_kv_connector_cache_layout` 同风格）。`rocm.py` 改为顶层 import，并在 attention 的赋值处加一行 ROCm 注释。验证：模块 import 正常，pre-commit 通过，`tests/v1/kv_connector/unit/test_umbp_*.py` 256 passed（venv 需要先 `uv pip install tblib`）。PR 描述已同步。
+
+- **2026-11-09 处理 review 意见 r4490119163（charxwu，canonical KV 来源无法保证），已 commit 为 `c1050779b7`（未 push）。分支已由用户 rebase 到 main `9ff2963a79`，HEAD 为 `37b24f9380`**：
+  - 采用方案 B：engine 中任一 connector 可能写入外来字节时，UMBP 的 derived namespace 加入 `"foreign_kv": true`。这样纯 UMBP engine 永远不会恢复混合配置 engine 存入的对象，hook 保持返回 True，aiter 快路径也得以保留。
+  - 详细分析、具体改动和给 reviewer 的英文回复草稿见 [`review-64715-canonical-provenance.md`](review-64715-canonical-provenance.md)。
+  - 验证：
+    - 新增测试在没有修复时会失败；
+    - UMBP 单测 341 个通过；
+    - pre-commit 通过；
+    - TP2 冒烟：恢复 24,320 token，store 379 / load 380，失败 0，回答与 GPU 直出一致，快路径保留。
+  - 环境注意事项：
+    - 新 main（#59478）的 INT4 QuickReduce 需要更新版的 aiter，容器里的 0.1.28.post1 会崩。运行脚本现在可以用 `QR_QUANT=INT8` 绕开。
+    - venv 需要重新安装 `tblib`。
 
 ## 3. 当前结论
 

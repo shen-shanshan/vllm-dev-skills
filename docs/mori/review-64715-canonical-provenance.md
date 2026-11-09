@@ -3,7 +3,7 @@
 > - **Review 链接**：https://github.com/vllm-project/vllm/pull/64715#discussion_r4490119163
 > - **Reviewer**：charxwu（2026-11-06）
 > - **位置**：`vllm/distributed/kv_transfer/kv_connector/v1/umbp/connector.py:109`（commit `cf59c081a4`），对应 `UMBPStoreConnector.only_restores_canonical_kv`
-> - **状态**：方案待确认，代码尚未修改
+> - **状态**：用户已确认方案 B（2026-11-09）。代码已改，单测和冒烟测试都通过，已 commit 为 `c1050779b7`（未 push）；回复草稿见第五节
 
 ## 原文
 
@@ -150,8 +150,61 @@ Engine B：[UMBP]       → may_load_foreign_kv = False → namespace = H(...)  
 - 恢复仍然命中；
 - 快路径仍然打开（日志中没有 "is ignored"）。
 
-## 三、待用户确认
+## 三、用户决定（2026-11-09）
 
-1. 选方案 B，还是按 reviewer 原话选方案 A？
-2. 是否同意在 `test_umbp_core.py` 中新增测试？
-3. 是否需要起草给 reviewer 的英文回复？
+1. 采用方案 B。
+2. 同意在 `test_umbp_core.py` 中新增测试。
+3. 起草给 reviewer 的英文回复，并重点说明：我们不想损失 aiter 快路径的性能，因为使用 UMBP 本来就是为了在 AgentX 上获得更好的性能。
+
+## 四、实现情况（未 commit）
+
+**关键实现细节**：MultiConnector 创建子 connector 时，会浅拷贝 `vllm_config`，并把其中的 `kv_transfer_config` 换成该子 connector 自己的配置（`multi_connector.py` 的 `_get_connector_classes_and_configs`）。因此 UMBP 从 `vllm_config.kv_transfer_config` 看不到兄弟 connector。
+
+解决办法：namespace 推导时改读当前 engine 的 config（`get_current_vllm_config_or_none()`）。依据如下：
+
+- worker 创建 connector 的两条路径，即 `WorkerWrapperBase.initialize_from_config` 和 `extend_kv_cache`，都包在 `set_current_vllm_config(self.vllm_config)` 中。
+- `extend_kv_cache` 的注释也写明 "The KV connector created here reads the current config"。
+
+如果读不到当前 config，就退回使用传入的 config。在只配 UMBP 的场景下，两者都会得到 False，结果一致。
+
+**改动**：
+
+| 文件 | 改动 |
+|---|---|
+| `umbp/data.py` | 新增 `_engine_may_load_foreign_kv()`。`UMBPNamespace.from_vllm_config` 在该函数返回 True 时，向指纹加入 `"foreign_kv": true`（仅在为 True 时才加，只配 UMBP 时 namespace 不变） |
+| `umbp/connector.py` | 更新 `only_restores_canonical_kv` 的注释，说明 derived namespace 同时区分了数据来源 |
+| `docs/features/umbp_store_connector_usage.md` | 在 Sharing 一节说明：与"可能加载外来 KV 的 connector"组合使用的 engine 会使用独立的 key |
+| `tests/v1/kv_connector/umbp_test_utils.py` | 测试用的假 config 补上 `kv_connector="UMBPStoreConnector"`，因为 namespace 推导现在要查询 connector 类 |
+| `tests/v1/kv_connector/unit/test_umbp_core.py` | 新增 `test_namespace_separates_engines_whose_siblings_load_foreign_kv`，覆盖 3 个用例：无当前 config、`Multi[UMBP]`、`Multi[ExampleConnector, UMBP]`。同时验证显式 `key_namespace` 不受影响 |
+
+另外，新 main 上的 pre-commit hook `check-docstring-style` 自动把本 PR 早先加入的几处 docstring 中的 ` ``x`` ` 改成了 `` `x` ``。
+
+**验证**：
+
+- 新测试在没有修复的代码上会失败（`Multi[ExampleConnector, UMBP]` 用例），修复后通过。
+- `tests/v1/kv_connector/unit/test_umbp_*.py` 共 341 个测试通过。
+- pre-commit 全部通过。
+- TP2 冒烟（2026-11-09，base main `9ff2963a79` + 本 PR + 本修改，GPU 2,3，Python 前端）：
+  - 从 UMBP 恢复 24,320 token，恢复后的回答与 GPU 直出一致（`match: true`）。
+  - store 379 个对象，load 380 个，失败 0。
+  - engine 日志中没有 Traceback，没有 NaN，也没有 "is ignored"（快路径仍然开启）。
+  - 以上与改动前的冒烟结果完全相同。
+  - 第一次运行没有跑起来：新 main 的 #59478 在 INT4 QuickReduce 下会调用 aiter `QuickAllReduceInt4.compile()`，而容器里的 aiter `0.1.28.post1` 没有这个方法，worker 在初始化 TP 通信时就崩了，与本修改无关。运行脚本的 `VLLM_ROCM_QUICK_REDUCE_QUANTIZATION` 现在可以用 `QR_QUANT` 覆盖，这次冒烟用的是 `QR_QUANT=INT8`。
+
+## 五、给 reviewer 的回复草稿（英文）
+
+> Thanks, good catch. `key_namespace="auto"` pins the layout, not who wrote the bytes, and your sequence does let a MultiConnector sibling's KV reach a UMBP-only engine through the shared standalone pool.
+>
+> We'd rather not return `False` here, though. On ROCm that turns off the aiter sparse MLA and NaN-free extra-cache paths for every UMBP deployment of DeepSeek-V4.1-Flash, and that combination is why we use UMBP at all. Every AgentX number in the description was measured with those paths on: +46% throughput and −78% mean TTFT at TP2 c192, and +3.8% throughput at DP2 c256. Falling back to the Triton sparse attention for all UMBP users, to guard against a MultiConnector setup none of them run, gives back part of what the connector is for.
+>
+> So this PR now guarantees the provenance instead of dropping the capability:
+>
+> - The derived namespace also records whether any connector of the engine may load foreign KV (`kv_connector_may_load_foreign_kv` on the engine config). If one may, `"foreign_kv": true` joins the fingerprint.
+> - The child UMBP connector only sees its own `kv_transfer_config` inside a MultiConnector, so it reads the engine's current config. Workers set that config while creating their connector, in both `initialize_from_config` and `extend_kv_cache`.
+> - In your example, engine A (`[NIXL, UMBP]`) now stores under a namespace of its own, and engine B (UMBP-only) restores from the plain one. B never sees A's objects.
+> - The argument for B: its KV comes only from its own forward passes or from the plain namespace, and only UMBP-only engines write that namespace. So `only_restores_canonical_kv() == True` holds. An explicit `key_namespace` still returns `False`.
+> - The field is added only when set, so UMBP-only namespaces and pools are unchanged.
+>
+> The cost is that mixed engines no longer share objects with UMBP-only ones, and the check is conservative: a sibling that never overrides the hook, such as `OffloadingConnector`, also gets the separate namespace. That costs some reuse but never correctness.
+>
+> `test_namespace_separates_engines_whose_siblings_load_foreign_kv` covers the mixed case; it fails without the change.
