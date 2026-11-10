@@ -16,7 +16,8 @@ export KV_OFFLOADING=${KV_OFFLOADING:-none}
 source "${INFX}/benchmarks/runtime_settings.sh"
 # Local run: no power telemetry, single node, full (non-fast) replay.
 export ENABLE_AGENTX_POWER=0 REQUIRE_POWER=0 IS_MULTINODE=false EVAL_ONLY=false
-export AIPERF_EXPERIMENTAL_FAST=0
+# FAST=1 runs the InferenceX agentx-fast replay (1200 s, one warmup request per lane).
+export AIPERF_EXPERIMENTAL_FAST=${AIPERF_EXPERIMENTAL_FAST:-0}
 
 # Recipe base benchmark.env.
 export AIPERF_REQUIRED_SERVER_METRIC_PREFIX='vllm:'

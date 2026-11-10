@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # One AgentX point end to end on a fresh deployment: engine -> router ->
-# AgentX replay (DURATION=3600) -> engine metric snapshot -> teardown.
+# AgentX replay (DURATION=3600, or the InferenceX agentx-fast replay with
+# FAST=1) -> engine metric snapshot -> teardown.
 #   TAG=base POLICY=cadence INTERVAL=1 bash run_config.sh
-#   TAG=del4_wait POLICY=delayer INTERVAL=4 MAX_WAIT_MS=3000 bash run_config.sh
+#   TAG=f_n11_w5000 FAST=1 POLICY=delayer INTERVAL=11 MAX_WAIT_MS=5000 bash run_config.sh
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 MORI=${HERE}/../../../mori
@@ -43,6 +44,7 @@ ROUTER_DP_SIZE=2 setsid nohup bash "${MORI}/umbp-dsv4-mtp/run_router.sh" >/dev/n
 ROUTER_PGID=$!
 until curl -sf localhost:30000/health >/dev/null; do sleep 5; done
 export DP=2 DP_LABEL=dp2
+export AIPERF_EXPERIMENTAL_FAST=${FAST:-0}
 bash "${MORI}/umbp-dsv4-mtp/snapshot_metrics.sh" > "${OUT}/engine_metrics_start.txt"
 CLIENT_RC=0
 TAG=${TAG} OUT=${OUT} bash "${MORI}/umbp-dsv41-flash/run_agentic.sh" >/dev/null 2>&1 || CLIENT_RC=$?
