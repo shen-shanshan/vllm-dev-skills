@@ -1,0 +1,12 @@
+<!-- Reply to https://github.com/vllm-project/vllm/pull/65655#issuecomment-6694910911 (Fangzhou-Ai, 2026-11-06). Fix commit: 5c4e9e74c3 on dp-prefill-delayer. -->
+
+@Fangzhou-Ai Thanks a lot for the thorough testing, the numbers across DP2/DP4/DPATP8 are very helpful.
+
+**Protected steps vs `--prefill-max-wait-ms`:** agreed, that is a real bug. The protected steps returned before the `queue_hot` check, so the wait limit only trimmed the holds after them, and prefill was capped at one token budget per interval. I applied your patch in 5c4e9e74c3 ("Let prefill_max_wait_ms end the delayer's protected steps"): a hot queue now ends the protected steps and fires `max_wait`. As you noted, `queue_hot` is part of the all-reduced state, so the decision stays identical on every rank. Your test is in as `test_max_wait_ends_protected_steps`, with one extra assertion that the next prefill-carrying step starts a full protected stretch again. The `prefill_max_wait_ms` docstring and the DP deployment docs now say it also applies during the protected steps.
+
+**Other suggestions:**
+- **Token budget.** Done. `docs/serving/data_parallel_deployment.md` now explains that `--max-num-batched-tokens` sets the delayer's TTFT cost. At 8K, prompts need more prefill steps and prefill can fall behind arrivals. 32K gives back most of the decode gain. 16K worked best on multi-turn agentic traffic, and the example command uses it.
+- **`pending_tokens` and prefix-cache hits.** Agreed that the estimate ignores cache hits: waiting requests are counted before their prefix-cache lookup. One nuance: overestimating makes `fill` reach its target earlier, not later. The effect is that a release can go out with a batch that is mostly cache hits, so the step is far less "full" than the delayer thinks. A cheap fix needs a cache-hit estimate without doing the full lookup in the state report, so I would like to handle it in a follow-up. For now it is listed under Limitations in the PR description. Happy to do it in this PR if you prefer.
+- **p99 metrics.** Agreed. The PR description will report TTFT and ITL p99 alongside p90. I am running an end-to-end comparison on DSv4.1-Flash DP2 c128 (MI355X, AgentX, 16K budget) with four arms: default, cadence, delayer, and delayer plus max-wait, all on the fixed code. I will post the results here.
+
+If you can share your test commands and scripts, I would like to reuse them so our numbers are directly comparable.
