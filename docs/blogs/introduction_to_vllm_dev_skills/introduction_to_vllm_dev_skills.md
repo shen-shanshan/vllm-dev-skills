@@ -8,7 +8,7 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/01）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/10）。
 
 ## 二、项目介绍
 
@@ -193,11 +193,12 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 
 **`vllm-rocm-pr-review`：面向 AMD/ROCm PR 的 Review 助手。**
 
-这个 Skill 专门用来 Review 与 AMD/ROCm 相关的 PR（如 AITER、MORI、ROCm Kernel 等改动）。它会把 `vllm-pr-summary` 的 PR 总结和 ROCm 视角的 Review 意见合并成一份中文报告，报告分为三部分：
+这个 Skill 专门用来 Review 与 AMD/ROCm 相关的 PR（如 AITER、MORI、ROCm Kernel 等改动）。它会把 `vllm-pr-summary` 的 PR 总结和 ROCm 视角的 Review 意见合并成一份中文报告，报告分为四部分：
 
 1. **PR 详细总结**：背景与动机、代码改动分析（含 Mermaid 图）、技术原理、讨论要点和风险表；
 2. **ROCm Review 意见**：按严重程度排序、按类型分类的问题清单，以及最终的 Review 结论；
-3. **英文 Review 评论**：标注了文件和 Diff 行号，可以直接复制到 GitHub 的 PR Review 中。
+3. **英文 Review 评论**：标注了文件和 Diff 行号，可以直接复制到 GitHub 的 PR Review 中；
+4. **英文总结评论**：报告最后用一段 100 词以内的英文给出本次 Review 的整体结论，可以直接发到 PR 的评论区。
 
 此外，报告开头会带一段 YAML Front Matter，记录 PR 编号、被 Review 的 Head Commit SHA、Review 结论（`block` / `needs-work` / `lgtm`）和 Review 时间。报告推送到仓库后，Pingboard Dashboard 会读取这些字段，在 PR 详情页展示 AI Review 的结论，并据此判断 PR 在 Review 之后是否又有了新的改动。
 

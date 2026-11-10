@@ -1,11 +1,11 @@
 ---
 name: vllm-rocm-pr-review
-description: Review AMD/ROCm-related pull requests from the vllm-project/vllm GitHub repository and produce a single combined Chinese report: a detailed PR summary (summary, background & motivation, code-change analysis with Mermaid diagrams, technical principles, discussion highlights, risk table) followed by severity-sorted, type-categorized ROCm review findings, a verdict, and copy-paste English review comments with file + diff line numbers ready for GitHub PR review. Use when the user provides a vllm PR number or link and asks to review it, especially for ROCm/AMD/aiter/mori related changes. Triggered by requests like "review vllm PR 12345", "帮我review vllm的PR 12345", "vllm rocm PR review", "review这个rocm PR".
+description: Review AMD/ROCm-related pull requests from the vllm-project/vllm GitHub repository and produce a single combined Chinese report: a detailed PR summary (summary, background & motivation, code-change analysis with Mermaid diagrams, technical principles, discussion highlights, risk table) followed by severity-sorted, type-categorized ROCm review findings, a verdict, copy-paste English review comments with file + diff line numbers ready for GitHub PR review, and a short (≤100-word) English overall summary to post as the PR's top-level review comment. Use when the user provides a vllm PR number or link and asks to review it, especially for ROCm/AMD/aiter/mori related changes. Triggered by requests like "review vllm PR 12345", "帮我review vllm的PR 12345", "vllm rocm PR review", "review这个rocm PR".
 ---
 
 # vLLM ROCm PR Review
 
-Review a `vllm-project/vllm` PR through an AMD/ROCm lens, then write a **single combined Chinese report** to `./outputs/pr-<NUMBER>-review.md`: Part A (§1–6) is a detailed PR summary in the style of the `vllm-pr-summary` skill, Part B (§7–8) is the ROCm review findings + verdict, and §9 holds 2–5 copy-paste English comments with file:line targets for the GitHub PR review UI. The `vllm-pr-summary` skill itself remains a separate, unchanged skill for standalone summary requests.
+Review a `vllm-project/vllm` PR through an AMD/ROCm lens, then write a **single combined Chinese report** to `./outputs/pr-<NUMBER>-review.md`: Part A (§1–6) is a detailed PR summary in the style of the `vllm-pr-summary` skill, Part B (§7–8) is the ROCm review findings + verdict, §9 holds 2–5 copy-paste English comments with file:line targets for the GitHub PR review UI, and §10 closes the report with a short English overall summary (≤100 words) to post in the PR's conversation. The `vllm-pr-summary` skill itself remains a separate, unchanged skill for standalone summary requests.
 
 Knowledge sources (kept in `references/`):
 
@@ -29,7 +29,7 @@ Knowledge sources (kept in `references/`):
 6. Backbone-file risk assessment
 7. Apply the rule checklist
 8. AI-code diagnostic + blind-spot check
-9. Write the combined report (incl. §9 copy-paste English comments) to `./outputs/` and tell the user the path
+9. Write the combined report (incl. §9 copy-paste English comments and the §10 English overall summary) to `./outputs/` and tell the user the path
 
 Non-ROCm path (gate says 不相关): Steps 1 → 2 → 3, then only housekeeping (HK) checks + verdict — no ROCm rule categories — then Step 9.
 
@@ -128,7 +128,7 @@ Finish with the blind-spot question: *is there any correctness risk, resource ha
 
 ## Step 9: Write the Report
 
-Save to `~/.claude/skills/vllm-rocm-pr-review/outputs/pr-<NUMBER>-review.md`. Chinese (Simplified) unless the user requests English. One file, two parts separated by `---`. Target ≤ ~750 lines: Part A ~250–400, Part B ~150–300, §9 ~40–60. 3–10 findings (fewer on the non-ROCm path).
+Save to `~/.claude/skills/vllm-rocm-pr-review/outputs/pr-<NUMBER>-review.md`. Chinese (Simplified) unless the user requests English. One file, two parts separated by `---`. Target ≤ ~750 lines: Part A ~250–400, Part B ~150–300, §9 ~40–60, §10 ~5–10. 3–10 findings (fewer on the non-ROCm path).
 
 **Front matter (required)**: the file must start with the YAML block below — the Pingboard dashboard reads it to show the verdict and to tell whether the PR has changed since the review. Plain `key: value` lines only, no nesting or quotes.
 
@@ -232,6 +232,12 @@ Non-ROCm path: only HK findings (env-var registration, CI/requirements/docker co
 ```text
 <English comment text>
 ```
+
+## 10. 英文总结评论 (Overall Review Summary)
+
+```text
+<≤100-word English summary, posted as the PR's top-level review comment>
+```
 ```
 
 Verdict rules: 🔴 BLOCK requires at least one finding with a concrete triggering input. ⚠️ NEEDS WORK when any ⚠️ findings exist. ✅ LGTM otherwise. No findings at all → omit section 7 entirely and say so in 结论.
@@ -242,6 +248,14 @@ Verdict rules: 🔴 BLOCK requires at least one finding with a concrete triggeri
 - **GitHub constraint**: inline comments can only attach to lines present in the diff. If the offending line is unchanged, anchor on the nearest changed line in the same hunk and say so in the comment.
 - One comment per finding; keep each 3–8 sentences in English: conclusion first, then why it matters, then the ask ("I think …" / "Could you …" / "Consider …"). Polite and direct; no severity emojis inside the comment text.
 - Non-ROCm path: derive from the HK findings (usually fewer comments), same format.
+
+§10 guidance — the report always ends with this section; it is the overall conclusion of the review, meant to be pasted as the top-level comment in the PR's conversation (or the body of the "Submit review" box):
+
+- **English, a few sentences, ≤ 100 words** (count before saving), one `text` code block, no headings, bullets, emojis or internal rule codes.
+- Structure: one sentence on what the PR does and what holds up (be specific — e.g. "the epilogue is bit-identical to the existing quantizer"); then the 1–3 most important asks, matching §9's top comments; end with the overall stance (approve / approve after X / changes needed before merge).
+- The stance must match the front-matter `verdict` and §8: `lgtm` → supportive, at most optional notes; `needs-work` → names what must change; `block` → states the concrete blocking issue and its trigger.
+- Only `[已验证]` findings; no `[推测]` content. Do not cite line numbers (that is §9's job) — refer to files/functions by name instead.
+- Non-ROCm path: same format, based on the HK findings and verdict.
 
 Also give the user a one-line summary in chat with the output path.
 

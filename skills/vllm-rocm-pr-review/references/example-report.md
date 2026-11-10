@@ -1,6 +1,6 @@
 # 示例报告（样式锚点）
 
-> 本文件是 vllm-rocm-pr-review 的样式参考：以 outputs/pr-29304-review.md 为底稿扩展出整合后的两段式结构——第一部分（§1–6）PR 详细总结（总结 / 背景与动机 / 代码修改分析含 Mermaid / 技术原理 / 讨论亮点 / 风险表），第二部分（§7–8）ROCm review 意见（按严重程度排序并按类型分类的 findings：Problem/Impact/Action + [已验证]/[推测] 标注 / 结论），末尾 §9 为可直接复制到 GitHub PR review 的英文评论（文件 + diff 行号，本节行号为示意；实际报告从 `files[].patch` 的 hunk 头推算）。
+> 本文件是 vllm-rocm-pr-review 的样式参考：以 outputs/pr-29304-review.md 为底稿扩展出整合后的两段式结构——第一部分（§1–6）PR 详细总结（总结 / 背景与动机 / 代码修改分析含 Mermaid / 技术原理 / 讨论亮点 / 风险表），第二部分（§7–8）ROCm review 意见（按严重程度排序并按类型分类的 findings：Problem/Impact/Action + [已验证]/[推测] 标注 / 结论），末尾 §9 为可直接复制到 GitHub PR review 的英文评论（文件 + diff 行号，本节行号为示意；实际报告从 `files[].patch` 的 hunk 头推算），最后的 §10 为 100 词以内的英文总结评论，可直接发到 PR 评论区。
 > 写报告前先读本文件，保证结构、finding 格式与语气一致。
 
 ---
@@ -218,4 +218,10 @@ The `while True:` loop in `save_kv_layer` busy-spins with no sleep or Event whil
 
 ```text
 `status_list[-1].Succeeded()` only checks the last transfer in `_recving_transfers`; if an earlier layer's RDMA fails, the request is still marked done and the producer releases the blocks, so the consumer silently decodes with an incomplete KV cache. Could you check `all(s.Succeeded() for s in status_list)` and confirm the retry path when a transfer fails?
+```
+
+## 10. 英文总结评论 (Overall Review Summary)
+
+```text
+Thanks for adding MoRIIO as the first ROCm-native KV transfer backend for PD disaggregation; the PUSH/PULL design and layer-wise non-blocking transfers look sound. Before merging, I think three things need fixing: get_port_offset() never receives tp_size, so DP>=2 with TP>=2 ranks collide on the same port; save_kv_layer busy-spins with no exit when nothing is ready to save; and only the last transfer status is checked, so earlier layer failures go unnoticed. A minimal end-to-end test against real mori would also help, since the current tests are mock-only. Changes requested for now.
 ```
