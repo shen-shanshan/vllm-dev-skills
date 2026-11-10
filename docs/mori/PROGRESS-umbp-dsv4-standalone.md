@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4-Pro 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-10-30（rebase 到 main `deacc36701`，已解决冲突）
+> 最后更新：2026-11-10（rebase 到 main `499a3d1e1e`，已解决冲突；main 已合入 7/10、8/10 和 #64715）
 > 每次推进后请同步更新「当前状态」「测试进展」「未完成事项」三节。
 
 ## 1. 任务概述
@@ -34,6 +34,35 @@
 注意：
 - `dev/init.sh`（未跟踪）会把分支 rebase 到 Docker 镜像的构建 commit，所以本地和 origin 会显示 "diverged"。推送时需要 `git push -f origin rocm-dsv4-umbp`，**推送前先确认**。
 - 本地 `gh` CLI 不可用，PR 信息用 `git fetch upstream pull/<N>/head:refs/remotes/pr/<N>` 拉取。
+
+### 2026-11-10 移除 `[9/10]`/`[10/10]`（lazy offload）
+- 按用户要求，分支只保留支持 DSv4-Pro 新增的内容。
+- 移除的内容：
+  - `umbp/scheduler.py` 恢复成 main 的版本，lazy offload 的代码全部去掉。
+  - 删除 `unit/test_umbp_lazy.py`。
+  - usage 文档里删掉 `lazy_offload*` 两行。
+- `test_mori_token_e2e.py` 本来就和 main 一致，不用处理。
+- 验证：UMBP 单测、prefix replay、sparse MLA 共 377 passed，pre-commit 通过。
+- 已 fixup 进提交 1，分支历史里不再有 lazy offload 的内容。现在提交 1 = `3859ed9e24 support umbp for dsv4`，提交 2 = `65b9de446a update`，都没有 push。
+- PR 描述已精简重写：只描述当前代码状态和测试结果，不再记录历史改动。
+
+### 2026-11-10 rebase 冲突的处理（以 main 为准，复用 #64715）
+- 新 base `499a3d1e1e`。main 已合入 `[7/10]` #61795、`[Test][8/10]` #61796、`[Test][4/10]` #61792，以及 dsv41-flash 的 #64715。#64715 带来了 `only_restores_canonical_kv`、TP 去重、`kv_connector_may_load_foreign_kv` 等通用代码。
+- 提交 1 = `673ec107d2`，提交 2 = `4f5a67c55f`，都没有 push。
+- 直接取 main 版本的文件：`umbp/data.py`、`runtime/standalone.py`（main 已有 `lookup_timeout_ms` 的兼容处理）、`unit/test_umbp_standalone.py`、`umbp_integration/test_mori_standalone_gpu.py`。
+- 在 main 的基础上保留我们的增量：
+  - `base.py`、`multi_connector.py`、`connector.py`：保留 `requests_sliding_window_replay` hook，以及 EAGLE draft 的提示文案。
+  - `kv_cache_interface.py`：保留 `rebuilt_by_replay`，同时带上 main 新增的字段。
+- 复用 #64715：`deepseek_v4/amd/rocm.py` 删掉自己的 `_has_foreign_kv_writer`，改用 `kv_connector_may_load_foreign_kv`。为它写的测试也删掉了，main 的 `test_umbp_core.py` 已经覆盖这个函数。
+- 语义冲突：main 已删除 Model Runner V1（#63373），`vllm_config.use_v2_model_runner` 不存在了。因此去掉了 `dsv4_swa_replay_enabled` 里 V1 相关的检查和对应测试用例。
+- 删除的文件：
+  - `umbp_integration/test_embedded_runtime.py`：这是旧版 6/10 的测试，main 已经改写进 `test_umbp_hybrid.py`。
+  - `docs/features/umbp_standalone.md` 和它在 README 里的链接：main 的 usage 文档已经覆盖 standalone。DSv4 特有的内容（`rebuild_sliding_window` 选项、DeepSeek-V4 on ROCm 小节、DSpark/EAGLE 说明）并入了 `umbp_store_connector_usage.md`。
+- 保留的内容：`[9/10]` lazy offload（`scheduler.py`、`test_umbp_lazy.py`），以及两个 DSpark/EAGLE draft 测试。前者 main 还没合入；后者加到了 main 版本的 `test_umbp_standalone.py` 末尾。
+- 验证：
+  - `test_umbp_*.py`、`test_prefix_replay.py`、`test_rocm_aiter_triton_sparse_mla.py` 共 391 passed。
+  - pre-commit 通过。
+  - GPU smoke 未重跑。
 
 ### 2026-10-30 rebase 冲突的处理（以 main 为准）
 - main 合入了 `[Test][UMBP][6/10]` #61794。我们提交里的 6/10 测试是旧版 `umbp-pr-6` head（字节相同），而合入版已被重写。
