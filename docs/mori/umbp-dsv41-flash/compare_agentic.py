@@ -28,6 +28,7 @@ rows = [
     ("TPOT mean / p50 / p90 (ms)", lambda a, e: " / ".join(f"{a['request_metrics']['latency']['tpot'][k] * 1000:.1f}" for k in ("mean", "p50", "p90"))),
     ("E2E latency mean / p50 / p90 (s)", lambda a, e: "{mean:.1f} / {p50:.1f} / {p90:.1f}".format(**a['request_metrics']['latency']['e2el'])),
     ("Interactivity p50 (tok/s/user)", lambda a, e: f"{a['request_metrics']['latency']['intvty']['p50']:.2f}"),
+    ("Interactivity p90 (tok/s/user)", lambda a, e: f"{a['request_metrics']['latency']['intvty']['p90']:.2f}"),
     ("Server GPU prefix hit (window)", lambda a, e: f"{a['server_metrics']['cache']['gpu_cache_hit_rate']:.1%}"),
     ("Server external (UMBP) hit (window)", lambda a, e: f"{a['server_metrics']['cache']['external_cache_hit_rate']:.1%}"),
     ("Prompt tokens from GPU cache (whole run)", lambda a, e: f"{e['prefix_cache_hits_total'] / e['prompt_tokens_total']:.1%}"),

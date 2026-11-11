@@ -18,6 +18,9 @@ UMBP_EXTRA=${UMBP_EXTRA:-}
 # parallelism). The mono decode kernels need TP 2/4/8 without DP and fail on
 # an explicit opt-in, so DP>1 drops --monokernel.
 DP=${DP:-1}
+# Prefill cadence (vllm-project/vllm#44558): admit prefills once every N steps;
+# the InferenceX DP2 recipe uses 11. Empty keeps the engine default (1).
+PREFILL_SCHEDULE_INTERVAL=${PREFILL_SCHEDULE_INTERVAL:-}
 SYNTHETIC_AL=${SYNTHETIC_AL:-}
 # main's extensible KV cache (#56492, on by default on ROCm) backs the KV cache
 # with VMM pages, which hipIpcGetMemHandle rejects, so the standalone UMBP
@@ -56,6 +59,9 @@ if [[ "${DP}" -gt 1 ]]; then
   EXTRA+=(--tensor-parallel-size 1 --data-parallel-size "${DP}")
 else
   EXTRA+=(--tensor-parallel-size 2 --monokernel)
+fi
+if [[ -n "${PREFILL_SCHEDULE_INTERVAL}" ]]; then
+  EXTRA+=(--prefill-schedule-interval "${PREFILL_SCHEDULE_INTERVAL}")
 fi
 if [[ "${EXTENSIBLE_KV_CACHE}" != "1" ]]; then
   EXTRA+=(--no-enable-extensible-kv-cache)

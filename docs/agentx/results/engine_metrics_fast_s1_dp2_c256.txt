@@ -1,0 +1,10 @@
+vllm:external_prefix_cache_hits_total 5344512
+vllm:external_prefix_cache_queries_total 94500045
+vllm:generation_tokens_total 5497774
+vllm:num_preemptions_total 0
+vllm:prefix_cache_hits_total 697482624
+vllm:prefix_cache_queries_total 791982669
+vllm:prompt_tokens_total 791982669
+vllm:spec_decode_num_accepted_tokens_total 3932259
+vllm:spec_decode_num_draft_tokens_total 7832535
+vllm:spec_decode_num_drafts_total 1566507

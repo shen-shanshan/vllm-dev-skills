@@ -54,7 +54,8 @@ if [[ "${UMBP}" == "1" ]]; then
   # InferenceX aggregation requires backend metadata whenever KV offload is on.
   export KV_OFFLOADING=dram KV_OFFLOAD_BACKEND=umbp
   export KV_OFFLOAD_BACKEND_METADATA='{"name":"umbp","version":"mori-1.2.3.post1"}'
-  export TOTAL_CPU_DRAM_GB=$(( UMBP_DRAM_CAPACITY / 1024**3 ))
+  # InferenceX counts GB as 10^9 bytes (infx/matrix/generate.py BYTES_PER_GB).
+  export TOTAL_CPU_DRAM_GB=$(( UMBP_DRAM_CAPACITY / 1000**3 ))
 fi
 TAG=${TAG} OUT=${OUT} bash "${HERE}/run_agentic.sh" >/dev/null 2>&1 || echo "client rc=$?" >&2
 bash "${HERE}/../umbp-dsv4-mtp/snapshot_metrics.sh" > "${OUT}/engine_metrics.txt"
