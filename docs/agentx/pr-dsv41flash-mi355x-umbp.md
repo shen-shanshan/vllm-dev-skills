@@ -18,26 +18,29 @@ This PR adds a new config key, `dsv41flash-fp4-mi355x-vllm-agentic-dspark-umbp`,
 
 Local AgentX replays on one MI355X node (GPUs 0-1) with this recipe's engine settings: the `nightly-96710245` container with vLLM main `595b1514e8` Python code. B0 is #4992's DP2 configuration; S1 adds UMBP with the 449 GB pool. Each point is a single InferenceX agentx-fast run (1200 s profile, prefix cache cold at the start), not a CI run. As in CI, UMBP turns off the extensible KV cache, so S1 has 4.2% less GPU KV than B0 (26.71M vs 27.89M tokens per rank).
 
-| Metric | c128 B0 → S1 | c256 B0 → S1 | c384 B0 → S1 |
-|---|---|---|---|
-| Total throughput per GPU (tok/s) | 193,099 → 183,984 (−4.7%) | 250,435 → 275,836 (**+10.1%**) | 143,888 → 291,619 (**+103%**) |
-| TTFT p50 / p90 (s) | 0.87 / 2.32 → 0.88 / 2.62 | 1.60 / 5.12 → 1.45 / 4.10 | 7.36 / 264.9 → 2.41 / 7.92 |
-| TPOT mean (ms) | 24.8 → 26.6 | 50.0 → 43.6 | 102.7 → 69.1 |
-| Interactivity p90 (tok/s/user) | 29.2 → 27.4 | 12.9 → 16.4 | 6.6 → 10.4 |
-| Prompt tokens from GPU prefix cache (B0 / S1) | 90.0% / 89.4% | 87.4% / 88.1% | 73.0% / 64.6% |
-| Prompt tokens restored from UMBP | 0.46% | 0.67% | 21.5% |
-| Prompt tokens computed | 10.0% → 10.1% | 12.6% → 11.3% | 27.0% → 13.9% |
+| Metric | c128 B0 → S1 | c256 B0 → S1 | c384 B0 → S1 | c544 B0 → S1 (not in this PR) |
+|---|---|---|---|---|
+| Total throughput per GPU (tok/s) | 193,099 → 183,984 (−4.7%) | 250,435 → 275,836 (**+10.1%**) | 143,888 → 291,619 (**+103%**) | 46,641 → 287,025 (**+515%**) |
+| TTFT p50 / p90 (s) | 0.87 / 2.32 → 0.88 / 2.62 | 1.60 / 5.12 → 1.45 / 4.10 | 7.36 / 264.9 → 2.41 / 7.92 | 66.1 / 387.3 → 21.9 / 58.7 |
+| TPOT mean (ms) | 24.8 → 26.6 | 50.0 → 43.6 | 102.7 → 69.1 | 144.9 → 87.5 |
+| Interactivity p90 (tok/s/user) | 29.2 → 27.4 | 12.9 → 16.4 | 6.6 → 10.4 | 6.8 → 8.5 |
+| Prompt tokens from GPU prefix cache (B0 / S1) | 90.0% / 89.4% | 87.4% / 88.1% | 73.0% / 64.6% | 27.8% / 21.7% |
+| Prompt tokens restored from UMBP | 0.46% | 0.67% | 21.5% | 62.0% |
+| Prompt tokens computed | 10.0% → 10.1% | 12.6% → 11.3% | 27.0% → 13.9% | 72.2% → 16.3% |
 
 - The gain tracks how far the working set exceeds GPU KV. At c384 the no-offload server is overloaded: its GPU prefix hit rate falls to 73%, TTFT p90 reaches 265 s, and throughput drops below c256. UMBP restores 21.5% of prompt tokens, halves the prefill computed, doubles throughput and brings TTFT p90 down to 7.9 s.
 - At c256 UMBP restores 0.67% of prompt tokens, cuts prefill computed by 11%, and raises throughput by 10% and p90 interactivity by 27%.
 - At c128 GPU KV holds the working set (90% prefix hits). UMBP restores 0.46% and does not pay for the smaller GPU KV and its store traffic: throughput is 4.7% lower, near the ~4.5% noise of a single fast run, with TTFT and TPOT moving the same way. That point is therefore not part of this PR.
-- No UMBP eviction (the pool never reached its watermark) and no preemption at any point. Steps of 1,024-2,048 tokens, which include decode steps above the 1,024-token cudagraph capture limit, are 0.7% at c384, as at c256.
+- c544 is beyond the knee and is not part of this PR. Without offloading the server collapses: 27.8% GPU prefix hits, 72% of prompt tokens recomputed, 46,641 tok/s/GPU. UMBP restores 62% of prompt tokens and holds 287,025 tok/s/GPU, level with c384, but TTFT p50/p90 rise to 21.9/58.7 s, 3.6% of steps exceed the cudagraph capture limit, and there are 20 preemptions. Throughput with UMBP therefore peaks around c384.
+- No UMBP eviction (the pool never reached its watermark) at any point, and no preemption up to c384. Steps of 1,024-2,048 tokens, which include decode steps above the 1,024-token cudagraph capture limit, are 0.7% at c384, as at c256.
+- The first S1 run at c544 failed during warmup, and a rerun succeeded. On the first requests, DP0's worker JIT-compiled Triton kernels that warmup does not cover (indexer prefill metadata among them) while holding the GIL. DP1 waited in the cross-DP all-reduce of a dummy batch until `VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS` (300 s) expired and the engine died. In the rerun, with a partly warm Triton cache, the same stall lasted about 75 s. Every run, including B0, logs runtime JIT warnings, so this is not specific to UMBP.
 - #4992 reports 310,739 tok/s/GPU at c256 from a one-hour local run on `nightly-083fbac02`. The B0 numbers above come from shorter, cold-cache fast runs, so compare UMBP against B0 here rather than against that absolute figure.
 
 ### Risks
 
 - First CI run of a standalone UMBP sidecar. The server and the engine run as separate srun steps of one job. They must see the same GPUs, share the host IPC namespace, and share the `/tmp/umbp` socket path inside the job container. A failure here shows up as an engine startup failure ("server is not ready") on the canary.
 - The local runs used this image's native binaries with vLLM Python code 59 commits newer, in fast mode. The sweep's one-hour runs are the first end-to-end DP2 + UMBP results on the pinned image.
+- A cold Triton cache on a CI node can make the first-request JIT stall exceed the 300 s execute-model timeout, as in the first local c544 run, and fail the point. The sweep shows whether this happens at c256 or c384.
 - The upstream vLLM recipe for this deployment (start `umbp_standalone_server`, then `vllm serve --kv-transfer-config …`) must be merged in vllm-project/recipes before this PR merges.
 
 <details>
@@ -97,19 +100,23 @@ MI355X 上 DeepSeek-V4.1-Flash 的 vLLM AgentX 曲线目前只到并发 64。并
 | c128 | 193,099 → 183,984（−4.7%） | 0.46% | TTFT p90 2.32 → 2.62 s，TPOT 均值 24.8 → 26.6 ms |
 | c256 | 250,435 → 275,836（**+10.1%**） | 0.67% | TTFT p90 5.12 → 4.10 s，p90 interactivity +27% |
 | c384 | 143,888 → 291,619（**+103%**） | 21.5% | B0 的 GPU prefix 命中降到 73%，TTFT p90 从 265 s 降到 7.9 s |
+| c544（不在本 PR 中） | 46,641 → 287,025（**+515%**） | 62.0% | B0 的 GPU prefix 命中只剩 27.8%；S1 的吞吐与 c384 持平，但 TTFT p50 / p90 为 21.9 / 58.7 s，有 20 次 preemption |
 
 - **收益取决于 GPU KV 放不下的程度。**
   - c384 下 B0 已经过载：吞吐比 c256 还低。UMBP 让需要计算的 prefill 减半，吞吐翻倍。
   - c256 下 UMBP 让需要计算的 prefill 减少 11%，吞吐提升 10%。
 - **c128 没有收益。** GPU KV 基本够用，GPU prefix 命中 90%，UMBP 只恢复了 0.46% 的 prompt，抵不过 GPU KV 变少和 store 的开销。吞吐 −4.7%，接近单次 fast 运行约 4.5% 的噪声，但 TTFT 和 TPOT 的变化方向一致，所以本 PR 不包含 c128。
+- **c544 已经过了拐点，不放进本 PR。** 不开 offloading 时服务崩溃：GPU prefix 命中只剩 27.8%，72% 的 prompt 要重算，吞吐只有 46,641。UMBP 恢复了 62% 的 prompt，吞吐保持在 287,025，与 c384 持平，但 TTFT p50 / p90 升到 21.9 / 58.7 s，3.6% 的 step 超过 cudagraph 上限，并出现 20 次 preemption。因此开 UMBP 时吞吐在 c384 附近达到上限。
+- **c544 的 S1 第一次运行挂死，重跑成功。** 第一批请求到达时，DP0 的 worker 在运行时 JIT 编译 warmup 没覆盖到的 Triton kernel（包括 indexer 的 prefill 元数据），并一直持有 GIL。DP1 在 dummy batch 的跨 DP all_reduce 里等待，超过 `VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS`（300 s）后引擎崩溃。重跑时 Triton cache 已部分预热，同样的停顿约 75 s 后恢复。所有运行（包括 B0）都有运行时 JIT 的警告，所以这不是 UMBP 特有的问题。
 - **其他检查都正常。**
-  - 三个点都没有发生 UMBP 淘汰，也没有 preemption。
+  - 所有点都没有发生 UMBP 淘汰；c384 及以下没有 preemption。
   - c384 下 1,024–2,048 token 的 step 只占 0.7%，和 c256 相当，cudagraph 上限 1,024 不需要调高。
 - **和 #4992 的绝对值不能直接比。** #4992 的 c256 是 1 小时本地运行，镜像 `nightly-083fbac02`，结果为 310,739 tok/s/GPU。上表 B0 是较短、开始时 cache 为冷的 fast 运行，所以 UMBP 的收益应以表中的 B0 为基准，不要和这个绝对值比。
 
 **风险**：
 - 这是 standalone UMBP sidecar 第一次在 CI 上运行。server 和引擎是同一个作业里的不同 srun step，需要看到相同的 GPU、共享主机 IPC 命名空间，并共用作业容器内 `/tmp/umbp` 下的 socket。如果这一条不满足，canary 会在引擎启动阶段失败（"server is not ready"）。
 - 本地测试用的是该镜像的 native 部分，Python 代码比镜像新 59 个 commit，而且是 fast 模式。sweep 中的 1 小时运行，才是固定镜像上第一次 DP2 + UMBP 的端到端结果。
+- CI 节点上的 Triton cache 如果是冷的，第一批请求触发的 JIT 停顿可能超过 300 s 的 execute-model 超时，就像本地 c544 第一次运行那样，导致该点失败。c256 和 c384 会不会遇到，要看 sweep 结果。
 - 本部署方式（先启动 `umbp_standalone_server`，再用 `vllm serve --kv-transfer-config …` 起服务）对应的 vLLM recipe 必须先在 vllm-project/recipes 合入，本 PR 才能合入。
 
 **AI 模型使用说明**：使用 `claude-opus-5-5[1m]`（Claude Opus 5.5，1M context），通过 Claude Code。工作内容：阅读现有配置、recipe 和 srt-slurm 服务代码；起草 master config 键、recipe override、`perf-changelog.yaml` 记录和本描述；运行 matrix 生成、用固定版本的 srtctl 渲染 recipe、`infx.matrix.changed` 和 sweep planner；运行本地 B0 / S1 的 AgentX 测试并汇总结果。没有委派给其他 agent。方案经人工审阅，拓扑（DP2）、并发点和 UMBP 模式由人工决定。

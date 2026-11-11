@@ -1,0 +1,47 @@
+Process 44876: VLLM::EngineCore_DP0
+Python v3.12.16 (/usr/bin/python3.12)
+
+Thread 44876 (idle): "MainThread"
+    cpu_all_reduce_ (vllm/distributed/utils.py:112)
+    ParallelConfig.sync_dp_state (vllm/config/parallel.py:987)
+    DPEngineCoreProc._has_global_unfinished_reqs (vllm/v1/engine/core.py:2854)
+    DPEngineCoreProc.run_busy_loop (vllm/v1/engine/core.py:2808)
+    fault_tolerant_wrapper.<locals>.run_with_fault_tolerance (vllm/v1/fault_tolerance/engine_core_sentinel.py:518)
+    EngineCoreProc.run_engine_core (vllm/v1/engine/core.py:1758)
+    BaseProcess.run (multiprocessing/process.py:108)
+    BaseProcess._bootstrap (multiprocessing/process.py:314)
+    _main (multiprocessing/spawn.py:135)
+    spawn_main (multiprocessing/spawn.py:122)
+    <module> (<string>:1)
+Thread 45325 (idle): "MultiprocWorkerMonitor"
+    _PollLikeSelector.select (selectors.py:415)
+    wait (multiprocessing/connection.py:1136)
+    MultiprocExecutor.start_worker_monitor.<locals>.monitor_workers (vllm/v1/executor/multiproc_executor.py:397)
+    Thread.run (threading.py:1012)
+    Thread._bootstrap_inner (threading.py:1075)
+    Thread._bootstrap (threading.py:1032)
+Thread 45435 (idle): "umbp-standalone-lookup_0"
+    _DaemonTransferPool._run (vllm/distributed/kv_transfer/kv_connector/v1/umbp/runtime/standalone.py:85)
+    Thread.run (threading.py:1012)
+    Thread._bootstrap_inner (threading.py:1075)
+    Thread._bootstrap (threading.py:1032)
+Thread 45442 (idle): "Thread-1 (process_input_sockets)"
+    Poller.poll (zmq/sugar/poll.py:106)
+    EngineCoreProc.process_input_sockets (vllm/v1/engine/core.py:2233)
+    Thread.run (threading.py:1012)
+    Thread._bootstrap_inner (threading.py:1075)
+    Thread._bootstrap (threading.py:1032)
+Thread 45445 (idle): "Thread-2 (process_output_sockets)"
+    Condition.wait (threading.py:355)
+    Queue.get (queue.py:171)
+    EngineCoreProc.process_output_sockets (vllm/v1/engine/core.py:2320)
+    Thread.run (threading.py:1012)
+    Thread._bootstrap_inner (threading.py:1075)
+    Thread._bootstrap (threading.py:1032)
+Thread 45454 (idle): "signal-callback"
+    Condition.wait (threading.py:355)
+    Event.wait (threading.py:655)
+    SignalCallback._run (vllm/v1/engine/utils.py:401)
+    Thread.run (threading.py:1012)
+    Thread._bootstrap_inner (threading.py:1075)
+    Thread._bootstrap (threading.py:1032)
