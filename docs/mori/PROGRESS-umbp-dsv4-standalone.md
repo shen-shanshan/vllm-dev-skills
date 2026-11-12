@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4-Pro 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-11-10（rebase 到 main `499a3d1e1e`，已解决冲突；main 已合入 7/10、8/10 和 #64715）
+> 最后更新：2026-11-12（rebase 到 main `a547de8a81`，已解决冲突；main 已合入 1/10–9/10 和 #64715）
 > 每次推进后请同步更新「当前状态」「测试进展」「未完成事项」三节。
 
 ## 1. 任务概述
@@ -34,6 +34,21 @@
 注意：
 - `dev/init.sh`（未跟踪）会把分支 rebase 到 Docker 镜像的构建 commit，所以本地和 origin 会显示 "diverged"。推送时需要 `git push -f origin rocm-dsv4-umbp`，**推送前先确认**。
 - 本地 `gh` CLI 不可用，PR 信息用 `git fetch upstream pull/<N>/head:refs/remotes/pr/<N>` 拉取。
+
+### 2026-11-12 再次 rebase 到 main `a547de8a81`
+- 冲突只在 `deepseek_v4/amd/rocm.py`，来源是 main 的 #66036（Sparse MLA 支持 tensor scale FP8 KV cache）。它给 `_aiter_sparse_mla_prefill_enabled` 加了 `plain_fp8_kv` 参数。
+- 处理：两边合并。保留 main 新增的 fp8 参数（metadata builder 传 `cache_dtype == "fp8_e4m3"`，attention 层传 `self._plain_fp8_kv`）；connector 判断继续用 `kv_connector_may_load_foreign_kv` / `self._has_foreign_kv_writer`。
+- 现在提交 1 = `2cb085fc74 support umbp for dsv4`，提交 2 = `187553e094 update`，都没有 push（需要 `-f`）。
+- 验证：UMBP 343、prefix replay 16、sparse MLA 46（main 新增了 FP8 用例），共 405 passed；pre-commit 通过。
+- GPU smoke 和 E2E 没有在新 base 上重跑。
+
+### 2026-11-12 rebase 到 main `11ddd587eb`
+- main 新合入了 `[UMBP][9/10]` #61797（lazy offload）。
+- 唯一的冲突在 `docs/features/umbp_store_connector_usage.md` 的选项表：以 main 为准保留 `save_decode_cache`（含 "Does not apply with `lazy_offload`"）和 `lazy_offload*` 两行，再补上我们的 `rebuild_sliding_window` 行。
+- 语义检查：lazy offload 只扫描 `prefix_cacheable_group_ids`。开启 replay 时 SWA 和 compressor 组不在其中，所以 lazy 和 replay 可以叠加，代码不用改。
+- 现在提交 1 = `6a5723e273 support umbp for dsv4`，提交 2 = `2090b9d4ef update`，都没有 push（需要 `-f`）。
+- 验证：UMBP 单测 343、prefix replay 16、sparse MLA 18，共 377 passed；pre-commit 通过。main 的 `tests/conftest.py` 新依赖 `tblib`，已装进 `.venv`。
+- GPU smoke 和 E2E 没有在新 base 上重跑。
 
 ### 2026-11-10 移除 `[9/10]`/`[10/10]`（lazy offload）
 - 按用户要求，分支只保留支持 DSv4-Pro 新增的内容。

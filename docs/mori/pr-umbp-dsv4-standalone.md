@@ -2,7 +2,7 @@
 
 ## Overview
 
-Lets DeepSeek-V4-Pro on MI355X offload its prefix KV to a node-local MORI-UMBP `umbp_standalone_server` (`UMBPStoreConnector`, standalone mode) and restore it later. Only the compressed KV goes to the pool. The sliding-window state is rebuilt by SWA bounded replay. RFC #57187; builds on the merged UMBP connector (`[UMBP][1/10]`–`[8/10]`) and on #64715 (DeepSeek-V4.1-Flash), whose TP dedup and `kv_connector_may_load_foreign_kv()` it reuses.
+Lets DeepSeek-V4-Pro on MI355X offload its prefix KV to a node-local MORI-UMBP `umbp_standalone_server` (`UMBPStoreConnector`, standalone mode) and restore it later. Only the compressed KV goes to the pool. The sliding-window state is rebuilt by SWA bounded replay. RFC #57187; builds on the merged UMBP connector (`[UMBP][1/10]`–`[9/10]`) and on #64715 (DeepSeek-V4.1-Flash), whose TP dedup and `kv_connector_may_load_foreign_kv()` it reuses.
 
 ## Claims
 
@@ -20,7 +20,7 @@ Lets DeepSeek-V4-Pro on MI355X offload its prefix KV to a node-local MORI-UMBP `
 |---|---|
 | `tests/v1/kv_connector/unit/test_umbp_*.py` | 343 passed |
 | `tests/v1/core/test_prefix_replay.py` | 16 passed |
-| `tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py` | 18 passed |
+| `tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py` | 46 passed |
 
 New tests:
 - `test_prefix_replay.py::test_state_rebuilt_by_replay_is_not_prefix_cached`: a `rebuilt_by_replay` group is neither cached nor a second replay window.

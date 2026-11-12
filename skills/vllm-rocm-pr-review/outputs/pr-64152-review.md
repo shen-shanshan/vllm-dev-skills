@@ -1,18 +1,19 @@
 ---
 pr: 64152
 repo: vllm-project/vllm
-head_sha: d33485dc2298bd9de283fbf8bb3a7912afdbfa29
+head_sha: ca66f0a7782f9ad82c68570b52f8a0544f96ad26
 verdict: lgtm
-reviewed_at: 2026-11-10T07:41:00Z
+reviewed_at: 2026-11-12T06:38:17Z
 skill: vllm-rocm-pr-review
 ---
 
 # PR #64152: [ROCm][Perf][DSv4.1] Mono: tuned K1 at TP8
 
-> **Author**: @okorzh-amd | **State**: OPEN | **Date**: 2026-10-27
+> **Author**: @okorzh-amd | **State**: MERGED（2026-11-11T02:00:16Z，main `bcd6bd810f`）| **Date**: 2026-10-27
 > **Branch**: `okorzh/dsv41-mono-tp8-tuned-k1` → `main` | **Labels**: rocm, deepseek, DSv4.1
 > **Changes**: +4 -4 lines across 2 files | **ROCm 相关性**: 完全相关（DSv4.1 AMD mono decode kernel，仅 gfx950）
-> **CI**: `mergeable_state=unstable`，check 详情因 GitHub API 限流未能获取；head `d33485dc22` 已 rebase 到 main `499a3d1e1e`，与 main 无冲突。请求的 reviewer：@tjtanaa、@hongxiayang、@dllehr-amd
+> **CI**: 最终 head `ca66f0a778` 是 CI bot 把 main 合入 `e8171b615a`（与上一版 `d33485dc22` 的 `git range-diff` 完全相同）得到的 merge commit，已包含 #64153；Buildkite #101587 在该 head 上触发，check 详情未能获取（API 限流）。请求的 reviewer：@tjtanaa、@hongxiayang、@dllehr-amd
+> **更新说明**：本报告初版针对 `d33485dc22`（2026-11-10）。此后代码 diff 没有变化，只是 head 合入了更新的 main，PR 已合入。下列意见均为合入后的跟进项。
 > 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
 
 ---
@@ -114,7 +115,8 @@ flowchart LR
 
 ## 5. 评论区讨论亮点 (Discussion Highlights)
 
-- 没有人工 review 评论。评论区只有 mergify 在 10-29 至 11-10 间提示了 5 次冲突，以及 claude[bot] 的"fork 不自动 review"提示。最新 head（11-10 rebase）的 `mergeable = true`。
+- 没有人工 review 评论。评论区只有 mergify 在 10-29 至 11-10 间提示了 5 次冲突，以及 claude[bot] 的"fork 不自动 review"提示。
+- @shen-shanshan 于 11-10 07:44 approve 并触发 `/ci run`（Buildkite #101409）。作者 21:29 再次 `/ci run`，CI bot 先合入 main 得到 `ca66f0a778`，再触发 Buildkite #101587。PR 于 11-11 02:00 合入。
 - 描述中自述的要点：
   - 原先的"TP8 tuned seam 单批 poll"修复没有包含进来，因为 K1 的 seam 走 `reduce=False`；K2 是 generic，8 个 pair 也在 `POLL_MAX = 12` 以内。
   - 设置了 mutation 对照：只让 TP8 tuned K1 偏一个 ulp，测试会在 `ratio 1, 1 x 6` 处失败。这说明逐 bit 比较确实有效，没有空过。
@@ -144,12 +146,12 @@ flowchart LR
 
 **📝【注释/文档】PR 描述仍是 rebase 前的栈式结构** `[已验证]`
 - **问题**：描述与当前 head 有四处不一致：
-  - "Stacking (review only the last commit)" 一节列出 `96fa04ad7a`…`0cc5f92bd5` 五个 commit，并要求 #63027 / #63893 先合入，还写着 head 为 `0cc5f92bd5`、基于 main `4b47db922b`。现在这两个 PR 都已在 main 上，head `d33485dc22` 基于 `499a3d1e1e`，只有一个 commit。
+  - "Stacking (review only the last commit)" 一节列出 `96fa04ad7a`…`0cc5f92bd5` 五个 commit，并要求 #63027 / #63893 先合入，还写着 head 为 `0cc5f92bd5`、基于 main `4b47db922b`。现在这两个 PR 都已在 main 上，PR 只剩一个代码 commit（`e8171b615a`）加一个合入 main 的 merge commit。
   - Purpose 中引用的 gate 写成 `not GFX942 and ... self.tp == 4`，实际代码（layer.py:120-126，继承自 #63893 合入版）是 `get_cdna_version() == 4 and ...`。
   - 测试说明写的是 `runner.build_key(M, ratio).tuned_front`，实际是 `runner.build(...)`。
   - commit message 写 "TP2 and TP4 builds ... compile byte-identical"，描述里写的是 24/24 + 24/24。两者一致，只是缺少 rebase 后重新编译的说明。
 - **影响**：不影响运行。但 reviewer 会按描述去找不存在的栈、对照错误的 gate 写法，增加 review 成本。
-- **行动**：建议作者删去 Stacking 一节或改为"#63027 / #63893 已合入"，把 gate 片段更新为当前代码，并注明 Test Result 中的数据对应的 commit。
+- **行动**：PR 已合入，描述直到合入都没有更新。建议作者在 PR 描述里补一行说明 Stacking 一节已过时、gate 以代码为准，方便以后追溯。
 
 **📝【测试】GPU 验证早于 #64153，需要在 rebase 后的 head 上确认** `[已验证]`
 - **问题**：
@@ -157,7 +159,8 @@ flowchart LR
   - 此后 main 合入了 #64153（`bdc7e1052a`）。它让 TP8 的 FFN/MoE 也加载 `push_bases`（layer.py:715），并在 TP8 下走 X8 行的批量加载（`moe.load_x8_rows` 的 `batched` 条件）。
   - #64153 改动的是 MoE 内部的访存方式，静态阅读看不出与 K1 tuned 布局有交互：区域偏移由同一个 `scratch_layout` 统一计算，`x8`/`x8s` 本来就是 K1 与 MoE 的共享区域。但 "TP8 tuned K1 + TP8 批量 X8 的 K2" 这一组合还没有在 GPU 上一起跑过，性能基线（generic K1）也不包含 #64153。
 - **影响**：正确性风险低。性能数字（-254 µs 等）相对于当前 main 可能略有出入。
-- **行动**：建议作者在当前 head 上重跑 `test_mono_decode_layer_matches_vllm[8]` 和 `test_mono_decode_matches_the_model[8-8]`/`[8-28]`，或者确认 Buildkite `mi355_8` 步骤在 `d33485dc22` 上通过。本次 CI 的 check 详情因限流未能获取，`mergeable_state` 为 `unstable`，建议 review 时追问失败的 check 是否与本 PR 有关。
+- **现状**：最终 head `ca66f0a778` 已包含 #64153，Buildkite #101587 就是在这个组合上跑的。但 check 详情未能获取，不知道 `mi355_8` 步骤是否通过。
+- **行动**：建议作者在 PR 中贴出 Buildkite #101587 `mi355_8` 步骤的结果，或者在合入后的 main 上重跑 `test_mono_decode_layer_matches_vllm[8]` 和 `test_mono_decode_matches_the_model[8-8]`/`[8-28]`。
 
 **📝【注释/文档】数值测试模块 docstring 仍写 "at TP2"** `[已验证]`
 - **问题**：`tests/models/test_dsv41_mono_numerics.py` 有两处仍只提 TP2：
@@ -170,24 +173,24 @@ flowchart LR
 
 ## 8. 结论 (Verdict)
 
-✅ **LGTM**。改动只有一行 gate。静态核对确认，tuned K1 的各分支在 TP8 形状下的前提条件都成立：`wqb_tasks == BLOCKS`、GATE0 有断言兜底、seam 不做 TP poll。现有数值测试会自动在 TP8 下对 tuned 与 generic 做逐 bit 比较，作者还用 mutation 对照证明了比较有效。剩下的都是非阻塞备注：更新过时的描述，以及在 rebase 后的 head 上确认 GPU 测试和 CI。
+✅ **LGTM**（PR 已合入）。改动只有一行 gate。静态核对确认，tuned K1 的各分支在 TP8 形状下的前提条件都成立：`wqb_tasks == BLOCKS`、GATE0 有断言兜底、seam 不做 TP poll。现有数值测试会自动在 TP8 下对 tuned 与 generic 做逐 bit 比较，作者还用 mutation 对照证明了比较有效。剩下的都是合入后的非阻塞跟进：确认 TP8 测试在包含 #64153 的代码上通过，以及说明描述已过时。
 
 ## 9. 英文 Review 评论 (Copy-Paste English Comments)
 
 **C1** `vllm/models/deepseek_v41/amd/mono/layer.py:125` — 📝 comment
 
 ```text
-The widened gate looks right to me: the tuned front branches don't depend on the TP size or the head count (at TP8, wqb_tasks == BLOCKS gives one wq_b task per CTA, and GATE0 is guarded by its assert), and K1's seam runs with reduce=False, so it never polls the TP partials. One request: the GPU results in the description were measured on the pre-rebase stack (main 4b47db922b + #63027 + #63893), before #64153 batched TP8 K2's X8 copies. Could you confirm that test_mono_decode_layer_matches_vllm[8] and the [8-8]/[8-28] layer cases pass on d33485dc22 (or link the mi355_8 Buildkite step for this head)?
+The widened gate looks right to me: the tuned front branches don't depend on the TP size or the head count (at TP8, wqb_tasks == BLOCKS gives one wq_b task per CTA, and GATE0 is guarded by its assert), and K1's seam runs with reduce=False, so it never polls the TP partials. One request: the GPU results in the description were measured on the pre-rebase stack (main 4b47db922b + #63027 + #63893), before #64153 batched TP8 K2's X8 copies. The final head ca66f0a778 includes #64153, so could you link the mi355_8 step of Buildkite #101587, or confirm that test_mono_decode_layer_matches_vllm[8] and the [8-8]/[8-28] layer cases pass on main after the merge?
 ```
 
 **C2** `vllm/models/deepseek_v41/amd/mono/README.md:33-35` — 📝 comment
 
 ```text
-Nit on the PR description rather than this file: the "Stacking (review only the last commit)" section and the head/base SHAs still describe the pre-rebase stack, but #63027 and #63893 are both on main now and this PR is a single commit. The quoted gate also reads `not GFX942 and ... self.tp == 4`, while the code has `get_cdna_version() == 4`, and the test note says `runner.build_key(...)` where the code calls `runner.build(...)`. Could you refresh the description so that reviewers aren't looking for commits that no longer exist?
+Nit on the PR description rather than this file: the "Stacking (review only the last commit)" section and the head/base SHAs still describe the pre-rebase stack, but #63027 and #63893 are both on main now and this PR is a single commit. The quoted gate also reads `not GFX942 and ... self.tp == 4`, while the code has `get_cdna_version() == 4`, and the test note says `runner.build_key(...)` where the code calls `runner.build(...)`. Since the PR has merged, a one-line note in the description saying that the stacking section is outdated would help anyone tracing this change later.
 ```
 
 ## 10. 英文总结评论 (Overall Review Summary)
 
 ```text
-Thanks for this. Widening MonoBuild.tuned_front to TP8 is a clean one-line change: the tuned K1 paths do not depend on the TP size, K2 stays generic, and the existing numerics test now compares TP8 tuned K1 bit for bit against a generic=True build, with your mutation control showing that the comparison is live. Two non-blocking notes: please confirm the TP8 numerics and layer tests (or the mi355_8 CI step) on the rebased head, since the GPU results predate #64153, and refresh the description's stale stacking section and gate snippet. Approve.
+Thanks for this. Widening MonoBuild.tuned_front to TP8 is a clean one-line change: the tuned K1 paths do not depend on the TP size, K2 stays generic, and the existing numerics test now compares TP8 tuned K1 bit for bit against a generic=True build, with your mutation control showing that the comparison is live. Two post-merge follow-ups: please link the mi355_8 result for the final head, since the GPU results in the description predate #64153, and note that the description's stacking section and gate snippet are outdated. Approved.
 ```

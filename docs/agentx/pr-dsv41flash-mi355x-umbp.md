@@ -11,6 +11,7 @@ This PR adds a new config key, `dsv41flash-fp4-mi355x-vllm-agentic-dspark-umbp`,
 - **Recipe:** the overrides are named `override_dp2_umbp_c{256,384}` and each row selects its own. #4992 adds `override_dp2_c{128,256,384}` to the same recipe file without `KV_OFFLOADING`, so automatic variant matching would select both sets for a UMBP point.
 - **KV offloading:** the recipe launches `umbp_standalone_server` as a critical srt-slurm `generic` service that starts before the workers and becomes ready once it logs `[StandaloneServer] listening`.
   - The server owns one 449 GB pool: `dram-utilization` 0.60 of the two-GPU node share, on 4 KiB pages. Both DP ranks share it.
+  - srtctl gives every step of a job its own mount namespace, so the server's `/tmp` is not the workers'. The recipe mounts the node-local `/dev/shm` into every step at `/umbp-host`, and the gRPC and fd sockets live in `/umbp-host/umbp/`. A new server rebinds over socket files an earlier job left behind.
   - The engine attaches through `UMBPStoreConnector` (`mode: standalone`, `kv_load_failure_policy: recompute`).
 - **Draft:** unchanged. It is the shipped DSpark head (`mtp.0-2`), loaded with the checkpoint's FP8 config.
 
@@ -38,7 +39,7 @@ Local AgentX replays on one MI355X node (GPUs 0-1) with this recipe's engine set
 
 ### Risks
 
-- First CI run of a standalone UMBP sidecar. The server and the engine run as separate srun steps of one job. They must see the same GPUs, share the host IPC namespace, and share the `/tmp/umbp` socket path inside the job container. A failure here shows up as an engine startup failure ("server is not ready") on the canary.
+- The first CI run (https://github.com/SemiAnalysisAI/InferenceX/actions/runs/43151259956) failed on every job because the sockets were under `/tmp`: the workers could not attach to the server (`cannot attach to the UMBP standalone server at unix:///tmp/umbp/standalone.grpc.sock`). The host-directory mount above fixes the path. The server and the workers also exchange GPU memory handles over HIP IPC; enroot shares the host IPC and PID namespaces, so this should work, but the next sweep is the first confirmation.
 - The local runs used this image's native binaries with vLLM Python code 59 commits newer, in fast mode. The sweep's one-hour runs are the first end-to-end DP2 + UMBP results on the pinned image.
 - A cold Triton cache on a CI node can make the first-request JIT stall exceed the 300 s execute-model timeout, as in the first local c544 run, and fail the point. The sweep shows whether this happens at c256 or c384.
 - The upstream vLLM recipe for this deployment (start `umbp_standalone_server`, then `vllm serve --kv-transfer-config …`) must be merged in vllm-project/recipes before this PR merges.
@@ -85,6 +86,7 @@ MI355X 上 DeepSeek-V4.1-Flash 的 vLLM AgentX 曲线目前只到并发 64。并
 - **Recipe**：override 命名为 `override_dp2_umbp_c{256,384}`，每一行显式指定自己的 override。#4992 在同一个 recipe 文件里加了 `override_dp2_c{128,256,384}`，且没有设置 `KV_OFFLOADING`，如果靠自动匹配，UMBP 的点会同时匹配到两组 override。
 - **KV offloading**：recipe 把 `umbp_standalone_server` 作为 srt-slurm 的 `generic` 服务启动，标记为 critical，在 worker 之前启动，日志出现 `[StandaloneServer] listening` 即视为就绪。
   - server 管理一个 449 GB 的池子，大小是两卡份额的 `dram-utilization` 0.60，使用 4 KiB 页，两个 DP rank 共用。
+  - srtctl 会给同一个作业里的每个 step 分配独立的 mount namespace，server 看到的 `/tmp` 和 worker 看到的不是同一个。所以 recipe 把节点本地的 `/dev/shm` 挂载到每个 step 的 `/umbp-host`，gRPC socket 和 fd socket 都放在 `/umbp-host/umbp/` 下。之前作业留下的 socket 文件不影响新 server 重新绑定。
   - 引擎通过 `UMBPStoreConnector` 接入（`mode: standalone`，`kv_load_failure_policy: recompute`）。
 - **Draft**：不变，仍是随 checkpoint 发布的 DSpark head（`mtp.0-2`），按 checkpoint 的 FP8 配置加载。
 
@@ -114,7 +116,7 @@ MI355X 上 DeepSeek-V4.1-Flash 的 vLLM AgentX 曲线目前只到并发 64。并
 - **和 #4992 的绝对值不能直接比。** #4992 的 c256 是 1 小时本地运行，镜像 `nightly-083fbac02`，结果为 310,739 tok/s/GPU。上表 B0 是较短、开始时 cache 为冷的 fast 运行，所以 UMBP 的收益应以表中的 B0 为基准，不要和这个绝对值比。
 
 **风险**：
-- 这是 standalone UMBP sidecar 第一次在 CI 上运行。server 和引擎是同一个作业里的不同 srun step，需要看到相同的 GPU、共享主机 IPC 命名空间，并共用作业容器内 `/tmp/umbp` 下的 socket。如果这一条不满足，canary 会在引擎启动阶段失败（"server is not ready"）。
+- 第一次 CI 运行（https://github.com/SemiAnalysisAI/InferenceX/actions/runs/43151259956）所有 job 都失败了，原因是 socket 放在 `/tmp` 下，worker 连不上 server（`cannot attach to the UMBP standalone server at unix:///tmp/umbp/standalone.grpc.sock`）。上面的宿主机目录挂载已修复了这个路径问题。server 和 worker 之间还要通过 HIP IPC 交换 GPU 显存句柄；enroot 共享宿主机的 IPC 和 PID namespace，这一步应该没问题，但要等下一次 sweep 才能确认。
 - 本地测试用的是该镜像的 native 部分，Python 代码比镜像新 59 个 commit，而且是 fast 模式。sweep 中的 1 小时运行，才是固定镜像上第一次 DP2 + UMBP 的端到端结果。
 - CI 节点上的 Triton cache 如果是冷的，第一批请求触发的 JIT 停顿可能超过 300 s 的 execute-model 超时，就像本地 c544 第一次运行那样，导致该点失败。c256 和 c384 会不会遇到，要看 sweep 结果。
 - 本部署方式（先启动 `umbp_standalone_server`，再用 `vllm serve --kv-transfer-config …` 起服务）对应的 vLLM recipe 必须先在 vllm-project/recipes 合入，本 PR 才能合入。
