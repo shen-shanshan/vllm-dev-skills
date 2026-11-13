@@ -1,16 +1,16 @@
-# [AMD][AgentX] DeepSeek-V4.1-Flash MI355X vLLM: add DP2 concurrency 256 and 384 with UMBP KV offloading / [AMD][AgentX] DeepSeek-V4.1-Flash MI355X vLLM：新增 DP2 并发 256、384 点并启用 UMBP KV offloading
+# [AMD][AgentX] DeepSeek-V4.1-Flash MI355X vLLM: add DP2 concurrency 128-384, with UMBP KV offloading at 256 and 384 / [AMD][AgentX] DeepSeek-V4.1-Flash MI355X vLLM：新增 DP2 并发 128–384 点，256、384 启用 UMBP KV offloading
 
 ## Summary
 
 The MI355X DeepSeek-V4.1-Flash vLLM AgentX curve stops at concurrency 64. Above that, the GPU KV cache stops holding every live session's prefix. Evicted prefixes are then recomputed, and prefill crowds out decode. vllm-project/vllm#64715 (merged 2026-11-10) adds UMBP standalone support for DeepSeek-V4.1-Flash on ROCm. With it, the engine offloads KV blocks to a node-local host-DRAM pool owned by MORI's `umbp_standalone_server` and restores them on a prefix hit instead of recomputing.
 
-This PR adds a new config key, `dsv41flash-fp4-mi355x-vllm-agentic-dspark-umbp`, with two points: concurrency 256 and 384. Evals run at c384. Concurrency 128 is left out: at c128 UMBP did not help in local runs (see below), and #4992 already covers it without offloading.
+This PR adds a new config key, `dsv41flash-fp4-mi355x-vllm-agentic-dspark-umbp`, with three points: concurrency 128 without KV offloading, and 256 and 384 with UMBP. Evals run at c384. The c128 point is carried over from the closed #4992 unchanged; UMBP is off there because it did not help at 128 in local runs (see below).
 
 - **Image:** `vllm/vllm-openai-rocm:nightly-be47189f37f6162991366ff6b91539f6e9d1f432` (2026-11-12, digest `sha256:a6263de1…`). It carries #64715 (UMBP standalone for DeepSeek-V4.1-Flash) and #66036 (per-tensor fp8 KV for sparse MLA on ROCm), and its MORI v1.2.3.post1 is built with UMBP. The existing TP4/TP2 key and the TP8 c1 key are untouched and are not rerun.
-- **KV cache dtype:** `fp8_e4m3` (#66036): plain per-tensor fp8 KV rows for the AITER sparse MLA instead of the default block-scaled `fp8_ds_mla` record. This differs from #4992, which keeps the default.
-- **Topology:** two GPUs per server with attention DP2. The MoE stays tensor-parallel across both ranks (`tensor-parallel-size 1`, `data-parallel-size 2`, no expert parallelism). vllm-router 0.1.14 fronts the ranks with `consistent_hash`, so each session keeps its rank and its prefix. Engine and router settings match the no-offload DP2 points in #4992, the current best MI355X DP2 baseline: prefill cadence (`prefill-schedule-interval 11`) and no `--monokernel`. The only difference is UMBP, so comparing the two sweeps isolates its effect.
-- **Recipe:** the overrides are named `override_dp2_umbp_c{256,384}` and each row selects its own. #4992 adds `override_dp2_c{128,256,384}` to the same recipe file without `KV_OFFLOADING`, so automatic variant matching would select both sets for a UMBP point.
-- **KV offloading:** the recipe launches `umbp_standalone_server` as a critical srt-slurm `generic` service that starts before the workers and becomes ready once it logs `[StandaloneServer] listening`.
+- **KV cache dtype:** `fp8_e4m3` (#66036): plain per-tensor fp8 KV rows for the AITER sparse MLA instead of the default block-scaled `fp8_ds_mla` record. It applies to all three points.
+- **Topology:** two GPUs per server with attention DP2. The MoE stays tensor-parallel across both ranks (`tensor-parallel-size 1`, `data-parallel-size 2`, no expert parallelism). vllm-router 0.1.14 fronts the ranks with `consistent_hash`, so each session keeps its rank and its prefix. Every point uses the settings of the closed #4992's DP2 points: prefill cadence (`prefill-schedule-interval 11`) and no `--monokernel`. The UMBP points differ from c128 only by UMBP.
+- **Recipe:** one override per row, each selected explicitly: `override_dp2_c128` (no offloading) and `override_dp2_umbp_c{256,384}`.
+- **KV offloading (256 and 384):** the recipe launches `umbp_standalone_server` as a critical srt-slurm `generic` service that starts before the workers and becomes ready once it logs `[StandaloneServer] listening`.
   - The server owns one 449 GB pool: `dram-utilization` 0.60 of the two-GPU node share, on 4 KiB pages. Both DP ranks share it.
   - srtctl gives every step of a job its own mount namespace, so the server's `/tmp` is not the workers'. The recipe mounts the node-local `/dev/shm` into every step at `/umbp-host`, and the gRPC and fd sockets live in `/umbp-host/umbp/`. A new server rebinds over socket files an earlier job left behind.
   - The engine attaches through `UMBPStoreConnector` (`mode: standalone`, `kv_load_failure_policy: recompute`).
@@ -32,7 +32,7 @@ Local AgentX replays on one MI355X node (GPUs 0-1) with this recipe's engine set
 
 - The gain tracks how far the working set exceeds GPU KV. At c384 the no-offload server is overloaded: its GPU prefix hit rate falls to 73%, TTFT p90 reaches 265 s, and throughput drops below c256. UMBP restores 21.5% of prompt tokens, halves the prefill computed, doubles throughput and brings TTFT p90 down to 7.9 s.
 - At c256 UMBP restores 0.67% of prompt tokens, cuts prefill computed by 11%, and raises throughput by 10% and p90 interactivity by 27%.
-- At c128 GPU KV holds the working set (90% prefix hits). UMBP restores 0.46% and does not pay for the smaller GPU KV and its store traffic: throughput is 4.7% lower, near the ~4.5% noise of a single fast run, with TTFT and TPOT moving the same way. That point is therefore not part of this PR.
+- At c128 GPU KV holds the working set (90% prefix hits). UMBP restores 0.46% and does not pay for the smaller GPU KV and its store traffic: throughput is 4.7% lower, near the ~4.5% noise of a single fast run, with TTFT and TPOT moving the same way. The c128 point therefore runs without offloading.
 - c544 is beyond the knee and is not part of this PR. Without offloading the server collapses: 27.8% GPU prefix hits, 72% of prompt tokens recomputed, 46,641 tok/s/GPU. UMBP restores 62% of prompt tokens and holds 287,025 tok/s/GPU, level with c384, but TTFT p50/p90 rise to 21.9/58.7 s, 3.6% of steps exceed the cudagraph capture limit, and there are 20 preemptions. Throughput with UMBP therefore peaks around c384.
 - No UMBP eviction (the pool never reached its watermark) at any point, and no preemption up to c384. Steps of 1,024-2,048 tokens, which include decode steps above the 1,024-token cudagraph capture limit, are 0.7% at c384, as at c256.
 - The first S1 run at c544 failed during warmup, and a rerun succeeded. On the first requests, DP0's worker JIT-compiled Triton kernels that warmup does not cover (indexer prefill metadata among them) while holding the GIL. DP1 waited in the cross-DP all-reduce of a dummy batch until `VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS` (300 s) expired and the engine died. In the rerun, with a partly warm Triton cache, the same stall lasted about 75 s. Every run, including B0, logs runtime JIT warnings, so this is not specific to UMBP.
@@ -43,7 +43,7 @@ Local AgentX replays on one MI355X node (GPUs 0-1) with this recipe's engine set
 - The first CI run (https://github.com/SemiAnalysisAI/InferenceX/actions/runs/43151259956) failed on every job because the sockets were under `/tmp`: the workers could not attach to the server (`cannot attach to the UMBP standalone server at unix:///tmp/umbp/standalone.grpc.sock`). The host-directory mount above fixes the path. The server and the workers also exchange GPU memory handles over HIP IPC; enroot shares the host IPC and PID namespaces, so this should work, but the next sweep is the first confirmation.
 - The local runs below predate the move to `nightly-be47189` and `fp8_e4m3`: they used the `nightly-96710245` image's native binaries with newer vLLM Python code, the default `fp8_ds_mla` KV cache, and fast mode. The fp8 KV layout changes the GPU KV capacity and UMBP block size and was not measured locally; the sweep is its first end-to-end run.
 - A cold Triton cache on a CI node can make the first-request JIT stall exceed the 300 s execute-model timeout, as in the first local c544 run, and fail the point. The sweep shows whether this happens at c256 or c384.
-- The upstream vLLM recipe for this deployment (start `umbp_standalone_server`, then `vllm serve --kv-transfer-config …`) must be merged in vllm-project/recipes before this PR merges.
+- The vLLM recipe for this deployment must merge before this PR: vllm-project/recipes#XXXX adds the UMBP KV offload option (its UMBP Server tab starts `umbp_standalone_server`), then vllm-project/vllm#XXXXX adds the `mi355x_agentx_dp2_umbp` preset to the DeepSeek-V4.1-Flash recipe.
 
 <details>
 <summary>AI model disclosure</summary>
@@ -80,13 +80,13 @@ Local AgentX replays on one MI355X node (GPUs 0-1) with this recipe's engine set
 
 MI355X 上 DeepSeek-V4.1-Flash 的 vLLM AgentX 曲线目前只到并发 64。并发更高时，GPU KV cache 放不下所有活跃会话的前缀，被淘汰的前缀只能重新计算，prefill 会挤占 decode。vllm-project/vllm#64715（2026-11-10 合入）在 ROCm 上为 DeepSeek-V4.1-Flash 支持了 UMBP standalone 模式：引擎把 KV block 卸载到节点本地的主机内存池（由 MORI 的 `umbp_standalone_server` 管理），前缀命中时直接恢复，不再重算。
 
-本 PR 新增配置键 `dsv41flash-fp4-mi355x-vllm-agentic-dspark-umbp`，包含并发 256、384 两个点，eval 在 c384 上跑。没有放 c128：本地测试中 UMBP 在 c128 没有收益（见下文），而且 #4992 已经有不开 offloading 的 c128 点。
+本 PR 新增配置键 `dsv41flash-fp4-mi355x-vllm-agentic-dspark-umbp`，包含三个点：c128 不开 KV offloading，c256 和 c384 开 UMBP，eval 在 c384 上跑。c128 这个点原样搬自已关闭的 #4992；本地测试中 UMBP 在 c128 没有收益（见下文），所以这个点不开 offloading。
 
 - **镜像**：`vllm/vllm-openai-rocm:nightly-be47189f37f6162991366ff6b91539f6e9d1f432`（2026-11-12，digest `sha256:a6263de1…`），包含 #64715（DSv4.1-Flash 的 UMBP standalone 支持）和 #66036（ROCm 上 sparse MLA 的 per-tensor fp8 KV），其中的 MORI v1.2.3.post1 编译时开启了 UMBP。已有的 TP4/TP2 键和 TP8 c1 键不变，也不会重跑。
-- **KV cache 类型**：`fp8_e4m3`（#66036），即给 AITER sparse MLA 用的 per-tensor fp8 KV，而不是默认的块缩放 `fp8_ds_mla`。这一点和 #4992 不同，#4992 用的是默认格式。
-- **拓扑**：每个服务 2 张卡，attention 用 DP2，MoE 在两个 rank 间做张量并行（`tensor-parallel-size 1`、`data-parallel-size 2`，不开 expert parallelism）。前端是 vllm-router 0.1.14，策略为 `consistent_hash`，同一会话固定落在同一个 rank 上，前缀也留在那里。引擎和 router 参数与 #4992 中不开 offloading 的 DP2 点完全一致：prefill cadence 相同（`prefill-schedule-interval 11`），也都不开 `--monokernel`。#4992 是目前 MI355X DP2 最好的基线，两边唯一的区别是 UMBP，对比两次 sweep 就能单独看出 UMBP 的效果。
-- **Recipe**：override 命名为 `override_dp2_umbp_c{256,384}`，每一行显式指定自己的 override。#4992 在同一个 recipe 文件里加了 `override_dp2_c{128,256,384}`，且没有设置 `KV_OFFLOADING`，如果靠自动匹配，UMBP 的点会同时匹配到两组 override。
-- **KV offloading**：recipe 把 `umbp_standalone_server` 作为 srt-slurm 的 `generic` 服务启动，标记为 critical，在 worker 之前启动，日志出现 `[StandaloneServer] listening` 即视为就绪。
+- **KV cache 类型**：`fp8_e4m3`（#66036），即给 AITER sparse MLA 用的 per-tensor fp8 KV，而不是默认的块缩放 `fp8_ds_mla`。三个点都使用这种格式。
+- **拓扑**：每个服务 2 张卡，attention 用 DP2，MoE 在两个 rank 间做张量并行（`tensor-parallel-size 1`、`data-parallel-size 2`，不开 expert parallelism）。前端是 vllm-router 0.1.14，策略为 `consistent_hash`，同一会话固定落在同一个 rank 上，前缀也留在那里。所有点都沿用已关闭的 #4992 中 DP2 点的参数：prefill cadence 为 11（`prefill-schedule-interval 11`），不开 `--monokernel`。两个 UMBP 点和 c128 唯一的区别就是开了 UMBP。
+- **Recipe**：每一行对应一个 override，并显式指定：`override_dp2_c128`（不开 offloading），以及 `override_dp2_umbp_c{256,384}`。
+- **KV offloading（c256、c384）**：recipe 把 `umbp_standalone_server` 作为 srt-slurm 的 `generic` 服务启动，标记为 critical，在 worker 之前启动，日志出现 `[StandaloneServer] listening` 即视为就绪。
   - server 管理一个 449 GB 的池子，大小是两卡份额的 `dram-utilization` 0.60，使用 4 KiB 页，两个 DP rank 共用。
   - srtctl 会给同一个作业里的每个 step 分配独立的 mount namespace，server 看到的 `/tmp` 和 worker 看到的不是同一个。所以 recipe 把节点本地的 `/dev/shm` 挂载到每个 step 的 `/umbp-host`，gRPC socket 和 fd socket 都放在 `/umbp-host/umbp/` 下。之前作业留下的 socket 文件不影响新 server 重新绑定。
   - 引擎通过 `UMBPStoreConnector` 接入（`mode: standalone`，`kv_load_failure_policy: recompute`）。
@@ -109,7 +109,7 @@ MI355X 上 DeepSeek-V4.1-Flash 的 vLLM AgentX 曲线目前只到并发 64。并
 - **收益取决于 GPU KV 放不下的程度。**
   - c384 下 B0 已经过载：吞吐比 c256 还低。UMBP 让需要计算的 prefill 减半，吞吐翻倍。
   - c256 下 UMBP 让需要计算的 prefill 减少 11%，吞吐提升 10%。
-- **c128 没有收益。** GPU KV 基本够用，GPU prefix 命中 90%，UMBP 只恢复了 0.46% 的 prompt，抵不过 GPU KV 变少和 store 的开销。吞吐 −4.7%，接近单次 fast 运行约 4.5% 的噪声，但 TTFT 和 TPOT 的变化方向一致，所以本 PR 不包含 c128。
+- **c128 没有收益。** GPU KV 基本够用，GPU prefix 命中 90%，UMBP 只恢复了 0.46% 的 prompt，抵不过 GPU KV 变少和 store 的开销。吞吐 −4.7%，接近单次 fast 运行约 4.5% 的噪声，但 TTFT 和 TPOT 的变化方向一致，所以 c128 这个点不开 offloading。
 - **c544 已经过了拐点，不放进本 PR。** 不开 offloading 时服务崩溃：GPU prefix 命中只剩 27.8%，72% 的 prompt 要重算，吞吐只有 46,641。UMBP 恢复了 62% 的 prompt，吞吐保持在 287,025，与 c384 持平，但 TTFT p50 / p90 升到 21.9 / 58.7 s，3.6% 的 step 超过 cudagraph 上限，并出现 20 次 preemption。因此开 UMBP 时吞吐在 c384 附近达到上限。
 - **c544 的 S1 第一次运行挂死，重跑成功。** 第一批请求到达时，DP0 的 worker 在运行时 JIT 编译 warmup 没覆盖到的 Triton kernel（包括 indexer 的 prefill 元数据），并一直持有 GIL。DP1 在 dummy batch 的跨 DP all_reduce 里等待，超过 `VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS`（300 s）后引擎崩溃。重跑时 Triton cache 已部分预热，同样的停顿约 75 s 后恢复。所有运行（包括 B0）都有运行时 JIT 的警告，所以这不是 UMBP 特有的问题。
 - **其他检查都正常。**
@@ -121,7 +121,7 @@ MI355X 上 DeepSeek-V4.1-Flash 的 vLLM AgentX 曲线目前只到并发 64。并
 - 第一次 CI 运行（https://github.com/SemiAnalysisAI/InferenceX/actions/runs/43151259956）所有 job 都失败了，原因是 socket 放在 `/tmp` 下，worker 连不上 server（`cannot attach to the UMBP standalone server at unix:///tmp/umbp/standalone.grpc.sock`）。上面的宿主机目录挂载已修复了这个路径问题。server 和 worker 之间还要通过 HIP IPC 交换 GPU 显存句柄；enroot 共享宿主机的 IPC 和 PID namespace，这一步应该没问题，但要等下一次 sweep 才能确认。
 - 下面的本地测试是在换成 `nightly-be47189` 和 `fp8_e4m3` 之前做的：用的是 `nightly-96710245` 镜像的 native 部分加上更新的 vLLM Python 代码，KV 是默认的 `fp8_ds_mla`，而且是 fast 模式。fp8 KV 会改变 GPU KV 容量和 UMBP 每个 block 的大小，本地没有测过，这次 sweep 是它第一次端到端运行。
 - CI 节点上的 Triton cache 如果是冷的，第一批请求触发的 JIT 停顿可能超过 300 s 的 execute-model 超时，就像本地 c544 第一次运行那样，导致该点失败。c256 和 c384 会不会遇到，要看 sweep 结果。
-- 本部署方式（先启动 `umbp_standalone_server`，再用 `vllm serve --kv-transfer-config …` 起服务）对应的 vLLM recipe 必须先在 vllm-project/recipes 合入，本 PR 才能合入。
+- 本部署方式对应的 vLLM recipe 必须先合入，本 PR 才能合入：先合 vllm-project/recipes#XXXX（新增 UMBP KV offload 选项，其 UMBP Server 标签页负责启动 `umbp_standalone_server`），再合 vllm-project/vllm#XXXXX（在 DeepSeek-V4.1-Flash recipe 中新增 `mi355x_agentx_dp2_umbp` preset）。
 
 **AI 模型使用说明**：使用 `claude-opus-5-5[1m]`（Claude Opus 5.5，1M context），通过 Claude Code。工作内容：阅读现有配置、recipe 和 srt-slurm 服务代码；起草 master config 键、recipe override、`perf-changelog.yaml` 记录和本描述；运行 matrix 生成、用固定版本的 srtctl 渲染 recipe、`infx.matrix.changed` 和 sweep planner；运行本地 B0 / S1 的 AgentX 测试并汇总结果。没有委派给其他 agent。方案经人工审阅，拓扑（DP2）、并发点和 UMBP 模式由人工决定。
 
