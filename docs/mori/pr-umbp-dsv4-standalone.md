@@ -18,7 +18,7 @@ Lets DeepSeek-V4-Pro on MI355X offload its prefix KV to a node-local MORI-UMBP `
 
 | Suite | Result |
 |---|---|
-| `tests/v1/kv_connector/unit/test_umbp_*.py` | 343 passed |
+| `tests/v1/kv_connector/unit/test_umbp_*.py` | 349 passed |
 | `tests/v1/core/test_prefix_replay.py` | 16 passed |
 | `tests/v1/attention/test_rocm_aiter_triton_sparse_mla.py` | 46 passed |
 
@@ -87,8 +87,8 @@ pytest tests/v1/kv_connector/unit/test_umbp_*.py tests/v1/core/test_prefix_repla
   - `UMBPStoreConnector` returns `True`; opt out with `rebuild_sliding_window: false`.
 - `deepseek_v4/compressor.py`: `dsv4_swa_replay_enabled()` is `True` only when all of these hold: ROCm, `swa_bounded_replay` on, no PCP, and the connector asks for replay. Startup logs whether it is enabled, or why not.
 - When enabled:
-  - The SWA cache uses `bounded_replay=True`.
-  - The C4/C128 compressor states use the new `SlidingWindowMLASpec.rebuilt_by_replay`. This keeps them out of prefix caching without declaring a second replay window, since the scheduler allows only one. The replay of 128 or more tokens from a 256-aligned hit rewrites them before they are read.
+  - The SWA cache uses `SlidingWindowManager` with `bounded_replay=True`.
+  - The C4/C128 compressor states use the new `SlidingWindowManager.Params.rebuilt_by_replay`. This keeps them out of prefix caching without declaring a second replay window, since the scheduler allows only one. The replay of 128 or more tokens from a 256-aligned hit rewrites them before they are read.
 - `deepseek_v4/amd/model.py` installs the existing replay-aware `DeepseekV41ModelState`. It forwards `replay_start` to the SWA metadata and pads the replayed slots of restored groups. The ROCm SWA builder already clamps at `replay_start`, so no kernel changes are needed.
 - Tradeoffs:
   - Replayed tokens see the sliding window only from `replay_start`, so the rebuilt window KV is approximate. Compressed and sparse top-k context stays exact. This is the same as on V4.1.

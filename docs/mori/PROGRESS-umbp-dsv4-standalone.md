@@ -1,7 +1,7 @@
 # 进度跟踪：vLLM DeepSeek-V4-Pro 接入 UMBP standalone 模式（ROCm）
 
 > 用途：换机器或开新会话时，先读这份文档恢复上下文，再接着做。
-> 最后更新：2026-11-12（rebase 到 main `a547de8a81`，已解决冲突；main 已合入 1/10–9/10 和 #64715）
+> 最后更新：2026-11-13（rebase 到 main `ab72c466aa`，已解决冲突；适配 #61452 的 KV cache spec 重构）
 > 每次推进后请同步更新「当前状态」「测试进展」「未完成事项」三节。
 
 ## 1. 任务概述
@@ -34,6 +34,18 @@
 注意：
 - `dev/init.sh`（未跟踪）会把分支 rebase 到 Docker 镜像的构建 commit，所以本地和 origin 会显示 "diverged"。推送时需要 `git push -f origin rocm-dsv4-umbp`，**推送前先确认**。
 - 本地 `gh` CLI 不可用，PR 信息用 `git fetch upstream pull/<N>/head:refs/remotes/pr/<N>` 拉取。
+
+### 2026-11-13 rebase 到 main `ab72c466aa`（适配 #61452）
+- main 合入了 #61452（RFC #42449 part 2：把 KV cache 分配策略从 KVCacheSpec 移到 manager）。`SlidingWindowSpec`、`SlidingWindowMLASpec`、`KVCacheGroupSpec` 都删了，改成 `MLAAttentionSpec` 加 `SlidingWindowManager.layer_config(spec, sliding_window=..., bounded_replay=...)`，组是 `KVCacheGroup`。
+- 冲突在 `vllm/v1/kv_cache_interface.py`，按 main 取。我们原来加在 `SlidingWindowMLASpec` 上的 `rebuilt_by_replay` 移到了 `SlidingWindowManager.Params.rebuilt_by_replay`，`prefix_cacheable` 改成 `not (bounded_replay or rebuilt_by_replay)`，`prefix_replay_tokens` 不变（只看 `bounded_replay`）。
+- 自动合并后需要手动改的地方：
+  - `deepseek_v4/compressor.py`：`rebuilt_by_replay` 从 spec 构造挪到 `SlidingWindowManager.layer_config(...)` 的参数。
+  - `test_prefix_replay.py`：state 组改用 `new_kv_cache_group` + `SlidingWindowManager.layer_config`，断言改为对 group 的 `prefix_cacheable` / `prefix_replay_tokens`。
+  - `test_umbp_standalone.py`（提交 2）：DSpark/EAGLE 两个测试改用 `KVCacheGroup.from_layers` + manager layer config。
+- `DeepseekV41ModelState` 用 `group.prefix_cacheable` 决定 pad 哪些组，走 manager 判断，新位置的 `rebuilt_by_replay` 会生效。
+- 现在提交 1 = `65023ad77a support umbp for dsv4`，提交 2 = `ed3c2c0f86 update`，都没有 push（需要 `-f`）。
+- 验证：UMBP 349（main 新增 6 个）、prefix replay 16、sparse MLA 46，共 411 passed；pre-commit 通过（含 mypy）。`.venv` 又缺 `tblib`，已重装。
+- GPU smoke 和 E2E 没有在新 base 上重跑。
 
 ### 2026-11-12 再次 rebase 到 main `a547de8a81`
 - 冲突只在 `deepseek_v4/amd/rocm.py`，来源是 main 的 #66036（Sparse MLA 支持 tensor scale FP8 KV cache）。它给 `_aiter_sparse_mla_prefill_enabled` 加了 `plain_fp8_kv` 参数。

@@ -3,200 +3,195 @@ pr: 66082
 repo: vllm-project/vllm
 head_sha: 68843aeb299fc3a40550053b422a6892d4d0744c
 verdict: block
-reviewed_at: 2026-11-09T07:51:31Z
+reviewed_at: 2026-11-13T06:44:06Z
 skill: vllm-rocm-pr-review
 ---
 
 # PR #66082: [Perf][ROCm][ROCM_ATTN] Run large fp8 decode batches on the AITER asm paged attention
 
 > **Author**: @lishuoshuo-amd | **State**: OPEN | **Date**: 2026-11-06
-> **Branch**: `perf/rocm-attn-aiter-asm-decode` → `main` | **Labels**: rocm
-> **Changes**: +385 -0 lines across 3 files | **ROCm 相关性**: 完全相关（ROCm 默认 MHA backend `ROCM_ATTN` 的 decode dispatch，Tier-1 文件）
+> **Branch**: `lishuoshuo-amd:perf/rocm-attn-aiter-asm-decode` → `main` | **Labels**: rocm
+> **Changes**: +385 -0 lines across 3 files | **ROCm 相关性**: 完全相关（Tier-1：`vllm/v1/attention/backends/rocm_attn.py`；Tier-2：`vllm/_aiter_ops.py`）
 > 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
-> CI 状态：未获取（本次未拉取 checks），**CI 状态未知**。与 `upstream/main` 无合并冲突（PR base `8af2080e7` 落后 main 150 个 commit，期间 `rocm_attn.py` / `rocm_aiter_fa.py` 只有 docstring 与 V1 runner 删除相关改动）。
+>
+> 数据来源说明：GitHub API 在 review 时被限流，diff 取自本地 `refs/remotes/pr/66082`（head `68843aeb29`，与 PR 页面一致，merge-base `8af2080e71`）；PR 描述与讨论取自 PR 网页。CI 状态未知（PR 尚无 `ready` label，作者称 CI 未启动）。
 
 ---
 
 ## 1. 总结 (Summary)
 
-`ROCM_ATTN`（ROCm 上非 MLA 模型的默认 attention backend）此前所有 decode 都走 vLLM 自带的 HIP paged attention。本 PR 在 `VLLM_ROCM_USE_AITER=1`（且 `VLLM_ROCM_USE_AITER_MHA` 默认开）+ fp8 KV cache + block size 16 + head_size 128 + GQA ≤ 8 时，把**纯 decode 且 `num_tokens × num_heads > 2 × CU 数`** 的 batch 改走 AITER 汇编 kernel `pa_fwd_asm`（ultra-precision 变体 `high_precision=2`），利用 fp8 + 16-token block 下 vLLM 的 K/V 布局与 AITER asm 所需布局字节一致这一事实，无需重排 KV。其余情况保持 HIP。作者声称 MI355X 上 conc 64/128 输出吞吐 +2.7%～+8.8%。
+ROCM_ATTN 是 ROCm 上非 MLA 模型的默认 attention backend（即使 `VLLM_ROCM_USE_AITER=1` 也排在 ROCM_AITER_FA 之前），decode 一直走 vLLM 自带的 HIP paged attention。本 PR 观察到：fp8 KV cache + 16-token block 时，ROCM_ATTN 的 K/V cache 物理布局恰好就是 AITER asm paged attention（`pa_fwd_asm`）要求的布局（V 只需 `unsqueeze(2)`），因此对「纯 decode 且 `num_tokens × num_heads > 2 × CU 数`」的大 batch 改调 `pa_fwd_asm`（`high_precision=2`，ultra-precision kernel，GQA ≤ 8），小 batch 与其他情况保持 HIP kernel 不变。作者报告 MI355X 上 conc 64/128 输出吞吐 +4–9%。
 
 ## 2. 背景与动机 (Background & Motivation)
 
-- AITER 的 `pa_fwd_asm` 在大 batch decode 上比 HIP paged attention 快（PR 给出的 kernel 级数据为 asm/HIP ≈ 0.70–0.89）。`ROCM_AITER_FA` 已经通过 `paged_attention_common` 使用该 kernel，但只在显式选择该 backend 且启用 shuffle KV layout 时生效；默认路径 `ROCM_ATTN` 用不上。
-- 关键观察：fp8 时 `x = 16 // elem_size = 16`，vLLM 的 K 布局 `[B, H, hs/16, 16, 16]` 与 AITER 一致；V 布局 `[B, H, hs, 16]` 在 block_size=16 时就是 AITER shuffled V `[B, H, block/16=1, hs, 16]`，`unsqueeze(2)` 即可。因此无需任何 KV relayout 即可复用 asm kernel。
-- 阈值 `2 × num_compute_units()` 照搬 AITER 自身 `_should_use_asm_kernel` 的 asm/HIP 切分（已核对 aiter 源码），MI355X = 512，MI300X = 608。
-- 选 `high_precision=2` 的原因：PR 自测在 AITER 默认精度下 GSM8K 比 main 低 0.2–0.9 点，uhp kernel 则持平。
-- 相关：#61332（open）拟在 AITER 开启时把 `ROCM_AITER_FA` 排到 `ROCM_ATTN` 之前，作者称两者不冲突。
+- ROCM_ATTN 的 decode 使用 `chunked_prefill_paged_decode` → vLLM HIP custom paged attention。AITER 自己的 `paged_attention_common` 在 `num_seqs × num_heads > 2 × CU` 时切到 asm kernel（`_should_use_asm_kernel`），说明 asm kernel 在大 batch 下更快；PR 的 kernel 微基准显示 asm 比 HIP 快 11–30%。
+- ROCM_AITER_FA 的 shuffle-KV 路径已经经由 `paged_attention_common` 间接用到同一 asm kernel，但需要专门的 shuffle 布局；本 PR 的卖点是 **ROCM_ATTN 现有 fp8 布局无需重排**即可喂给 asm kernel。
+- PR 描述最初写「ROCM_AITER_FA already uses this kernel」，经 @okorzh-amd 指出 `pa_fwd_asm` 在树内此前**零调用方**后作者已改正：这是 vLLM 第一次直接调用 `pa_fwd_asm`，也是第一次喂它原生（非 shuffle）布局。
+- 性能声明（PR 描述，`[unverified]`，无原始日志）：MI355X、`VLLM_ROCM_USE_AITER=1`、`--kv-cache-dtype fp8`、random 1024/1024：Qwen3-14B-FP8 / Llama-3.1-8B-Instruct / Qwen3-8B TP1 在 conc 64 +4.2–6.3%、conc 128 +6.2–8.8%；TP2 +2.7–4.4%；conc ≤ 16 基本持平。GSM8K 三个模型与 main 在 run-to-run 波动内一致，另称 3K–32K passkey 一致。
 
 ## 3. 代码修改分析 (Code Change Analysis)
 
 ### 3.1 修改的模块
 
-| 模块 | 改动 |
-|------|------|
-| `vllm/v1/attention/backends/rocm_attn.py` (+123) | Metadata 增加 per-layer `k_scale`/`v_scale` 表字典；Builder 新增 `use_aiter_asm_decode` 门控与 `_build_aiter_kv_scale_tables()`（复用 `rocm_aiter_fa.AsmKvScaleTables`）；Impl 新增 `_use_aiter_asm_decode` 静态门控、`_aiter_asm_min_heads` 阈值、`_forward_aiter_asm_decode()`，并在 `forward()` 中按运行时条件分派 |
-| `vllm/_aiter_ops.py` (+5) | `rocm_aiter_ops.pa_fwd_asm` 新增 `high_precision: int = 1` 参数并透传（默认值保持 `ROCM_AITER_FA` 行为不变） |
-| `tests/kernels/attention/test_rocm_attn_aiter_asm_decode.py` (+257，新) | 阈值上下切换、CUDA graph 重放、不适用场景回退 HIP、scale 表绑定等 15 个 kernel 级用例 |
+| 文件 | 改动 | 说明 |
+|------|------|------|
+| `vllm/_aiter_ops.py` | +5 | `rocm_aiter_ops.pa_fwd_asm` 新增 `high_precision: int = 1` 并透传给 `aiter.pa_fwd_asm` |
+| `vllm/v1/attention/backends/rocm_attn.py` | +123 | metadata 新增 `k_scale/v_scale` 每层 scale 表；builder 构建 scale 表；impl 新增 asm decode 门控、`_forward_aiter_asm_decode` 与 forward 中的分支 |
+| `tests/kernels/attention/test_rocm_attn_aiter_asm_decode.py` | +257（新） | 5 个测试函数 / 15 个 case：阈值上下切换、CUDA graph replay、不适用场景保持 HIP、scale 表随 KV 绑定 |
 
 ### 3.2 架构 / 流程图
 
-decode dispatch（`RocmAttentionImpl.forward`）：
-
 ```mermaid
 flowchart TD
-    A[forward 入口] --> B{encoder / encoder_only?}
+    A[RocmAttentionImpl.forward] --> B{encoder / encoder-only?}
     B -- 是 --> E1[_forward_encoder_attention]
-    B -- 否 --> C[split_kv_cache 并 view 成 fp8]
-    C --> D{"__init__ 静态门控 _use_aiter_asm_decode<br/>AITER MHA 开 / DECODER / fp8 或 fp8_e4m3<br/>head_size=128 / GQA 1..8<br/>无 alibi / 无 sinks / 无 sliding window"}
-    D -- 否 --> H[chunked_prefill_paged_decode<br/>HIP 或 Triton，使用 sm_scale=self.scale]
-    D -- 是 --> F{"运行时门控<br/>max_query_len==1<br/>num_tokens*num_heads > 2*CU<br/>k_scale 表已建 / causal<br/>无 output_scale / Q 为 bf16<br/>max_seq_len<=128K / block=16<br/>KV 为原生稠密布局"}
+    B -- 否 --> C[split_kv_cache + fp8 view]
+    C --> D{"_use_aiter_asm_decode（init 期静态门控）<br/>AITER MHA 开、DECODER、fp8/fp8_e4m3、<br/>head=128、1≤GQA≤8、无 alibi/sinks/滑窗"}
+    D -- 否 --> H[chunked_prefill_paged_decode<br/>HIP / Triton，使用 self.scale]
+    D -- 是 --> F{"运行期门控<br/>max_q==1、tokens×heads > 2×CU、<br/>k_scale 表已建、causal、无 output_scale、<br/>bf16 query、max_seq_len≤128K、<br/>block=16、native 连续布局"}
     F -- 否 --> H
-    F -- 是 --> G["_forward_aiter_asm_decode<br/>pa_fwd_asm(high_precision=2)<br/>kernel 内 softmax scale 固定为 1/sqrt(128)"]
-    G --> R[return output]
-    H --> R
+    F -- 是 --> G["_forward_aiter_asm_decode<br/>rocm_aiter_ops.pa_fwd_asm(high_precision=2)<br/>V.unsqueeze(2)，K/V_QScale = 每层常量表<br/>softmax scale 由 kernel 内部固定为 1/√128"]
 ```
-
-scale 表的惰性构建（每个 KV cache group 一个 builder）：
 
 ```mermaid
 sequenceDiagram
-    participant R as ModelRunner
+    participant R as GPUModelRunner
     participant B as RocmAttentionMetadataBuilder
-    participant T as AsmKvScaleTables(类变量, 定义于 rocm_aiter_fa)
+    participant T as AsmKvScaleTables（ROCM_AITER_FA 类属性，进程共享）
     participant L as Attention layer
-    R->>B: build()（profiling / capture / 每步）
+    R->>B: build(common_attn_metadata)
     B->>B: _build_aiter_kv_scale_tables()
-    alt 已建或门控关闭
-        B-->>R: 直接复用 self.k_scale / self.v_scale
-    else 首次且 KV 已绑定
-        loop layer_names
-            B->>L: 读 kv_cache.shape[0], _k_scale_float, _v_scale_float
+    alt 已建表 或 builder 门控不满足
+        B-->>B: 直接返回
+    else layer.kv_cache 尚未绑定（空 tensor）
+        B-->>B: 返回，k_scale 保持 None → impl 走 HIP
+    else
+        loop 每个 layer_name
+            B->>L: 读 kv_cache.shape[0]、_k_scale_float、_v_scale_float
             B->>T: get(device, num_blocks, kv_heads, 16, scale)
-            T-->>B: torch.full([num_blocks, kv_heads, 16], scale)（按 scale 去重共享）
+            T-->>B: [num_blocks, kv_heads, 16] fp32 常量表（按 scale 去重）
         end
     end
-    B-->>R: RocmAttentionMetadata(k_scale=dict, v_scale=dict)
+    B-->>R: RocmAttentionMetadata(k_scale, v_scale)
 ```
 
 ### 3.3 关键实现细节
 
-- **两级门控**：`__init__` 里的静态条件（dtype / head_size / GQA / alibi / sinks / sliding window）+ `forward()` 里的运行时条件（纯 decode、阈值、表就绪、causal、无 fused output quant、bf16 query、`max_seq_len ≤ 128K`、block=16、原生布局）。`128 * 1024` 上限与 `use_rocm_custom_paged_attention()` 一致。
-- **静态门控未包含 `self.scale` 与 `logits_soft_cap`**：`pa_fwd_asm` 没有 softmax scale 参数，kernel 内部固定使用 `1/sqrt(head_size)`（见 §7 🔴）。
-- **scale 表**：asm kernel 读 per-slot `[num_blocks, num_kv_heads, block_size]` fp32 scale；PR 用 per-tensor `_k_scale_float` 填满整表，由 `AsmKvScaleTables` 按 `(device, shape, scale)` 去重；表在 KV cache 绑定后的首次 `build()` 时分配，此后永久缓存。
-- **CUDA graph**：分派判断在 Python 中完成。V2 runner 捕获时 `max_seq_len = max_model_len`、mixed graph 的 `max_query_len = num_tokens`，因此只有 uniform-decode full graph 会把 asm 固化进图，mixed graph 永远走 HIP；`pa_fwd_asm` 不在内部分配 workspace（输出由调用方提供），捕获安全。
-- **`high_precision=2`**：aiter `pa_asm.csv`（gfx942、gfx950）仅提供 `pa_bf16_pertokenFp8_gqa8_2tg_4w_uhp`（block 16），heuristic 会把 GQA 1..8 上取整到 8，故 GQA ≤ 8 的约束是必要且充分的；GQA > 8 时 uhp 不存在，PR 正确地保留 HIP。
+- **布局复用**：ROCM_ATTN 的 K cache 是 `[blocks, kv_heads, hs/x, 16, x]`（fp8 时 x=16），V cache 是 `[blocks, kv_heads, hs, 16]`；asm kernel 期望 V 为 `[blocks, kv_heads, block/X, hs, X]`，block=16、X=16 时恰好 `block/X = 1`，所以 `value_cache.unsqueeze(2)` 即可，零拷贝。
+- **scale 表**：asm kernel 读稠密的 per-slot scale 表 `[num_blocks, kv_heads, block_size]`（per-token fp8 kernel）。PR 复用 ROCM_AITER_FA 的 `AsmKvScaleTables`（按 `(device, num_blocks, kv_heads, block_size, scale)` 去重的进程级缓存），在 KV cache 绑定后首次 `build()` 时惰性创建。
+- **两层门控**：impl `__init__` 中的静态条件（`rocm_attn.py:371-380`）+ forward 中的运行期条件（`rocm_attn.py:556-567`）；builder 另有一套更宽的条件（`rocm_attn.py:101-106`）决定是否建表。
+- **阈值**：`_aiter_asm_min_heads = 2 * num_compute_units()`（MI355X 256 CU → 512；MI300X 304 CU → 608），与 AITER `_should_use_asm_kernel` 相同。
+- **精度档位**：`high_precision=2` 强制 ultra-precision（uhp）kernel；已核对 aiter 0.1.29 的 `hsa/gfx942/pa/pa_asm.csv` 与 `hsa/gfx950/pa/pa_asm.csv` 都只有 `Gqa=8, Hp=2, blkSz=16` 的 `pa_bf16_pertokenFp8_gqa8_2tg_4w_uhp` 一个 bf16×fp8 uhp kernel；`get_heuristic_kernel` 会把 GQA 1–8 向上取整到 8 匹配，与 PR 的 `1 <= GQA <= 8` 门控一致。
+- **CUDA graph**：分支条件全部是 Python 侧标量（`max_query_len`、`num_actual_tokens`），在 FULL graph 捕获时按 graph 尺寸固化；scale 表是常量，replay 时不更新也正确。
 
 ## 4. 涉及的技术原理 (Technical Principles)
 
-- **Paged attention 的 KV 布局**：vLLM ROCm HIP kernel 使用 K `[B, H, hs/x, block, x]`、V `[B, H, hs, block]`（`x = 16 / elem_bytes`）。AITER asm 使用 K 同形、V 为 "shuffled" `[B, H, block/x, hs, x]`。fp8 下 x=16，block=16 时两种 V 布局逐字节相同，这是本 PR 零拷贝复用的前提；`has_native_kv_cache_layout` 确保每个 block 在 K/V 两侧都是稠密 page（asm 用 `K.stride(0)` 推算 page 地址且假定 V 与 K stride 相同）。
-- **fp8 KV 的 scale**：vLLM 对 fp8 KV 使用 per-tensor `k_scale`/`v_scale`（gfx942 fnuz 时加载阶段已 `×2`）；HIP kernel 直接读标量，asm kernel 读 per-slot 表，所以要把标量广播成表。kernel 按 `tensor.dtype` 区分 fp8 类型，gfx942 上 `current_platform.fp8_dtype()` 为 fnuz、gfx950 为 OCP，`view` 后 dtype 正确。
-- **asm 与 HIP 的选择阈值**：asm kernel 的网格为 `num_kv_heads × batch`，只有总 head 数显著超过 CU 数时才能填满 GPU；小 batch + 长上下文时 asm 反而更慢（PR 自己的数据：40/8、ctx 4096、1–4 条序列时 20 µs vs HIP 8–10.7 µs）。
-- **CUDA graph 与 Python 分派**：在 full graph 中，Python `if` 只在 capture 时求值一次，结果被固化。因此任何依赖运行时数据的分派条件必须对"该 graph 可能重放的所有 batch"都成立；本 PR 的条件（max_query_len、padded batch 大小、max_model_len）在 capture 与 replay 间是一致的。
-- **softmax scale**：attention 计算 `softmax(scale · QKᵀ)`。多数模型 `scale = head_dim^-0.5`，但 Granite（`attention_multiplier`）、Gemma-2/3（`query_pre_attn_scalar^-0.5`）等模型使用自定义值，vLLM 通过 `AttentionImpl.scale` 传入后端。
+- **Paged attention decode 与 asm kernel**：decode 每个序列 1 个 query token，需遍历该序列的所有 KV block。HIP kernel 按 256-token partition 做 split-K + reduce；AITER asm kernel（2 thread-group × 4 wave）针对 head=128、block=16 手写，batch 足够大（总 head 数 > 2×CU）时占满 CU，减少 reduce 开销，因此更快；小 batch 时 HIP 的 split-K 并行度更好。
+- **fp8 KV cache 的 scale 语义**：vLLM 写 cache 时 `stored = x / k_scale`，读时乘回 `k_scale`。HIP kernel 接收标量 `layer._k_scale`；asm kernel 是 per-token 量化 kernel，需要稠密 scale 表，所以 per-tensor scale 被展开为常量表。gfx942 上 fp8 为 e4m3fnuz、gfx950 为 OCP e4m3fn，aiter `dtypes.fp8` 与 vLLM `current_platform.fp8_dtype()` 的映射一致。
+- **softmax scale**：标准 attention 为 `softmax(q·k × scale)`，大多数模型 `scale = head_size^-0.5`，但 Granite（`attention_multiplier`）、Gemma3（`query_pre_attn_scalar^-0.5`）等模型使用自定义值，由 `Attention(scale=...)` 传给 backend。`aiter.pa_fwd_asm` **没有 scale 参数**，`csrc/py_itfs_cu/asm_pa.cu` 里固定 `k_scalar = log2(e) / sqrt(head_size)`。
+- **CUDA graph 下的 Python 分支**：V1 FULL graph 按 batch 尺寸捕获，Python 分支在捕获时决定、replay 时不再执行；所以门控只能依赖在同一 graph key 下恒定的量（这里是 `num_actual_tokens`、`max_query_len`），这一点 PR 做对了。
 
 ## 5. 评论区讨论亮点 (Discussion Highlights)
 
-- 目前没有人工 review 或 inline 评论。唯一的 review 来自 `claude[bot]`，内容是"PR 来自 fork，自动 review 被禁用"，没有技术讨论。
-- PR 描述本身信息量大：明确列出未验证范围（gfx942/MI300X 仅 CI、TP>2、GQA 9–16、其他模型、AITER 0.1.27 以外版本），也说明了 kernel 选择取决于同 batch 的其他请求（非 batch-invariant）。
+- **@okorzh-amd（11-10）**：指出描述中「ROCM_AITER_FA already uses this kernel」不实——`pa_fwd_asm` 在 merge-base 零调用方，ROCM_AITER_FA 走的是 `paged_attention_common`；因此正确性完全依赖本 PR 自己的 GSM8K/passkey 验证。作者（11-11）承认并改写描述，强调 `test_decode_switches_to_asm_above_the_cut` 用 HIP 结果做对照（mean err < 3e-3）可以证明布局正确。
+- **@okorzh-amd**：新测试 module 级 skip，唯一会收集到它的非可选 job 是 NVIDIA 的 Kernels/Attention 步骤，全部 skip。作者回应：与 `test_rocm_aiter_fa.py` 等 AITER 测试相同，AMD 侧在可选的 MI300/MI355 Attention Kernels 步骤 + nightly 中覆盖，本地 MI355X 15 个 case 全过；请 maintainer 解锁 CI。
+- **作者（11-12）**：@ 了 shen-shanshan / tjtanaa / AndreasKaratzas / dllehr-amd 请求加 `ready` label。目前无 approval。
 
 ## 6. 风险与潜在问题 (Risk Analysis)
 
 | 风险 | 严重程度 | 说明 |
 |------|---------|------|
-| 自定义 softmax scale 的模型静默算错 | High | 见 §7 🔴「asm 路径丢弃 `self.scale`」 |
-| 非 gfx942/gfx950 的 CDNA（gfx1250）运行时报错 | Medium | 见 §7 ⚠️「缺少 arch 门控」 |
-| scale 表在 KV 预算之外分配 | Medium | 见 §7 ⚠️「scale 表不计入 KV 显存预算」 |
-| 测试只覆盖默认 scale | Medium | 见 §7 ⚠️【测试】 |
-| AITER + fp8 KV 用户默认数值变化、kernel 取决于同 batch 请求 | Low | 见 §7 📝【设计】；kill-switch 只有粒度很粗的 `VLLM_ROCM_USE_AITER_MHA=0` |
-| gfx942 / MI308X / CPX 分区下阈值与收益未验证 | Low | 见 §7 📝【性能】 |
-| `max_model_len > 128K` 时 decode full graph 永远不走 asm | Low | capture 用 `max_model_len` 求值，长上下文部署拿不到收益（不影响正确性） |
-| CUDA graph 捕获兼容性 | Low | 已核对：分派条件在 capture/replay 间一致，kernel 无内部分配 |
+| 正确性：自定义 softmax scale 被忽略 | High | 见 §7「asm 分支忽略 `self.scale`」 |
+| 资源：scale 表不计入 KV 预算 | Medium | 见 §7「scale 表显存未计入预算」 |
+| 测试覆盖：AMD CI 未跑、仅 MI355X 验证 | Medium | 见 §7「AMD CI 尚未运行，gfx942 未验证」 |
+| 兼容性：默认路径行为改变 | Medium | `VLLM_ROCM_USE_AITER=1 + fp8 KV` 的用户默认切到新 kernel；唯一回退手段是 `VLLM_ROCM_USE_AITER_MHA=0`（同时会把 ROCM_AITER_FA 移出候选） |
+| 精度：asm 比 HIP 舍入更多 | Low | 测试容差 max 5e-2 / mean 3e-3；GSM8K 持平；uhp kernel 已是最高档 |
+| 性能证据 | Low | 吞吐数字来自 PR 描述，`[unverified]`；kernel 微基准用的是默认精度而非实际使用的 `high_precision=2` |
+| 可维护性：跨 backend 耦合 | Low | ROCM_ATTN builder 从 `rocm_aiter_fa` 导入 `AiterFlashAttentionMetadataBuilder.asm_kv_scale_tables` |
 
 ---
 
 ## 7. Review 意见 (Findings)
 
-| 类型 | 🔴 | ⚠️ | 📝 |
-|------|----|----|----|
-| 正确性 | 1 | — | — |
-| 兼容性 | — | 1 | — |
-| 性能 / 资源 | — | 1 | 1 |
-| 测试 | — | 1 | — |
-| 设计 | — | — | 1 |
-| 可维护性 | — | — | 1 |
+| 意见类型 | 🔴 | ⚠️ | 📝 |
+|---------|----|----|----|
+| 正确性 | 1 | | |
+| 性能 / 资源 | | 1 | 1 |
+| 测试 | | 1 | |
+| 可维护性 | | | 2 |
 
 ---
 
-**🔴【正确性】asm 路径丢弃 `self.scale`：kernel 固定使用 1/sqrt(128)，自定义 softmax scale 的模型 decode 静默算错** `[已验证]`
+**🔴【正确性】asm 分支忽略 `self.scale`，自定义 softmax scale 的模型会算出错误 attention** `[已验证]`
+- **问题**：`rocm_aiter_ops.pa_fwd_asm` / `aiter.pa_fwd_asm` 没有 softmax scale 参数，aiter `csrc/py_itfs_cu/asm_pa.cu::pa_fwd` 内部固定 `k_scalar = log2(e) / sqrt(head_size)`。而 HIP 路径传的是 `sm_scale=self.scale`。PR 的静态门控 `rocm_attn.py:371-380` 检查了 head_size、GQA、alibi、sinks、滑窗，但**没有检查 `self.scale == head_size**-0.5`**（`logits_soft_cap` 同样未检查）。
+- **影响**：具体触发输入——`ibm-granite/granite-3.1-8b-instruct`（head 128，32/8 heads，GQA 4，`scale = attention_multiplier = 0.0078125`，而 kernel 用 `1/√128 ≈ 0.0884`，相差 11 倍）+ `VLLM_ROCM_USE_AITER=1 --kv-cache-dtype fp8`，MI355X TP1 上并发 ≥ 17（17×32 = 544 > 512）时 decode 输出静默错误；Gemma3-27B 的全局层（head 128，32/16 heads，`scale = 168^-0.5 ≈ 0.0772`）同理。小并发走 HIP、大并发走 asm，输出质量随负载变化，非常难排查。PR 测试全部用 `scale=HEAD_SIZE**-0.5`（`test_rocm_attn_aiter_asm_decode.py:123`），无法发现该问题；三个 benchmark 模型都是默认 scale。
+- **行动**：作者应当在 `_use_aiter_asm_decode` 中加入 `math.isclose(self.scale, head_size**-0.5)`（以及 `self.logits_soft_cap == 0`）条件，并补一个非默认 scale（如 `scale=1/128`）在阈值之上仍与 HIP 一致的测试用例。
 
-- **问题**: `rocm_attn.py:371-380` 的静态门控只检查 dtype / head_size / GQA / alibi / sinks / sliding window，没有检查 `self.scale`；`_forward_aiter_asm_decode`（`rocm_attn.py:458-469`）调用 `pa_fwd_asm` 时也无法传入 scale，因为该 API 根本没有 scale 参数（已核对 Docker pin 的 aiter v0.1.28.post1：`pa_fwd_asm(Q, K, V, block_tables, context_lens, block_tables_stride0, max_qlen, K_QScale, V_QScale, out_, qo_indptr, high_precision, kernelName)`）。kernel 入口 `csrc/py_itfs_cu/asm_pa.cu::pa_fwd` 中写死了 `k_scalar = sqrt(dim); args.sclg2e = log2e / k_scalar`。而被替换的 HIP 路径通过 `sm_scale=self.scale` 使用模型真实的 scale（`rocm_attn.py:593`）。
-- **具体触发输入**: `ibm-granite/granite-3.3-8b-instruct`（`GraniteForCausalLM`，bf16，hidden 4096 / 32 heads → head_dim 128，8 KV heads → GQA 4，`attention_multiplier = 0.0078125`，即 `self.scaling = 1/128`，见 `granite.py:186`）；`VLLM_ROCM_USE_AITER=1 vllm serve ... --kv-cache-dtype fp8`，MI355X TP1，并发 ≥ 17（17×32 = 544 > 512）。此时所有 decode step 走 asm，实际使用的 scale 为 0.0884，是正确值的 11.3 倍，logits 被严重放大，输出错误且无任何报错。同类模型还有 Gemma-2-27B（head_dim 128，`query_pre_attn_scalar=144` → 0.0833）和 Gemma-3-27B 的 global 层（`query_pre_attn_scalar=168` → 0.0772）`[推测：这两个模型的 config 数值凭记忆，未逐一核对]`。
-- **影响**: 只有 `scale == head_dim^-0.5` 的模型（PR 测的 Qwen3 / Llama-3.1 恰好都是）结果正确；其他模型在高并发时静默算错，而低并发（低于阈值）时结果正确，问题很难被发现。注：`ROCM_AITER_FA` 的 shuffle 路径经 `paged_attention_common` 走 asm 时同样丢弃 scale（aiter 侧只把 `scale` 传给 HIP 分支），属既有问题，但那是 opt-in 路径；本 PR 把它带进了 AITER + fp8 KV 的默认路径。
-- **行动**: 作者应当在 `_use_aiter_asm_decode` 中加入 `math.isclose(self.scale, head_size ** -0.5)`，同时为防御起见加入 `self.logits_soft_cap == 0`（HIP 路径本身也不支持 softcap，属既有问题，但不应再多一条忽略它的路径），并补一个非默认 scale 的用例，断言此时回退到 HIP。
+---
 
-**⚠️【兼容性】缺少 arch 门控：gfx1250 上 `is_mha_enabled()` 为真，但 asm PA 没有该 arch 的 kernel** `[已验证]`
+**⚠️【资源】scale 表显存未计入 KV cache 预算，且 builder 门控比 impl 门控宽** `[已验证]`
+- **问题**：`_build_aiter_kv_scale_tables`（`rocm_attn.py:110-143`）在 KV cache 分配**之后**按 `[num_blocks, kv_heads, 16]` fp32 为每个不同的 scale 建表。checkpoint 带逐层校准的 kv scale 时（如 FP8-KV 量化的 Llama checkpoint），每层 K、V 各一张表，额外显存约为 fp8 KV cache 的 `2×16×4 / (2×16×128) = 3.1%`（例：Llama-3.1-8B、约 160 万 token 的 KV cache ≈ 104 GB → 约 3.3 GB），这部分不在 `gpu_memory_utilization` 的 profiling 预算中。另外 builder 门控（`rocm_attn.py:101-106`）只看 AITER MHA、fp8、block 16、head 128，不检查 GQA ≤ 8、滑窗、sinks、`causal` 等，所以 GQA 16 的模型（如 64/4 heads）或全部为滑窗层的组也会建表，但永远不会走 asm。
+- **影响**：高 `gpu_memory_utilization`（0.9+）+ 逐层 kv scale 的部署可能在 warmup / CUDA graph 捕获阶段 OOM；不使用 asm 的模型白白多占显存。ROCM_AITER_FA 的 shuffle 路径有同样做法，但那是显式 opt-in，而这里是 AITER + fp8 KV 的默认路径。
+- **行动**：建议作者 (1) 让 builder 只在至少一个 layer 的 impl 会走 asm 时建表（例如从 `static_forward_context` 读 impl 的 `_use_aiter_asm_decode`）；(2) 在 PR 描述中说明额外显存的量级，或把表显存计入 KV cache 规划；scale 全为 1.0 时只有一张共享表，可说明对常见 checkpoint 影响很小。
 
-- **问题**: 门控仅依赖 `rocm_aiter_ops.is_mha_enabled()`，即 `is_aiter_found_and_supported()` → `get_cdna_version() > 2`。`get_cdna_version()` 对 gfx1250 返回 5（`platforms/rocm.py:372-381`）。但 aiter v0.1.28.post1 只有 `hsa/gfx942/pa/` 和 `hsa/gfx950/pa/`，`hsa/gfx1250/` 下没有 `pa/` 目录；aiter 自己也提供了 `aiter.ops.attention.pa_fwd_asm_supports_arch()`（只包含 `("gfx942", "gfx950")`）。
-- **影响**: 在 gfx1250 上使用 AITER + fp8 KV、并发超过阈值时，`get_heuristic_kernel` 会触发 `AITER_CHECK(false, "cannot get heuristic kernel!")`，服务在首次大 batch decode 或 decode graph 捕获时直接崩溃。这是显式报错而非静默错误，但从用户角度看是新引入的回归。
-- **行动**: 建议作者在静态门控中加入 `on_gfx942() or on_gfx950()`（或调用 aiter 的 `pa_fwd_asm_supports_arch()`），并在注释中说明原因。
+---
 
-**⚠️【性能 / 资源】asm scale 表在 KV 显存预算之外分配，per-layer scale 不同时开销约为 KV cache 的 3.1%** `[已验证]`（OOM 后果 `[推测]`）
+**⚠️【测试】AMD CI 尚未运行；只在 MI355X 上验证，gfx942 未验证** `[已验证]`
+- **问题**：PR 无 `ready` label，CI 未启动；新测试只在可选的 MI300/MI355 Attention Kernels 步骤运行。作者所有吞吐 / GSM8K / passkey 数据均来自 MI355X（gfx950）。我核对了 aiter 0.1.29：gfx942 的 `pa_asm.csv` 中有同名 `pa_bf16_pertokenFp8_gqa8_2tg_4w_uhp`，fp8 dtype（e4m3fnuz）映射也与 vLLM 一致，所以 gfx942 上应能选到 kernel，但没有任何数值验证；MI300X 的阈值也不同（304 CU → 608 heads）。
+- **影响**：这是 Tier-1 默认路径的 kernel 替换；MI300X/MI325X 用户在 `VLLM_ROCM_USE_AITER=1 + fp8 KV` 下会第一个用到它，若 gfx942 uhp kernel 有数值问题，合入前没有任何信号。
+- **行动**：建议 maintainer 解锁 MI300 Attention Kernels 步骤跑一次新测试，并建议作者在 MI300X 上补一组 GSM8K（至少一个模型）结果贴到 PR。
 
-- **问题**: `_build_aiter_kv_scale_tables`（`rocm_attn.py:110-143`）在 KV cache 绑定后的首次 `build()` 中，为每个不同的 `(num_blocks, kv_heads, scale)` 用 `torch.full` 分配 fp32 `[num_blocks, kv_heads, 16]` 表，K、V 各一张。这块显存发生在 memory profiling 和 KV 块数确定之后，不计入 `gpu_memory_utilization`。每层 K+V 表为 `num_blocks × kv_heads × 128` 字节，而该层 fp8 KV 为 `num_blocks × kv_heads × 4096` 字节，比例为 1/32 ≈ 3.125%。PR 描述中的"约 0.08%"只在所有层共享同一个 scale 时成立（2×64 / (4096×40) ≈ 0.078%，已复算），比如 Qwen3-14B-FP8 没有校准 KV scale 而全部为 1.0 的情况。
-- **影响**: 对于带逐层校准 KV scale 的 checkpoint（例如 Quark / ModelOpt 导出的 `*-FP8-KV` 模型），开启 AITER 后多出约 3% KV 大小的显存。在 `--gpu-memory-utilization 0.9+` 的大 KV 部署中，可能在 capture 阶段 OOM，或挤占 activation 余量。
-- **行动**: 建议作者在 PR 描述中如实给出"逐层不同 scale"时的开销，并考虑在 KV 预算中预留这部分（或改用 per-tensor scale 的 kernel 变体 / 共享一张 1.0 表并把 scale 折进其他位置）；至少在 per-layer scale 不同时打印一次显存开销日志。
+---
 
-**⚠️【测试】测试与"默认 scale"耦合，无法暴露 scale 丢失；数值对照的是结构上的孪生实现** `[已验证]`
+**📝【性能】kernel 微基准测的不是实际使用的精度档位** `[已验证]`
+- **问题**：PR 描述的 kernel 延迟表注明「asm at AITER's default precision」，即 `high_precision=1`，而 PR 实际调用 `high_precision=2`（uhp kernel，是不同的 `.co`）；作者仅以「serving runs show `high_precision=2` runs at the same speed」带过。吞吐表数字无原始日志，每点是否多次运行未说明，标为 `[unverified]`。
+- **影响**：读者会把 11–30% 的 kernel 加速当作 uhp kernel 的数据。
+- **行动**：建议作者用 `high_precision=2` 重跑 kernel 延迟表，或在描述中明确两者的关系。
 
-- **问题**: `test_rocm_attn_aiter_asm_decode.py:120-129` 构造 impl 时写死 `scale=HEAD_SIZE**-0.5`，恰好等于 kernel 的内置 scale。`test_decode_switches_to_asm_above_the_cut` 的严格断言是 `out == case.direct_asm(md)`（`:181`），也就是拿同一个 kernel、同样的参数再调用一遍，属于结构孪生，两边会带着同样的 bug 一致通过。与 HIP 的比较只用了较宽的 `max < 5e-2 / mean < 3e-3` 容差。`test_decode_unchanged_where_asm_does_not_apply` 覆盖了 GQA 16、sliding window、fp16、多 token query、KV 未绑定，但没有覆盖非默认 scale、softcap 和非 gfx942/gfx950 的情况。
-- **影响**: 上面的 🔴 问题在现有测试和 PR 的 GSM8K / passkey 验证（三个模型都使用默认 scale）下都发现不了。
-- **行动**: 建议作者在"不适用场景"参数化中加入 `scale != head_size**-0.5` 和 `logits_soft_cap > 0` 两个 variant，断言与 HIP 结果逐位一致；并考虑加一个带非默认 scale 的模型级 smoke 测试（例如 Granite 小模型 + fp8 KV + 高并发）。
+---
 
-**📝【设计】AITER + fp8 KV 用户的默认数值会变化，且 kill-switch 粒度过粗** `[已验证]`
+**📝【可维护性】`max_seqlen_k <= 128 * 1024` 无出处，FULL graph 下与 eager 行为不一致** `[已验证]`
+- **问题**：`rocm_attn.py:564` 的 128K 上限没有注释说明来源（kernel 限制？context_lens 编码？）。同时 `gpu_model_runner` 在 CUDA graph 捕获时把 `max_seq_len` 设为 `max_model_len`，因此 `max_model_len > 128K` 的部署中 FULL graph 永远走 HIP，而 piecewise / eager 下实际序列 ≤ 128K 时走 asm——同一部署两种 kernel，行为与数值不一致（安全但令人意外）。
+- **行动**：建议作者注释这个上限的来源；若来自 kernel 的硬限制，请说明，否则考虑去掉。
 
-- **问题**: `VLLM_ROCM_USE_AITER_MHA` 默认是 True（`envs.py:154`），因此所有已经设置 `VLLM_ROCM_USE_AITER=1` 并使用 fp8 KV 的用户，升级后默认就会走 asm。按 PR 自己的数据，uhp asm 相对 fp32 参考的 mean error 为 0.00044–0.00078，HIP 为 0.00013–0.00018，约 3–4 倍。而且同一请求用哪个 kernel 取决于同一个 batch 里有多少其他请求。唯一的关闭方式 `VLLM_ROCM_USE_AITER_MHA=0` 还会顺带把 `ROCM_AITER_FA` 从 backend 优先级里移除（`platforms/rocm.py:563-564`）。
-- **影响**: GSM8K 等端到端指标在误差范围内持平，但对数值敏感、或要求跨并发可复现的用户没有一个专门的开关可用。
-- **行动**: 建议 review 时追问是否值得提供一个专用的临时开关（验证一段时间后再移除），或者至少在 PR 描述 / 文档中写明 `VLLM_ROCM_USE_AITER_MHA=0` 的副作用。
+---
 
-**📝【性能】benchmark 数字只能追溯到 PR 描述中的表格；gfx942 的阈值与收益未验证** `[已验证]`（gfx942 收益 `[推测]`）
-
-- **问题**: 表中各个百分比与原始 tok/s 一致（已复算，例如 Llama TP1 conc128 12661→13670 = +7.97%，Qwen3-8B conc128 = +8.84%），并发 16 是否越过阈值也与 `heads × conc > 512` 吻合（Qwen3-14B 40 头 ×16 = 640 越过；32 头模型 ×16 = 512 未越过）。但 PR 没有附原始 `vllm bench serve` 输出或日志，因此这些数字是 `[unverified]`。gfx942 一侧（阈值 608）完全没有实测；MI308X（80 CU → 阈值 160）或 CPX 分区模式下阈值会低很多，而 PR 自己的数据显示小 batch + 长上下文时 asm 比 HIP 慢约 2 倍。
-- **行动**: 建议作者附上至少一组原始 benchmark 输出，并在合入前补一组 MI300X 的 conc 16/64 数据，或者在注释中说明低 CU 数设备上的预期表现。
-
-**📝【可维护性】`rocm_attn` 依赖 `rocm_aiter_fa` 的类变量；scale 表永久缓存；与 FA 版本存在孪生分歧** `[已验证]`（scale 热更新场景 `[推测]`）
-
-- **问题**: ① `rocm_attn.py:115-119` 通过 import `AiterFlashAttentionMetadataBuilder` 来拿到 `asm_kv_scale_tables` 这个 ClassVar，形成了两个 Tier-1 backend 文件之间的隐式耦合，`AsmKvScaleTables` 应该放到一个共享模块里。② builder 在第一次成功构建后，`self.k_scale` 就永远不再刷新；如果 RL / 在线权重更新改了 `_k_scale_float`，asm 路径会继续使用旧 scale，而 HIP 路径读的是 `layer._k_scale`。③ 本 PR 用的是 `kv_cache_spec.num_kv_heads`，并对未绑定的 KV 做了 early return；`rocm_aiter_fa._build_asm_kv_scale_tables` 用的是模型级 `num_heads_kv`，也没有这层保护。两份几乎相同的代码已经出现分歧（本 PR 这一份更正确）。
-- **行动**: 建议作者把 `AsmKvScaleTables` 和构建函数抽成共享工具，供两个 backend 共同使用，并在注释中写明"scale 表只构建一次，不支持运行时更新 KV scale"的前提。
+**📝【可维护性】ROCM_ATTN 依赖 ROCM_AITER_FA builder 的类属性** `[已验证]`
+- **问题**：`rocm_attn.py:115-119` 在函数内 `from vllm.v1.attention.backends.rocm_aiter_fa import AiterFlashAttentionMetadataBuilder` 只为拿 `asm_kv_scale_tables`。两个 backend 共享进程级缓存是有意为之（draft/target 去重），但依赖方向不自然：重构 ROCM_AITER_FA 时容易误伤 ROCM_ATTN。
+- **行动**：建议作者把 `AsmKvScaleTables` 及其单例移到中立模块（如 `vllm/v1/attention/ops/` 下的 aiter 工具文件），两个 backend 都从那里导入。
 
 ## 8. 结论 (Verdict)
 
-**🔴 BLOCK**
-
-这个 PR 的思路是成立的：fp8 + block 16 下 KV 布局零拷贝对齐、阈值沿用 AITER 自己的切分、uhp kernel 的 GQA 约束、CUDA graph 下的分派一致性，这几点我都逐项核实过。PR 描述的完整度也很高。但 asm kernel 在内部写死了 `1/sqrt(head_size)`，而门控没有检查 `self.scale`。像 Granite-3.x-8B 这类使用自定义 attention scale 的 head_dim=128 模型，在 AITER + fp8 KV + 高并发时会静默算出错误结果。至少要在门控中加入 scale（以及 softcap）条件并补上对应测试后才能合入。arch 门控和 scale 表显存开销也建议一并处理。CI 状态未知。
+🔴 **BLOCK** — 布局复用、阈值、CUDA graph 处理和 GQA ≤ 8 门控都经得起核对，思路很好；但 asm kernel 固定使用 `1/√head_size` 作为 softmax scale，而门控没有排除自定义 scale 的模型，Granite-3.x-8B / Gemma3-27B 在 `VLLM_ROCM_USE_AITER=1 + fp8 KV` 且 decode batch 超过阈值时会静默得到错误输出。加上 scale 条件和对应测试后即可转为 ⚠️/✅；scale 表显存与 gfx942 验证建议一并处理。
 
 ## 9. 英文 Review 评论 (Copy-Paste English Comments)
 
 **C1** `vllm/v1/attention/backends/rocm_attn.py:371-380` — 🔴 blocking
 
 ```text
-The asm path silently ignores `self.scale`. `pa_fwd_asm` has no softmax-scale argument, and aiter's `pa_fwd` (csrc/py_itfs_cu/asm_pa.cu) hard-codes `k_scalar = sqrt(dim)`, i.e. 1/sqrt(128). The HIP path it replaces uses `sm_scale=self.scale`. Models with head_dim 128 and a non-default scale therefore get wrong decode output above the cut with no error. A concrete case is ibm-granite/granite-3.3-8b-instruct (attention_multiplier = 1/128, GQA 4) with VLLM_ROCM_USE_AITER=1, --kv-cache-dtype fp8 and >= 17 concurrent requests on MI355X. Could you add `math.isclose(self.scale, head_size ** -0.5)` to this gate? Please also add `self.logits_soft_cap == 0` defensively, plus a test that asserts a non-default scale stays on the HIP kernel.
+The asm path ignores self.scale. aiter.pa_fwd_asm has no softmax-scale argument; asm_pa.cu hardcodes k_scalar = log2(e) / sqrt(head_size), while the HIP path passes sm_scale=self.scale. Models with a custom scale and head_size 128 pass this gate, e.g. granite-3.1-8b-instruct (scale = attention_multiplier = 1/128, GQA 4) or the global layers of Gemma3-27B (scale = 168**-0.5). With VLLM_ROCM_USE_AITER=1 and an fp8 KV cache, every decode batch above the cut (17+ sequences for Granite on MI355X) would silently produce wrong attention. Could you add math.isclose(self.scale, head_size**-0.5) and self.logits_soft_cap == 0 to _use_aiter_asm_decode?
 ```
 
-**C2** `vllm/v1/attention/backends/rocm_attn.py:372` — ⚠️ comment
+**C2** `tests/kernels/attention/test_rocm_attn_aiter_asm_decode.py:166-184` — ⚠️ comment
 
 ```text
-This gate relies only on `rocm_aiter_ops.is_mha_enabled()`, which is true on every CDNA > 2. That includes gfx1250, since `get_cdna_version()` returns 5 there. However, aiter only ships asm PA kernels for gfx942 and gfx950: there is no `hsa/gfx1250/pa/`, and `aiter.ops.attention.pa_fwd_asm_supports_arch()` lists only those two arches. On gfx1250, the first decode batch above the cut would hit `AITER_CHECK(... "cannot get heuristic kernel!")`. Could you also gate on `on_gfx942() or on_gfx950()` (or aiter's `pa_fwd_asm_supports_arch()`)?
+All cases build the impl with scale=HEAD_SIZE**-0.5, so the tests cannot catch a scale mismatch between the asm kernel and the HIP path. Could you add a case with a non-default scale (e.g. 1/128) above the cut and assert it still matches HIP within the existing tolerance (or stays on HIP once the gate is fixed)? Separately, since this replaces the default decode kernel on gfx942 too, could we get one run of the MI300 Attention Kernels step and a GSM8K number on MI300X?
 ```
 
-**C3** `vllm/v1/attention/backends/rocm_attn.py:123-143` — ⚠️ comment
+**C3** `vllm/v1/attention/backends/rocm_attn.py:101-106` — ⚠️ comment
 
 ```text
-These scale tables are allocated after the KV cache has been sized, so they are not covered by gpu_memory_utilization. The ~0.08% overhead in the description only applies when all layers share one scale. With per-layer calibrated KV scales (e.g. Quark/ModelOpt "*-FP8-KV" checkpoints), every layer gets its own K and V fp32 [num_blocks, kv_heads, 16] tables. That costs 128 B vs 4096 B of fp8 KV per block per KV head, so about 3.1% of the KV cache, which can squeeze the activation headroom at high utilization. Could you document this case and either reserve the memory or log the allocated size once?
+The builder allocates the dense [num_blocks, kv_heads, 16] fp32 scale tables after the KV cache is sized, so they are outside the gpu_memory_utilization budget. With per-layer calibrated KV scales that is two tables per layer, about 3% of the fp8 KV cache (roughly 3 GB for Llama-3.1-8B at ~1.6M tokens). This gate is also broader than the impl gate (no GQA <= 8, sliding-window or sinks check), so models that never take the asm path still pay for it. Could the builder only build tables when some layer's impl actually uses the asm decode, and could the description note the memory cost?
 ```
 
-**C4** `tests/kernels/attention/test_rocm_attn_aiter_asm_decode.py:120-129` — ⚠️ comment
+**C4** `vllm/v1/attention/backends/rocm_attn.py:564` — 📝 comment
 
 ```text
-The impl is always built with `scale=HEAD_SIZE**-0.5`. That happens to equal the scale the asm kernel hard-codes, so the tests cannot catch a dropped scale. The exact-match assertion also compares against `direct_asm`, which calls the same kernel with the same arguments. Could you add `scale != head_size**-0.5` and `logits_soft_cap > 0` variants to `test_decode_unchanged_where_asm_does_not_apply`, asserting bit-exact equality with the HIP output?
+Where does the 128 * 1024 limit come from? A short comment would help. Note that CUDA graph capture sets max_seq_len to max_model_len, so with max_model_len > 128K the FULL graphs always take HIP while piecewise/eager batches below 128K take asm, i.e. one deployment runs two kernels depending on the cudagraph mode.
+```
+
+## 10. 英文总结评论 (Overall Review Summary)
+
+```text
+Nice idea: the fp8 ROCM_ATTN cache already matches the asm paged-attention layout, the GQA <= 8 gate matches the only ultra-precision kernel in AITER, and the per-graph cut is CUDA-graph safe. One blocker: pa_fwd_asm hardcodes 1/sqrt(head_size) as the softmax scale, so models with a custom scale (Granite, Gemma3-27B global layers) get wrong decode output above the cut. Please gate on self.scale (and soft cap) and add a non-default-scale test. Also consider limiting the scale-table allocation to layers that use asm, and please run the MI300 attention step. Changes needed before merge.
 ```
