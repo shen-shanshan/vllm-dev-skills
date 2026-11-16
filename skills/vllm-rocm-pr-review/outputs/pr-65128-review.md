@@ -1,128 +1,172 @@
 ---
 pr: 65128
 repo: vllm-project/vllm
-head_sha: e72253ca4c5e0f7cd62d2c7613599276b53a37e9
+head_sha: 73ff6d1659980dfb7620da40678b0ca649b1abdd
 verdict: needs-work
-reviewed_at: 2026-11-05T03:23:03Z
+reviewed_at: 2026-11-16T11:00:30Z
 skill: vllm-rocm-pr-review
 ---
 
-# PR #65128: [MORI][DBO] Dual batch overlap with MoRI EPv2 (native and AsyncLL), and DBO fixes on ROCm
+# PR #65128: [MORI][DBO] Dual batch overlap with MoRI EPv2 (native and AsyncLL), and DBO fixes
 
 > **Author**: @ChengYM5685 | **State**: OPEN | **Date**: 2026-11-02
-> **Branch**: `feat/mori-epv2-dbo` → `main` | **Labels**: documentation, rocm, deepseek, nvidia, mrv2, DSv4
-> **Changes**: +908 -137 lines across 24 files | **ROCm 相关性**: 完全相关（MoRI EPv2 all2all + DeepSeek-V4 ROCm 模型路径 + ROCm DBO），另有部分 CUDA/ROCm 共享的 DBO 基础设施改动
+> **Branch**: `ChengYM5685:feat/mori-epv2-dbo` → `main` | **Labels**: documentation, rocm, ready, deepseek, nvidia, mrv2, DSv4
+> **Changes**: +851 -110 lines across 22 files | **ROCm 相关性**: 部分相关（MoRI EPv2 prepare/finalize、`platforms/rocm.py`、DeepSeek-V4 ROCm 模型代码是 ROCm 专属；`vllm/v1/worker/` 下的 DBO 修复是 CUDA 和 ROCm 共用的）
 > 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
+>
+> 说明：
+> - 代码取自本地 ref `pr/65128`（head `73ff6d1659`，merge-base `0d9d953d68`，与 PR 的 base sha 一致）。当前 `upstream/main` 比它新 24 个 commit，其中改到同一批文件的是 `all2all.py`、`parallel.py`、`vllm.py`、`model_runner.py` 和文档，改动区域与本 PR 不重叠。
+> - 抓取到的 JSON 里 `checks` 字段只有键名、没有内容，所以 **CI 状态未知**。评论区能看到作者多次 `/ci run`，并说 Main CI #100468 通过、CPU 镜像构建失败是网络问题，但没有看到 `/amd-ci run`。
+> - 这是静态 review，没有运行 PR 代码。MoRI 符号对照了本机安装的 `amd_mori 1.2.3.post1`（没有 EPv2 AsyncLL），以及 ROCm/mori main 上的 `dispatch_combine_v2/dispatch_combine_op.py` 和 `internode_regions.py`。
 
 ---
 
 ## 1. 总结 (Summary)
 
-本 PR 让 `--all2all-backend mori` 在运行 MoRI EPv2 时支持 `--enable-dbo`（Dual Batch Overlap），覆盖两种 EPv2 内核：native（dispatch/combine 在 comm stream 上执行，与另一个 microbatch 的计算重叠）与新接入的 AsyncLL（基于 SDMA，dispatch/combine 拆成 send/recv 两半，仿照 deepep_ll 的 recv hook 交错）。同时修复了在 DeepSeek-V4 + MI355X DP8/EP8 上发现的若干 DBO 问题：纯 DP padding 的 microbatch 触发 FULL graph 回放和两个 DSv4 ROCm 算子越界、非 0 号 microbatch 的 workspace 未在 lock 前定尺寸、模型侧流上 hipBLASLt handle 未在 capture 前创建（`HIP error 900`）。V2 与 V1 两个 model runner 都做了对应修复。
+本 PR 让 `--all2all-backend mori` 在跑 MoRI EPv2 时支持 `--enable-dbo`（dual batch overlap），并支持两种模式：
+- **native EPv2**：dispatch/combine 放到 comm stream 上，和另一个 microbatch 的计算重叠；
+- **AsyncLL**：在 gfx950 上同时设置 `MORI_ENABLE_SDMA=1` 和 `VLLM_MORI_EP_V2=1` 时启用，用 SDMA 搬运 token，dispatch/combine 拆成 send 和 recv 两半，复用 deepep_ll 的 recv-hook 交错机制。
+
+为此，每个 microbatch 使用自己的 EPv2 op（op 0 保持原大小，同时服务不切分的 step；后面的 op 按一个 microbatch 最多能拿到的 token 数分配）。同时修了 DeepSeek-V4 在 ROCm DP8+EP8 下暴露的几个通用 DBO 问题：
+- 某个 rank 的最后一个 microbatch 全是 DP padding 时，不再 replay FULL graph，改为 eager；
+- profile run 之后，把所有 microbatch 的 workspace 都按 microbatch 0 的大小分配好；
+- capture 之前，在模型持有的所有 side stream 上先建好 hipBLASLt handle；
+- DSv4 的 sparse decode 和 MXFP4 indexer compressor 只处理真实 token。
+
+作者给出的数据：DSv4-Pro prefill 提升 12–14%（native）和 22%（AsyncLL）；decode 拆分后变慢，所以建议只对 prefill 开 DBO。
 
 ## 2. 背景与动机 (Background & Motivation)
 
-- 此前 ROCm 上可配合 DBO 的 all2all 只有 deepep_*、nixl_ep 和 `allgather_reducescatter`，mori 不在 `supported_backends` 中，DSv4 在 MI355X 上用 MoRI EPv2 部署时无法使用 DBO 做通信/计算重叠。
-- MoRI 上游新增了 EPv2 AsyncLL 内核（ROCm/mori#768，2026-10-27 合并）以及「每个 AsyncLL op 独立 SDMA 队列」（ROCm/mori#892，2026-11-05 合并）。此前 vLLM 的 `MORI_ENABLE_SDMA=1` 会强制退回 EPv1，本 PR 改为在 MoRI 带 AsyncLL 时选 EPv2 AsyncLL。
-- 作者在 DSv4-Pro、8×MI355X、DP8+EP8 上验证：prefill 吞吐 native +11.7%~14.0%、AsyncLL +21.7%~21.9%；但 decode 一旦被拆分会**下降 25%~27%**，因此作者建议只在 prefill 上开 DBO（调大 `--dbo-decode-token-threshold` 或在 PD 分离时只给 prefill 实例开），且明确说明不改各后端共享的阈值默认值。
-- PR 描述声明使用了 AI 辅助（Claude）编写代码与描述，提交者自行复核并完成了验证。
+- main 上的 DBO 在 ROCm 只支持 deepep_ll/ht、nixl_ep 和 `allgather_reducescatter`。MoRI EPv2 是 ROCm 上默认的 EP all2all，此前不能和 DBO 一起用（`VllmConfig` 的断言会直接拒绝）。
+- EPv2 的 op 内部持有接收/暂存 buffer，下一次调用会覆盖上一次的结果。两个 microbatch 交错执行时，不能共用一个 op。
+- MoRI 新增了 EPv2 AsyncLL（ROCm/mori#768，2026-10-27 合入）和 per-op SDMA 队列（ROCm/mori#892，2026-11-05 合入），两者都包含在 v1.2.5 中。AsyncLL 把 dispatch/combine 拆成 send/recv，中间可以插入计算。
+- 在 DSv4 上开 DBO 暴露了几个与 MoRI 无关的 DBO bug：
+  1. V2 runner 的 pure-padding 判断（`2 * min < graph_tokens`）漏掉了「最小 rank 的 token 恰好填满前面 microbatch」这个边界，而且只适用于 2 个 microbatch；
+  2. profile run 不切分 microbatch，所以只给 microbatch 0 分配了 workspace。microbatch 1 的 slot 在 forward 中途扩容，会在线程里触发 device sync，workspace 锁定后则直接失败；
+  3. 在 capture 过程中创建 hipBLASLt handle 会报 HIP error 900。
+- 关联 PR（由 @okorzh-amd 整理）：
+  - #57020（`<` 改成 `<=`）被本 PR 覆盖；
+  - #63823 是另一种方案（保留 FULL graph，把 padding microbatch 当作图内 padding replay）；
+  - #64787 加了完全相同的 `dbo_comm_region`，后合入的一方要删掉自己那份；
+  - #66733 / #66734 是 Quark MXFP4 走 EPv2 的前置依赖。
 
 ## 3. 代码修改分析 (Code Change Analysis)
 
 ### 3.1 修改的模块
 
-| 模块 | 改动 |
-|------|------|
-| `vllm/model_executor/layers/fused_moe/prepare_finalize/mori_epv2.py` (+149 -26) | `MoriEPv2PrepareAndFinalize` 改为持有一组 op（每个 microbatch 一个）；native 路径用 `dbo_comm_region()` 包住 dispatch/combine；新增 `prepare_async`/`finalize_async`（AsyncLL），`supports_async()` 返回 `async_ll`，`supports_dbo()` 返回 `len(ops) > 1`；routing 按 ubatch 分槽保存 |
-| `vllm/model_executor/layers/fused_moe/all2all_utils.py` (+53 -2) | `_make_mori_epv2_ops`：按 `get_num_ubatches` 建多个 op，非 0 号 op 的 `max_num_inp_token_per_rank` 用 `_mori_ubatch_max_tokens` 缩小；AsyncLL 时补 `async_ll=True, async_ll_transport="sdma", kernel_backend="hip"`，MoRI 支持时加 `async_ll_own_sdma_queue=True` |
-| `vllm/distributed/device_communicators/all2all.py` (+15 -2) | AsyncLL arena 大小改用 MoRI `asyncll_regions(cfg)`；`_make_handle` 接受只作为 cache key 的 `ubatch_id`；探测 LSA team 后 `comm.barrier()` 再 `close()`（SDMA 下交换队列句柄） |
-| `vllm/config/parallel.py` (+38 -13) / `vllm/platforms/rocm.py` (+1 -1) | 新字段 `mori_epv2_async_ll`；参数 `sdma_picks_epv1` → `sdma_moves_tokens`；SDMA 只有在 MoRI 缺 AsyncLL 时才退回 EPv1 |
-| `vllm/config/vllm.py` (+2) | ROCm 上 `mori_ep_v2=True` 时把 `mori` 加入 DBO 支持的后端列表 |
-| `vllm/utils/import_utils.py` (+29) | `mori_epv2_has_async_ll()`、`mori_epv2_has_own_sdma_queue()`：按 `EpDispatchCombineConfig` dataclass 字段和 `internode_regions` 模块做特性探测 |
-| `vllm/v1/worker/ubatching.py` (+20) / `naive_dp_ep.py` (+4 -32) | `_comm_region` 从 naive DP/EP 上提为公共 `dbo_comm_region()`，mori_epv2 复用 |
-| `vllm/v1/worker/ubatch_utils.py` (+36 -2) | 新增 `find_model_streams(model)`（扫描模块属性中的 `torch.cuda.Stream`）与 `create_blas_handles(streams, dtype)`（ROCm 上用 1×1 GEMM 预建 hipBLASLt handle） |
-| `vllm/v1/worker/gpu/{dp_utils,model_runner,ubatch_utils}.py` (V2 runner) | DP 同步改用 `is_last_ubatch_empty`（覆盖「恰好填满前面 microbatch」的边界）；profile_run 后 `size_workspace_ubatches_alike()`；capture 时为模型侧流也建 BLAS handle |
-| `vllm/v1/worker/gpu_model_runner.py` / `gpu_ubatch_wrapper.py` (V1 runner) | profile_run 先跑不拆分的 dummy run，再跑一次拆分的 dummy run 并对齐 workspace；CUDA graph 内存 profile 对所有 microbatched FULL graph 逐个采样；清理 UBatchWrapper 自己的 graph；抽出 `_capture_microbatched` |
-| `vllm/v1/worker/workspace.py` (+29) | `WorkspaceManager.size_ubatches_alike()`：把每个 lane 下各 microbatch 槽位扩到该 lane 最大槽位 |
-| `vllm/models/deepseek_v4/amd/rocm.py` (+9 -3) | sparse MLA decode 在 `num_decode_tokens == 0` 时跳过；MXFP4 indexer compressor 的 launch 行数取 state 与 K cache slot mapping 的较小者 |
-| 测试 (`test_mori_epv2_prepare_finalize.py` +291、`test_gpu_dp_utils.py` +75、`test_workspace.py` +31 等) | mock op 验证 DBO 交错顺序、AsyncLL recv hook 时序、later-op 容量上界、空 microbatch 走 eager、workspace 对齐 |
-| 文档 (`dbo.md`、`expert_parallel_deployment.md`) | 说明 mori EPv2 支持 DBO、SDMA→AsyncLL 行为，以及 decode 不建议拆分 |
+| 模块 | 文件 | 改动 |
+|------|------|------|
+| MoRI EPv2 prepare/finalize | `fused_moe/prepare_finalize/mori_epv2.py` (+149/-26) | `mori_op` 改为 `mori_ops` 列表，按 `dbo_current_ubatch_id()` 选择 op。native 模式在 `dbo_comm_region()` 中执行 dispatch/combine；AsyncLL 模式实现 `prepare_async`/`finalize_async`（hook = `dispatch_recv`/`combine_recv`）。`supports_async()` 在 AsyncLL 时返回 True，`supports_dbo()` 在 op 数大于 1 时返回 True。routing 改为每个 microbatch 各存一份 |
+| op 构造 | `fused_moe/all2all_utils.py` (+53/-2) | `_mori_ubatch_max_tokens()` 计算后续 op 的容量 `min(N, cdiv(N,n)+(n-1)q)`；`_make_mori_epv2_ops()` 按 `ubatch_id` 区分 handle cache key。AsyncLL 时传入 `async_ll=True, async_ll_transport="sdma", kernel_backend="hip"`，MoRI 支持时再加 `async_ll_own_sdma_queue=True` |
+| MoRI 通信管理 | `distributed/device_communicators/all2all.py` (+15/-2) | AsyncLL 的 arena 大小改用 MoRI 的 `asyncll_regions()`；`_make_handle(ubatch_id=0, ...)`；在 `create_dev_comm` 之后、`close` 之前加 `comm.barrier()`（SDMA 队列句柄交换） |
+| 配置 | `config/parallel.py` (+43/-13)、`config/vllm.py` (+2)、`platforms/rocm.py` (+1/-1) | 新增 `ParallelConfig.mori_epv2_async_ll` 字段；`sdma_picks_epv1` 改名为 `sdma_moves_tokens`。`MORI_ENABLE_SDMA=1` 单独设置时仍走 EPv1，加上 `VLLM_MORI_EP_V2=1` 且 MoRI 支持时走 AsyncLL。ROCm 上 `mori` 在 EPv2 下加入 DBO 允许列表 |
+| 特性探测 | `utils/import_utils.py` (+29) | `mori_epv2_has_async_ll()` 和 `mori_epv2_has_own_sdma_queue()`，通过 dataclass 字段和模块是否存在来探测 |
+| DBO 公共层（CUDA 共用） | `v1/worker/ubatching.py` (+20)、`prepare_finalize/naive_dp_ep.py` (+4/-32) | `_comm_region` 从 naive DP/EP 移到 `ubatching.dbo_comm_region`，两处共用，逻辑逐行一致 |
+| DBO 公共层（CUDA 共用） | `v1/worker/gpu/dp_utils.py` (+12/-5) | pure-padding 判断改用 `is_last_ubatch_empty(min, graph_tokens, n)`，覆盖恰好填满的边界和 n>2 的情况 |
+| DBO 公共层（CUDA 共用） | `v1/worker/workspace.py` (+29)、`v1/worker/gpu/model_runner.py` (+9/-1) | `WorkspaceManager.size_ubatches_alike()`：按 lane 把所有 microbatch 的 slot 扩到最大的那个；`profile_run` 在 `use_ubatching` 时调用 |
+| DBO 公共层（CUDA 共用） | `v1/worker/ubatch_utils.py` (+36/-2)、`v1/worker/gpu/ubatch_utils.py` (+9/-9) | `find_model_streams()` 扫描各 module 属性里的 `torch.cuda.Stream`；`create_blas_handles()` 在每个 stream 上建 BLAS handle，ROCm 上额外跑一次 1x1 GEMM。capture 时覆盖 compute、comm 和模型的 side stream |
+| DSv4 ROCm | `models/deepseek_v4/amd/rocm.py` (+9/-3) | decode 在 `num_decode_tokens == 0` 时跳过；MXFP4 compressor 的 launch 行数取 `min(state slot_mapping, k_cache slot_mapping)` |
+| 文档 | `docs/design/dbo.md`、`docs/serving/expert_parallel_deployment.md` | DBO 支持的后端列表；SDMA/AsyncLL 的选择规则；建议只对 prefill 开 DBO |
+| 测试 | `tests/kernels/moe/test_mori_epv2_prepare_finalize.py` (+311)、`tests/v1/worker/test_gpu_dp_utils.py` (+75)、`test_workspace.py` (+31) 等 | 用 FakeOp 测 op 尺寸（n=2/3，spec=0/1/3）、两个 microbatch 各用各的 op 交错执行、AsyncLL 在对方的间隙中 recv、SDMA 选择矩阵、eager 回退的三种情况、workspace slot 尺寸 |
 
 ### 3.2 架构 / 流程图
 
-后端选择（启动期，`resolve_mori_all2all`）：
+**MoRI 后端选择（gfx950）**
 
 ```mermaid
 flowchart TD
     A["--all2all-backend mori"] --> B{"VLLM_MORI_EP_V2"}
     B -- "0" --> V1["EPv1"]
-    B -- "unset / 1" --> C{"EPv2 可用?<br/>MoRI≥1.2.4、gfx950/gfx1250、单机 LSA、BF16 等"}
-    C -- "否(unset)" --> V1
-    C -- "是" --> D{"MORI_ENABLE_SDMA=1<br/>且 sdma_moves_tokens(非 gfx1250)?"}
-    D -- "否" --> N["EPv2 native"]
-    D -- "是" --> E{"MoRI 有 EPv2 AsyncLL?<br/>(config.async_ll + internode_regions)"}
-    E -- "有" --> L["EPv2 AsyncLL over SDMA<br/>mori_epv2_async_ll=True"]
-    E -- "无(unset)" --> V1
-    N --> F{"--enable-dbo"}
-    L --> F
-    V1 --> G["DBO 断言失败<br/>(mori 不在支持列表)"]
-    F --> H["每个 microbatch 一个 EPv2 op<br/>op0 满尺寸，其余按份额缩小"]
+    B -- "未设置" --> C{"EPv2 不支持的原因?<br/>MoRI<1.2.4 / 跨机 / 非 BF16 / per-tensor ...<br/>或 MORI_ENABLE_SDMA=1（新：未显式 opt-in）"}
+    C -- "有" --> V1
+    C -- "无" --> N["EPv2 native"]
+    B -- "1" --> D{"MORI_ENABLE_SDMA=1 且<br/>MoRI 有 async_ll + internode_regions?"}
+    D -- "否" --> N
+    D -- "是" --> L["EPv2 AsyncLL（SDMA）"]
+    N --> E{"--enable-dbo?"}
+    L --> E
+    E -- "是" --> F["每个 microbatch 一个 op<br/>op0: N tokens; op_i: cdiv(N,n)+(n-1)q"]
+    E -- "否" --> G["单个 op"]
+    V1 --> H{"--enable-dbo?"}
+    H -- "是" --> X["VllmConfig 断言拒绝"]
 ```
 
-AsyncLL + DBO 下两个 microbatch 的交错（与 deepep_ll 相同的 recv hook 机制，单 compute stream）：
+**AsyncLL 在 DBO 下的交错（2 个 microbatch，同一层 MoE）**
 
 ```mermaid
 sequenceDiagram
     participant U0 as ubatch0 线程
     participant U1 as ubatch1 线程
-    participant M as MoRI op0 / op1 (SDMA)
+    participant S as compute stream（同一条）
+    U0->>S: op0.dispatch_send
+    U0-->>U1: 登记 hook=op0.dispatch_recv, yield
+    U1->>S: 先跑 hook: op0.dispatch_recv
+    U1->>S: op1.dispatch_send
+    U1-->>U0: 登记 hook=op1.dispatch_recv, yield
+    U0->>S: experts(op0 接收行)
+    U0->>S: finalize_async 先跑 hook: op1.dispatch_recv
+    U0->>S: op0.combine_send, shared experts
+    U0-->>U1: 登记 hook=op0.combine_recv, yield
+    U1->>S: experts → 先跑 hook: op0.combine_recv → op1.combine_send
+    U1-->>U0: 登记 hook=op1.combine_recv, yield
+    Note over U0,U1: 每个 op 都按 send→recv→send→recv 的顺序执行，符合 MoRI AsyncLL 状态机
+```
 
-    U0->>M: op0.dispatch_send
-    U0->>U1: register_recv_hook(op0.dispatch_recv) + yield
-    U1->>M: 先跑 op0.dispatch_recv（对方的 recv）
-    U1->>M: op1.dispatch_send
-    U1->>U0: register_recv_hook(op1.dispatch_recv) + yield
-    U0->>U0: _finish_dispatch → experts 计算
-    U0->>M: finalize_async: 先跑对方 hook (op1.dispatch_recv)，再 op0.combine_send
-    U0->>U0: shared experts（MK 内部重叠）
-    U0->>U1: register_recv_hook(op0.combine_recv) + yield
-    U1->>M: 先跑 op0.combine_recv，再走自己的 experts / combine_send
+**DP 同步阶段的 pure-padding 回退（V2 runner）**
+
+```mermaid
+flowchart TD
+    A["all-reduce: num_tokens_across_dp 等"] --> B{"所有 rank 都允许 ubatch<br/>且 min 通过阈值?"}
+    B -- 否 --> Z["不切分"]
+    B -- 是 --> C["cudagraph_manager.dispatch(max tokens, n)"]
+    C --> D{"is_last_ubatch_empty(min, P, n)<br/>(P//n)*(n-1) >= min"}
+    D -- 是 --> E["eager 切分（cg_mode=NONE）"]
+    D -- 否 --> F["replay FULL microbatched graph"]
+    Note1["输入都是 all-reduce 后的值<br/>→ 各 rank 得出相同结论"] -.-> D
 ```
 
 ### 3.3 关键实现细节
 
-- **每 microbatch 一个 op**：MoRI op 的 receive/staging buffer 只在下次调用前有效，因此 microbatch 共用一个 op 会互相覆盖。`ubatch_id` 只进 `handle_cache` 的 key，不传给 `EpDispatchCombineConfig`。op0 保持 `max_num_inp_token_per_rank = moe.max_num_tokens`（即 `max_num_batched_tokens`），因为不拆分的 step 也走 op0。
-- **later op 容量上界**：`_mori_ubatch_max_tokens(N, n) = min(N, cdiv(N, n) + (n-1)*q)`，`q = 1 + num_speculative_tokens`，推导依赖 `maybe_create_ubatch_slices` 在 `N//n` 处切分、或 V2 `create_ubatch_slices` 在 `q*(N//(q*n))` 处切分。
-- **native DBO**：`dbo_comm_region()` 在 DBO 且非 capture 时 `yield_and_switch_from_compute_to_comm` → collective → `switch_to_compute_sync`；graph capture 中仍在 capture stream 上执行（因此 decode FULL graph 无重叠）。
-- **AsyncLL**：`supports_async()=True` 会同时打开 modular kernel 内部的 shared-experts 重叠；`finalize_async` 开头主动调用 `dbo_maybe_run_recv_hook()`，因为 MK 只在 `prepare_async` 前调用它（与 deepep_ll / nixl_ep 写法一致）。
-- **空 microbatch**：`is_last_ubatch_empty(min, N, n)` 判断 `(N//n)*(n-1) >= min`，原条件 `2*min < N` 漏掉了「恰好填满」的情况（如 N=128、min=64）；命中时该 step 走 eager。DSv4 的 MXFP4 compressor 改为按 `min(state_slot_mapping, k_cache_slot_mapping)` 行数 launch（`compress_pool` 的 grid 取 `pooled_k.shape[0]`，与之一致）。
-- **workspace**：V2 的 profile run 不拆分，只给 ubatch0 定尺寸；V1 改为先跑不拆分的，再跑一次拆分的（让其他 ubatch 创建 persistent resource），然后 `size_ubatches_alike()`。
-- **hipBLASLt handle**：handle 按线程和 stream 区分，只有 GEMM 才会创建；capture 中创建会失败。现在 capture 前对 compute/comm stream 以及 `find_model_streams` 找到的模型侧流（如 DSv4 的 `shared_experts_stream`、indexer `aux_stream_list`）都跑一次 1×1 `torch.mm`。
+- **op 尺寸上界**：`create_ubatch_slices` 的切分点是 `P // n`，uniform decode 且 q>1 时是 `q * (P // (q n))`。前 n-1 个 microbatch 各拿到一个切分点长度的 token，最后一个拿到剩余部分，少于 `P/n + (n-1)q`。
+  - op 0 的容量就是 `max_num_batched_tokens`，所以只要 P ≤ `max_num_batched_tokens`，后续 op 不会溢出；万一溢出，MoRI 的 `dispatch` 会抛 `ValueError`。
+  - q 取 `1 + num_speculative_tokens`。V2 runner 的 `uniform_token_count` 只在 decode-eligible 的 batch 上非空，不会超过 q。dummy batch 在 uniform 时请求数是偶数（R=256）或 q=1。我核对过，这个上界成立。
+- **native 的流同步**：`dbo_comm_region` 先 `_signal_compute_done` 再 yield，切到 comm stream 后 `wait(compute_done)`；退出时 compute stream `wait(comm_done)`。这与 naive DP/EP 原有的 `_comm_region` 逐行一致，跨流的内存复用也由这次 wait 保证顺序。
+- **AsyncLL**：`prepare_async` 返回 `(op.dispatch_recv, receiver)`。`finalize_async` 先调用 `dbo_maybe_run_recv_hook()`，这是因为 MK 只在 `prepare_async` 之前跑 hook，做法与 `deepep_ll.py:409` 相同。`supports_async()` 为 True 后，MK 会走 `MK_INTERNAL_OVERLAPPED` 的 shared experts 路径，即使不开 DBO 也一样。
+- **AsyncLL 配置**：`kernel_backend="hip"`（只有 hip backend 有 AsyncLL）。arena 大小按 MoRI 的 `asyncll_regions(cfg)` 加上每个 region 256 B 的对齐。
+- **配置**：新字段 `mori_epv2_async_ll` 没有加进 `compile_factors` 的忽略列表，会参与 hash。它由 env 和已安装的 MoRI 决定，在同一台机器上各 rank 一致（EPv2 本身要求单机）。
+- **workspace**：`size_ubatches_alike()` 只扩大 scratch slot，不碰 persistent resources。persistent resources 仍然在第一次 microbatched capture 时创建，那时 workspace 还没锁。
+- **MoRI 符号核对**：`dispatch_send/dispatch_recv/combine_send/combine_recv`、`async_ll`、`async_ll_transport`、`async_ll_own_sdma_queue`、`kernel_backend`、`internode_regions.asyncll_regions` 在 mori main 上都存在，签名与调用一致；`combine_in_view` 在已安装的 1.2.3.post1 中就有。没有发现不存在的符号。
 
 ## 4. 涉及的技术原理 (Technical Principles)
 
-- **DBO（Dual Batch Overlap）**：把一个 step 的 token 切成 2 个（或 n 个）microbatch，每个由一个 CPU 线程驱动，在 MoE 的 all2all 处 yield，让一个 microbatch 的通信与另一个的计算重叠。各 DP rank 必须以相同的方式切分并 padding，否则 all2all 的集合语义被破坏。因此某个 rank 的最后一个 microbatch 可能完全是 padding。
-- **MoRI EPv2 / CCO-LSA**：AMD 的 MoE dispatch/combine 库。EPv2 基于 cco 对称内存窗口（每 rank 按 4 GiB 预留 VMM），要求所有 EP rank 在同一个 LSA team（单机）。op 的 arena 从窗口中切出，所以每多一个 op 就多占一块 arena。
-- **AsyncLL over SDMA**：用 GPU 的 SDMA 引擎（拷贝引擎）搬 token，不占 CU。dispatch/combine 拆成 send 与 recv 两半，recv 侧自旋等待。在 eager prefill 中可以和计算重叠；但在 FULL graph decode 中会被串行化，作者实测拆分 decode 反而更慢。
-- **CUDA/HIP graph 与 handle/workspace 预分配**：graph capture 期间不能分配新的 hipBLASLt handle，也不能扩 workspace（锁定后扩容会释放 graph 引用的静态 buffer），所以所有 microbatch、所有 stream 的资源必须在 capture/lock 前建好。
-- **Modular kernel 的 async 契约**：`supports_async()` 让 MK 调用 `prepare_async/finalize_async`（返回 hook + receiver），DBO 下 hook 登记到下一个 ubatch 的 context，由对方在自己 send 之前执行。
+- **DBO（dual batch overlap）**：把一个 step 的 batch 切成 n 个 microbatch，每个 microbatch 由一个线程执行。各线程在 MoE 的 dispatch/combine 处通过 CPU event 交接控制权，让 A 的 all2all 和 B 的计算同时在 GPU 上运行。EP 场景下，所有 DP rank 必须用相同的 token 数和相同的切分点，否则 all2all 的集合通信对不上。
+- **MoRI EPv2**：基于 CCO 对称内存窗口的 intranode dispatch/combine。每个 op 在 window 里分配一块 arena（接收、暂存、路由表），容量 = `world_size × max_num_inp_token_per_rank` 行，超出时在 host 端抛错。native kernel 一次 launch 内完成 send 和 recv。
+- **AsyncLL**：MoRI 的另一类 kernel。send 和 recv 分开 launch，SDMA（copy engine）在两者之间搬数据，不占 CU，所以 send/recv 之间可以插入计算。每个 op 内部有 host 状态机，强制 `dispatch_send → dispatch_recv → combine_send → combine_recv` 的顺序，乱序会抛 RuntimeError。多个 op 共用一条 SDMA 队列时，后面 op 的 recv 会被前面 op 的 send 堵住（head-of-line blocking），#892 的 per-op 队列解决了这个问题。
+- **CUDA/HIP graph 与 microbatch**：FULL graph 在 capture 时把各 microbatch 的形状固定下来。如果某个 rank 的最后一个 microbatch 全是 padding，与 capture 时的形状和元数据假设不符，所以只能 eager 运行。hipBLASLt 的 handle 和 workspace 按 (线程, stream) 惰性创建，在 capture 中首次创建会失败，必须提前预热。
+- **Workspace 管理**：按 (ubatch, lane) 分 slot 的 scratch buffer。锁定之后不允许扩容，否则会释放 graph 引用的静态 buffer。
 
 ## 5. 评论区讨论亮点 (Discussion Highlights)
 
-- 目前没有实质性人工 review。评论只有 mergify 的文档预览链接，以及 `claude[bot]` 的一条说明（PR 来自 fork，自动 review 被禁用，需要 maintainer 评论 `@claude review` 触发）。
-- 作者在 PR 描述中主动说明了一处已知限制：V1 runner + DBO 的 CUDA graph 内存 profile「不计入 microbatched graph（上游行为）」，因此要多留几 GiB 余量，并提到有一次 V1 AsyncLL decode 在 `--gpu-memory-utilization 0.92` 下 OOM。但本 PR 的 diff 恰好新增了对 microbatched graph 的逐个 profile（见 §7 📝），描述与代码需要对齐。
+- **@okorzh-amd（inline，`parallel.py`）**：main 上 `MORI_ENABLE_SDMA=1` 总是选 EPv1，Quark MXFP4 MoE 模型就是在这个设置下运行的。按 PR 原来的改法，装了带 AsyncLL 的 MoRI（v1.2.5）后，同一条命令会走 EPv2 AsyncLL，然后在 `post_init_setup` 中因为 per-tensor 量化被拒，启动失败。作者接受了这个意见：改为只有 `MORI_ENABLE_SDMA=1` 时仍走 EPv1，必须显式设置 `VLLM_MORI_EP_V2=1` 才 opt-in AsyncLL。作者还在 8×MI355X 上用 MiniMax-M3.1-Flash-Quark-MXFP4 验证了改动前会失败、改动后走 EPv1。
+- **@okorzh-amd（关联 PR 清单）**：
+  - 与 #64787 是 add/add 冲突（同一个 `dbo_comm_region`）；
+  - 与 #66733 在 `mori_epv2.py` 的 `prepare → _finish_dispatch` 拆分上冲突；
+  - 与 #64668（MRV2 DBO 切分重构）以及 #63556/#63567/#64278 在 `sync_cudagraph_and_dp_padding` 上冲突。
+  合入顺序需要协调。
+- **作者关于 CI 的说明**：Main CI #100468 通过；CPU 镜像构建失败是因为从 GitHub Releases 下载 triton-cpu wheel 时出现 504，与本 PR 无关；docs 严格模式的告警在 main 上同样存在。
+- 没有其他 maintainer 的实质 review。claude[bot] 因为是 fork PR 没有运行。
 
 ## 6. 风险与潜在问题 (Risk Analysis)
 
 | 风险 | 严重程度 | 说明 |
 |------|---------|------|
-| 新 MoRI 路径无 AMD CI 覆盖 | High | 见 §7 ⚠️【测试】：基础镜像 MoRI v1.2.3.post1 < 1.2.4，EPv2/AsyncLL 在 CI 中走不到；新增测试全部基于 mock op |
-| later op 容量依赖切分算法的解析上界 | Medium | 见 §7 ⚠️【正确性】：切分逻辑一旦改变就可能超出容量，且运行时没有守卫 |
-| 默认阈值下开 DBO 会让 mori decode 变慢 | Medium | 见 §7 ⚠️【性能】：decode 下降 25%~27%，目前只在文档里提示 |
-| `MORI_ENABLE_SDMA=1` 语义变更 | Medium | 见 §7 ⚠️【兼容性】：升级 MoRI 后，gfx950 上的 SDMA 部署会从 EPv1 切到 EPv2 AsyncLL，并同时改变 shared experts 的执行顺序 |
-| 共享 DBO 路径行为变化（CUDA 也受影响） | Low | `is_last_ubatch_empty`、`create_blas_handles`、V1 profile_run 改动对 CUDA DBO 用户同样生效。逻辑上是修复，但只在 ROCm 上验证过 |
-| 启动时间 / 内存 | Low | V1 多跑一次 max_num_tokens dummy run，并逐个 profile 所有 microbatched graph；DBO 下每个 microbatch 多一个 EPv2 arena（按 GiB 取整） |
-| 性能数字可复现性 | Low | 见 §7 ⚠️【性能证据】 |
+| 共享 DBO 代码（dp_utils / workspace / BLAS 预热）对 CUDA 的行为改变没有在 CUDA 上验证 | Medium | 见 §7 ⚠️【兼容性】 |
+| 主路径（MoRI + DBO）CI 无法覆盖，端到端数据是在 merge 掉 V1 之前测的 | Medium | 见 §7 ⚠️【测试】 |
+| 多个开放 PR 与本 PR 冲突（#64787、#66733、#64668 等） | Medium | 合入顺序决定谁来 rebase；两份 `dbo_comm_region` 都要保持语义一致 |
+| AsyncLL + DBO 在缺少 #892 的 MoRI 上悄悄共用一条 SDMA 队列 | Low | 见 §7 📝【性能/文档】 |
+| 每多一个 microbatch op，每卡多占约 1 GiB arena | Low | 见 §7 📝【性能】 |
+| op 尺寸上界依赖 `create_ubatch_slices` 的切分规则 | Low | 两处代码没有互相引用，见 §7 📝【可维护性】 |
+| 跨 rank 不一致导致 hang | Low | eager 回退由 all-reduce 后的值决定，op 创建顺序和调用顺序在各 rank 相同。没发现分歧点 |
 
 ---
 
@@ -130,90 +174,117 @@ sequenceDiagram
 
 | 类型 | 🔴 | ⚠️ | 📝 |
 |------|----|----|----|
-| 正确性 | — | 1 | — |
-| 测试 | — | 1 | — |
-| 性能 | — | 2 | 1 |
 | 兼容性 | — | 1 | — |
+| 测试 | — | 1 | — |
+| 性能/文档 | — | — | 2 |
 | 可维护性 | — | — | 1 |
+| 正确性 | — | — | 1 |
 | 注释/文档 | — | — | 1 |
+
+先说结论：重点检查的几个方面都没有发现阻塞问题。
+
+- **microbatch 尺寸**：后续 op 的容量上界与两种切分规则一致，溢出时 MoRI 会大声报错，不会静默越界。
+- **跨 rank 一致性**：pure-padding 回退只依赖 all-reduce 后的值，各 rank 结论相同。
+- **AsyncLL**：每个 op 的调用顺序符合 MoRI 状态机。
+- **native 模式**：流同步与已有的 naive DP/EP 完全一致。
+- **配置与平台**：`rocm.py` 的改动只是 kwarg 改名，`parallel.py` 的选择逻辑对 Quark 模型保持了 main 上的行为。
+
+下面的意见集中在共享代码的 CUDA 验证、测试证据和若干可维护性问题。
 
 ---
 
-**⚠️【测试】MoRI EPv2 DBO / AsyncLL 新路径在 AMD CI 镜像中走不到，新增测试全部基于 mock** `[已验证]`
+**⚠️【兼容性】共享 DBO 代码的三处行为改变没有 ROCm 门控，CUDA 上的 DBO 也会受影响，但只在 MI355X 上验证过** `[已验证]`（改动不受平台门控已确认；CUDA 上的实际影响为 `[推测]`）
+- **问题**：
+  - `vllm/v1/worker/gpu/dp_utils.py:162-167`：pure-padding 判断从 `2*min < P` 改为 `is_last_ubatch_empty`。n=2 时多覆盖了 `min == P/2`（P 为偶数）这一种情况，这类 step 会从 FULL replay 改成 eager。
+  - `vllm/v1/worker/gpu/model_runner.py:1100-1103`：只要 `use_ubatching`，profile run 后就会把所有 microbatch 的 slot 扩到与 microbatch 0 一样大。在 CUDA DeepEP DBO 上，这部分 workspace 改为在 KV cache 分配之前占用。
+  - `vllm/v1/worker/gpu/ubatch_utils.py:518-544`：capture 时还会在模型持有的所有 side stream 上调用 `current_blas_handle()`，ROCm 上额外跑 1x1 GEMM。
+- **影响**：三处都是修复方向，回退风险看起来很低。但 CUDA 用户会看到行为变化：在恰好填满边界的 decode step 上从 graph 变成 eager，KV cache 容量变小一个 workspace 的大小，capture 时多建几个 cuBLAS handle/workspace。作者的验证只覆盖了 MI355X 和 naive DP/EP。
+- **行动**：建议作者补一次 CUDA 上 DeepEP LL/HT + DBO 的冒烟测试（例如 DeepSeek-V2-Lite DP2，在 profile 日志中对比 KV cache 容量），并请 MRV2 runner 的维护者（`dp_utils.py`/`ubatch_utils.py` 的主要作者 @njhill、@WoosukKwon，`workspace.py` 的 @LucasWilkinson）确认。
 
-- **问题**: `docker/Dockerfile.rocm_base:15` 固定 `MORI_BRANCH="v1.2.3.post1"`，而 `vllm/utils/import_utils.py` 的 `MORI_EPV2_MIN_VERSION = "1.2.4"`。因此在官方 ROCm 镜像里 `mori_epv2_unavailable_reason()` 不为空，`mori` 一律解析到 EPv1，`mori_epv2_async_ll` 永远为 False，`vllm/config/vllm.py:2236` 也不会把 mori 加入 DBO 列表。AsyncLL 依赖的 ROCm/mori#768 / #892 目前都没有正式 release（#892 今天才合并）。`tests/kernels/moe/test_mori_epv2_prepare_finalize.py` 新增的 DBO/AsyncLL 用例全部用 `FakeOp` / `_AsyncLLOp` 模拟，只验证调用顺序，不跑真实内核。本次 CI 状态无法获取（fetch 结果只有 `checks` 的 key 名）。
-- **影响**: 合入后，`mori_epv2.py` 的多 op / AsyncLL 分支、`_mori_epv2_arena_bytes` 的 AsyncLL 分支、`comm.barrier()` 时序等在 main 上没有任何硬件回归保护；MoRI 后续 API 漂移（比如 `asyncll_regions` 改名）只会在用户部署时暴露。
-- **行动**: 建议作者在 PR 描述里写明验证所用的 MoRI commit（需要同时包含 #768 和 #892），并说明 AMD CI 覆盖计划（升级 base 镜像 MoRI pin，或在 AMD 队列加一个 EPv2 + DBO 的 DSv4/小 MoE 冒烟用例）。review 时建议追问：上述 MoRI 依赖何时进入 release。
+**⚠️【测试】主路径没有 CI 覆盖，端到端数据早于当前 head，CI 状态未知** `[已验证]`
+- **问题**：
+  - 作者承认 CI 跑不了 MoRI + DBO（需要 8×MI355X）。单测用 FakeOp 验证了 op 尺寸、交错顺序和选择矩阵，但真实 MoRI 的 arena、SDMA 和 graph capture 没有覆盖。
+  - 描述中的性能表「是在 merge 之前在 V2 runner 上测的」，之后 merge 掉了 V1 的改动。所谓「在提交的代码上做的最终一次运行」是在哪个 commit 上做的不清楚，head 之后又 merge 了 main 10 次左右。
+  - 本次抓取拿不到 checks 数据，评论区也只看到 `/ci run`，没有看到 `/amd-ci run` 的结果。
+  - 表中数字（例如 AsyncLL prefill +21.7%）有复现命令，但没有日志可以追溯，暂记为 `[unverified]`。
+- **影响**：DBO 的线程交接一旦出错（例如某个 microbatch 抛异常），兄弟线程会永久停在交接点，表现为 hang（`begin_capturable_run` 的注释承认了这一点）。这类问题只能靠真实硬件上的端到端运行发现。
+- **行动**：建议作者在当前 head 上重跑一次 native 和 AsyncLL 的 DBO prefill/decode 以及 GSM8K，贴出日志摘要和 commit；同时触发 `/amd-ci run` 并贴出结果。
 
-**⚠️【正确性】later microbatch 的 EPv2 op 容量取自对切分算法的解析上界，运行时没有守卫** `[已验证]`（越界后果 `[推测]`）
+**📝【性能/文档】AsyncLL + DBO 在缺少 per-op SDMA 队列的 MoRI 上会静默共用队列；文档没有写出最低 MoRI 版本** `[已验证]`
+- **问题**：
+  - `all2all_utils.py:403-404` 只有在 `mori_epv2_has_own_sdma_queue()` 为真时才传 `async_ll_own_sdma_queue=True`，否则不打任何日志，继续运行。按 ROCm/mori#892 的描述，DBO 的两个 op 共用队列会造成 head-of-line blocking，DSv4-Pro EP8 prefill 每次 forward 大约多 100 ms。
+  - 能触发的只是在 #768（10-27）和 #892（11-05）之间从源码构建的 MoRI，v1.2.5 两者都有。
+  - 此外，`docker/Dockerfile.rocm_base` 仍然固定 `MORI_BRANCH="v1.2.3.post1"`，低于 EPv2 要求的 1.2.4。在官方镜像里照着新文档使用 `--enable-dbo --all2all-backend mori`，会被 `VllmConfig` 的断言以「mori is not supported」拒绝。这个 pin 不是本 PR 引入的。
+- **行动**：建议作者在 DBO + AsyncLL 且没有 own queue 时打一条 `warning_once`，并在 `expert_parallel_deployment.md` 写明：DBO 需要 MoRI ≥ 1.2.4（native），AsyncLL 需要 ≥ 1.2.5。
 
-- **问题**: `all2all_utils.py:193-207` 的 `_mori_ubatch_max_tokens` 把非 0 号 op 的 `max_num_inp_token_per_rank` 缩为 `cdiv(N, n) + (n-1)*q`。这个上界只在两种切分方式下成立：`maybe_create_ubatch_slices` 默认的 `N//n`，以及 V2 `create_ubatch_slices` 的 `q*(N//(q*n))`。但 `maybe_create_ubatch_slices` 本身已经支持显式的 `split_point: list[int]`（任意切分点），`mori_epv2.py:208-216` / `232-235` 取 `self.mori_ops[ubatch_id]` 后直接 dispatch，没有检查 `a1.shape[0]` 是否超过该 op 的容量。容量的推导与切分代码分布在三个文件中，只有一个单测（`test_later_microbatch_ops_hold_their_share`）把它们绑在一起。
-- **影响**: 只要以后有人改切分策略（例如按请求边界切 prefill、或启用显式 `split_point` 列表），后续 microbatch 就可能超过 op 容量。MoRI 侧是报错还是静默写越界取决于其实现，最坏情况是 dispatch 的 receive 区被写坏、结果静默出错。
-- **行动**: 建议作者在 `prepare`/`prepare_async` 中对 `a1.shape[0]` 与该 op 的 `max_num_inp_token_per_rank` 加一个 CPU 侧断言（shape 是静态的，不影响 graph capture），并在 `maybe_create_ubatch_slices` 的切分处注释说明这一约束。
+**📝【性能】每个后续 microbatch 都有自己的 EPv2 op，带来约 1 GiB/卡的 arena；不开 UBatchRunner 时也会创建** `[已验证]`（大小是按 `_mori_epv2_arena_bytes` 公式估算的）
+- **问题**：
+  - 以 DSv4-Pro 为例（hidden 7168，BF16，EP8，`max_num_batched_tokens=8192`），后续 op 的容量是 8×4097 行，每行约 28.7 KB，arena 约 0.94 GB，向上取整到 1 GiB。
+  - `_make_mori_epv2_ops` 用 `get_num_ubatches()` 决定创建几个 op。而 `maybe_build_ubatch_runner` 在 DP=1 且 schedule 为 `dispatch-combine-overlap` 时返回 None，这时多出来的 op 永远用不到。
+- **行动**：建议作者在文档中写明 DBO 会多占这部分显存，并考虑在 runner 不会被构建时只创建一个 op。
 
-**⚠️【性能】默认 DBO 阈值下，mori 的 decode 会被拆分并明显变慢，只有文档提示** `[已验证]`（数字本身 `[unverified]`）
+**📝【可维护性】op 尺寸上界与切分规则分处两处，q 的来源也是自己重新推导的** `[已验证]`
+- **问题**：`all2all_utils.py:194-208` 的 `_mori_ubatch_max_tokens` 用 `1 + num_speculative_tokens` 作为 q，正确性依赖 `gpu/ubatch_utils.create_ubatch_slices` 的切分规则（`P//n`，或 `q*(P//(qn))`）。
+  - 配置层已经有 `VllmConfig.uniform_decode_query_len`，它的 docstring 专门说明了 DFlash 等情况下 query 长度与 draft 预留 slot 的区别，DBO 的阈值提升（`_raise_dbo_thresholds_for_spec_decode`）也用的是它。
+  - 将来切分规则改动（例如 #64668 的 MRV2 DBO 切分重构）时，这里不会跟着改，只会在运行时由 MoRI 抛 ValueError。
+- **行动**：建议作者改用 `uniform_decode_query_len`，并在 `create_ubatch_slices` 的 docstring 中引用这个上界（或者加一个断言：最后一个 slice 的 token 数 ≤ 后续 op 的容量）。
 
-- **问题**: PR 自己的数据显示，默认阈值（`dbo_decode_token_threshold=32`）下开启 DBO，native decode 为 −27.0%、AsyncLL 为 −24.8%。代码对此只在 `expert_parallel_deployment.md:108` 加了一句建议，`vllm/config/vllm.py:2236` 放行 mori 时没有任何日志提示。
-- **影响**: 按文档常规用法 `--enable-dbo --all2all-backend mori` 部署 DSv4 的用户，会在混合负载中默默损失约四分之一的 decode 吞吐。
-- **行动**: 建议作者在 mori + DBO + decode 阈值仍为默认值时输出一条 `warning_once`，提示调大 `--dbo-decode-token-threshold`；如果不改共享默认值，也可以考虑只对 mori 后端在 `_raise_dbo_thresholds_for_spec_decode` 一类的位置做后端特定的调整。
+**📝【正确性】`find_model_streams` 只扫描 module 的直接属性和一层容器，可能漏掉 side stream** `[推测]`
+- **问题**：`vllm/v1/worker/ubatch_utils.py:150-165` 只看 `vars(module)` 及其中的 dict/list/tuple。
+  - 普通对象里持有的 stream 找不到，例如 `deepseek_v41/amd/mhc.py:38` 中 `MHCOverlapStream` 的 `.stream`。
+  - 在 forward 中临时取的全局 stream 也找不到，例如 `inkling/amd/ops/qkvr_prep.py:870` 的 `kv_stream = aux_stream()`。
+  - 由于 `aux_stream()` 是全局单例，只要有一个 module 把它存为属性（例如 `SharedExperts._stream`），就能间接覆盖到。但这是巧合，不是保证。
+- **影响**：如果某个模型的 side stream 没被扫描到，它在 DBO capture 中仍会遇到 HIP error 900。
+- **行动**：建议作者在 `find_model_streams` 中额外加入已初始化的全局 `aux_stream()`，或在 docstring 中说明覆盖范围。
 
-**⚠️【兼容性】`MORI_ENABLE_SDMA=1` 的语义从「强制 EPv1」变为「EPv2 AsyncLL」，并连带打开 MK 内部 shared-experts 重叠** `[已验证]`
-
-- **问题**: `config/parallel.py:1330-1335` 在 gfx950 上、MoRI 带 AsyncLL 时设置 `mori_epv2_async_ll=True`；`mori_epv2.py` 的 `supports_async()` 随之返回 True。这不仅换了 all2all 内核，还让 modular kernel 改走 `prepare_async/finalize_async`，shared experts 也改为 `MK_INTERNAL_OVERLAPPED` 顺序（不开 DBO 时同样如此）。验证范围只有 DSv4-Pro、DP8+EP8、单机 MI355X。
-- **影响**: 现有 SDMA 部署在升级 MoRI 后，会在不改任何 vLLM 参数的情况下切换到完全不同的执行路径。激活范围（所有 gfx950 上的 mori MoE 模型）比验证范围（单一模型、单一并行配置）宽。
-- **行动**: 建议作者在 PR / release note 中把它列为 breaking 行为变更（已有 `logger.info_once` 输出 "AsyncLL over SDMA"，建议改为 warning 级别并提示 `VLLM_MORI_EP_V2=0` 可恢复旧行为），并在不开 DBO 的情况下，至少对另一个 MoE 模型（如 DeepSeek-V3 / Kimi）补一组 AsyncLL 的精度结果。
-
-**⚠️【性能】性能数字缺少可复现信息** `[unverified]`
-
-- **问题**: 验证表给出了 prefill/decode tok/s 和百分比，但没有 benchmark 命令/脚本、MoRI commit、ROCm/aiter 版本，也没有说明是单次运行还是多次取均值；描述中「final run matched these within 3%」同样没有原始输出。
-- **影响**: 无法复核 +21.7% 与 −27% 等结论，也无法判断 3% 的波动是否会掩盖 native 与 AsyncLL 之间的差异。
-- **行动**: 建议作者补充完整的 `vllm serve` 与 `vllm bench serve` 命令、MoRI/aiter/ROCm 版本，并附上原始 benchmark 输出（或 gist）。
-
-**📝【性能】DBO + AsyncLL 在 MoRI 只有 #768、没有 #892 时会默默共用 SDMA 队列** `[已验证]`
-
-- **问题**: `all2all_utils.py:402-403` 只在 `mori_epv2_has_own_sdma_queue()` 为真时设置 `async_ll_own_sdma_queue=True`，否则不做任何提示。按 ROCm/mori#892 的描述，同一 stream 上多个 AsyncLL op 共用 SDMA 队列时，recv 会被无关传输阻塞，这是性能问题而不是正确性问题。
-- **行动**: 建议作者在 DBO + AsyncLL 且缺少 own-queue 支持时输出一条 `info_once`/`warning_once`，避免用户把较差的重叠效果误判为 DBO 本身的问题。
-
-**📝【注释/文档】PR 描述中「V1 内存 profile 不计入 microbatched graph」与 diff 不一致；V1 启动成本上升** `[已验证]`
-
-- **问题**: `gpu_model_runner.py:6322-6345` 新增了 `profile_groups`，对所有 microbatched FULL graph 逐个 capture 采样（`profile_descs = descs if microbatched else descs[:2]`），并把结果计入 `per_graph_estimate[mode, True]`。这与描述 Notes 中「does not count the microbatched graphs (upstream behavior)」的说法矛盾。另外 `gpu_model_runner.py:6123-6135` 让 profile_run 多跑一次 `max_num_tokens` 的拆分 dummy run。
-- **行动**: 建议作者更新描述，说明本 PR 后 V1 还缺哪部分内存没有计入（与那次 0.92 OOM 的关系），并给出开启 DBO 时启动/profile 耗时的增量。
-
-**📝【可维护性】mori 解析为 EPv1 时，`--enable-dbo` 的报错没有说明原因** `[已验证]`
-
-- **问题**: `vllm/config/vllm.py:2235-2236` 只在 `mori_ep_v2` 为真时放行 mori。如果因为 MoRI < 1.2.4、gfx942、或 SDMA 但没有 AsyncLL 而退回 EPv1，用户会看到 "mori is not supported" 的断言，提示列表里也没有 mori，无从得知是 EPv1 回退导致的。
-- **行动**: 建议作者在 ROCm 且 backend 为 mori 但 `mori_ep_v2=False` 时给出专门的报错，说明 DBO 需要 EPv2，并附上 EPv2 不可用的原因（`_mori_epv2_unsupported_reason` 已经能算出来）。
-
-> AI 代码诊断：描述对机制（WHY）解释充分，数字也不是整数，作者声明了 AI 辅助并自行做了硬件验证。主要信号是测试以 mock 为主、靠 CPU 侧时序断言保证正确性。幻觉符号扫描方面：`asyncll_regions`、`dispatch_send/dispatch_recv/combine_send/combine_recv`、`async_ll`、`async_ll_transport` 与 ROCm/mori#768 的描述一致，`async_ll_own_sdma_queue` 与 #892 一致，且 vLLM 侧都有特性探测兜底。没有发现缺失符号。DSv4 的两处空 microbatch 修复（`rocm.py` decode 跳过、compressor `min` 行数）经交叉核对 `compress_pool` 的 grid 后确认是安全的。
+**📝【注释/文档】PR 描述与最终 diff 不一致** `[已验证]`
+- **问题**：
+  - 描述中「9 个 commit，每个都可以单独 review」包括「Count microbatched CUDA graphs in the V1 memory profile」，但 V1 runner 已经被删除，这部分在最终 diff 中不存在。
+  - 最终 diff 对 CUDA graph 的显存 profiling 没有任何改动。描述中提到 V2 对 microbatched graph 显存高估（20.7 GiB 对比实际 9.2 GiB），本 PR 也没有处理。
+- **行动**：建议作者更新描述，去掉 V1 的部分，并为 V2 的显存高估开一个跟进 issue。
 
 ## 8. 结论 (Verdict)
 
-**⚠️ NEEDS WORK**
+⚠️ **NEEDS WORK**。
 
-设计与现有 DBO 机制（deepep_ll 的 recv hook、naive DP/EP 的 comm region）一致，DSv4/workspace/hipBLASLt 等 DBO 修复也有针对性的单测。本次没有找到能给出具体触发输入的阻塞性缺陷。但新的 MoRI EPv2 DBO/AsyncLL 路径在 AMD CI 镜像中完全走不到，later op 容量缺少运行时守卫，`MORI_ENABLE_SDMA=1` 的行为变更和默认阈值下 decode 变慢也需要更显式的提示，性能数字需要补充可复现信息。
+我检查过的 ROCm 路径都没有发现阻塞问题：
+- microbatch op 的容量上界、跨 rank 一致的 eager 回退、AsyncLL 每个 op 的调用顺序、native 模式的流同步，都经过逐段追踪；
+- `MORI_ENABLE_SDMA` 的默认行为保持与 main 一致。
+
+合入前建议：
+1. 在 CUDA 上用 DBO 冒烟测试一次本 PR 对共享 worker 代码的改动；
+2. 在当前 head 上重跑端到端数据并给出 AMD CI 的结果。
+
+📝 项可以在跟进 PR 中处理。
 
 ## 9. 英文 Review 评论 (Copy-Paste English Comments)
 
-**C1** `vllm/model_executor/layers/fused_moe/all2all_utils.py:193-207` — ⚠️ comment
+**C1** `vllm/v1/worker/gpu/dp_utils.py:162-167` — ⚠️ comment
 
 ```text
-The later microbatch ops are sized from an analytic bound that mirrors the split logic in `maybe_create_ubatch_slices` (N // n) and V2 `create_ubatch_slices` (q * (N // (q * n))), but nothing checks it at runtime: `MoriEPv2PrepareAndFinalize.prepare`/`prepare_async` index `self.mori_ops[ubatch_id]` and dispatch `a1` directly. `maybe_create_ubatch_slices` already accepts an explicit `split_point` list, so a future change to the split policy could silently exceed a later op's `max_num_inp_token_per_rank`. Could you add a cheap CPU-side assert in prepare/prepare_async that `a1.shape[0]` fits the current op's capacity (the shape is static, so it is graph-safe), and note the constraint next to the split code?
+These shared DBO fixes are not ROCm-gated, so they also change CUDA DBO (DeepEP LL/HT, nixl_ep): with two microbatches, a step where the smallest rank exactly fills microbatch 0 (min == P/2) now runs eager instead of replaying the FULL graph, `profile_run` now reserves every microbatch's workspace before the KV cache is sized (model_runner.py:1100-1103), and capture now creates BLAS handles on every model side stream. All three look like the right fixes, but the validation in the description is MI355X-only. Could you add a CUDA DeepEP + DBO smoke run (e.g. DeepSeek-V2-Lite DP2, comparing KV cache size and decode throughput) and get a sign-off from the MRV2 runner owners?
 ```
 
-**C2** `vllm/config/vllm.py:2236` — ⚠️ comment
+**C2** `vllm/model_executor/layers/fused_moe/all2all_utils.py:194-208` — ⚠️ comment
 
 ```text
-This enables DBO for `mori` only when it resolves to EPv2, but the default ROCm base image pins MoRI v1.2.3.post1 (< MORI_EPV2_MIN_VERSION 1.2.4), and AsyncLL needs ROCm/mori#768 and #892, which are not in a release yet. So none of the new EPv2 DBO / AsyncLL paths can run in AMD CI, and the new tests use mocked ops only. Could you state the exact MoRI commit used for validation and the plan for CI coverage (bump the MoRI pin or add an EPv2 + DBO smoke test on the AMD queue)? Separately, when mori falls back to EPv1, the assertion below lists the supported backends without mentioning why mori was excluded; a dedicated error that says DBO needs EPv2, with the EPv1 fallback reason, would save users some debugging.
+The later-op bound is correct for today's split rule (P // n, or q * (P // (q * n)) for uniform q-token decode), but it lives here while the rule lives in `gpu/ubatch_utils.create_ubatch_slices`, and q is re-derived from `num_speculative_tokens` instead of `VllmConfig.uniform_decode_query_len`, which DBO's own threshold check already uses and which documents the DFlash distinction. If the split changes (e.g. #64668), this only surfaces as a MoRI ValueError at runtime. Could you use `uniform_decode_query_len` here and cross-reference or assert the bound next to the split?
 ```
 
-**C3** `vllm/config/parallel.py:1330-1335` — ⚠️ comment
+**C3** `vllm/model_executor/layers/fused_moe/all2all_utils.py:403-404` — ⚠️ comment
 
 ```text
-With a MoRI that has AsyncLL, `MORI_ENABLE_SDMA=1` on gfx950 now switches from EPv1 to EPv2 AsyncLL. Because `supports_async()` then returns True, the modular kernel also takes the prepare_async/finalize_async path and overlaps shared experts internally, even without DBO. That is a sizeable behavior change for existing SDMA deployments, and it was validated only on DeepSeek-V4-Pro DP8+EP8. Consider logging this at warning level with a hint that `VLLM_MORI_EP_V2=0` restores the old behavior, calling it out in the release notes, and adding a non-DBO AsyncLL accuracy check on at least one other MoE model.
+When the installed MoRI has EPv2 AsyncLL (#768) but not `async_ll_own_sdma_queue` (#892), DBO silently runs both microbatch ops on one SDMA queue. Per ROCm/mori#892 that head-of-line blocking costs about 100 ms per forward on DeepSeek-V4-Pro EP8 prefill. Could you log a `warning_once` in that case, and state the minimum MoRI versions in expert_parallel_deployment.md (>= 1.2.4 for DBO on native EPv2, >= 1.2.5 for AsyncLL)? Note that `Dockerfile.rocm_base` still pins MoRI v1.2.3.post1, so `--enable-dbo --all2all-backend mori` is rejected in the official image.
 ```
 
-**C4** `vllm/model_executor/layers/fused_moe/all2all_utils.py:395-403` — ⚠️ comment
+**C4** `vllm/v1/worker/gpu/model_runner.py:1100-1103` — ⚠️ comment
 
 ```text
-Your own numbers show that, with the default `dbo_decode_token_threshold` (32), enabling DBO on mori makes decode 25-27% slower, and the only mitigation is a sentence in the docs. Users who follow the usual `--enable-dbo --all2all-backend mori` recipe will lose decode throughput without any signal. Could you emit a `warning_once` when mori EPv2 runs with DBO and the decode threshold is still the default? It would also help to log when DBO + AsyncLL runs on a MoRI without `async_ll_own_sdma_queue` (pre-#892), since the shared SDMA queue reduces the overlap.
+The PR's end-to-end numbers were measured before the merge that dropped the V1 changes, and the head has been re-merged with main several times since. Since CI cannot run MoRI + DBO, could you re-run native and AsyncLL DBO (prefill, decode and GSM8K) on the current head, post the commit and log summaries, and trigger `/amd-ci run`? The description also still lists the V1 "Count microbatched CUDA graphs" commit, which is no longer part of the diff.
+```
+
+## 10. 英文总结评论 (Overall Review Summary)
+
+```text
+Thanks for the careful root-cause work. Later EPv2 ops are sized with a bound that matches both split rules, MoRI fails loudly on overflow, the pure-padding eager fallback uses DP-synced values so ranks cannot diverge, and each AsyncLL op follows MoRI's send/recv order. Before merge, please smoke-test the shared worker changes (eager fallback, workspace sizing, side-stream BLAS warm-up) with CUDA DeepEP DBO, and re-run the end-to-end numbers on the current head with AMD CI results. Deriving q from uniform_decode_query_len and warning without per-op SDMA queues would help. Approve after those.
 ```
