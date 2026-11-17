@@ -1,0 +1,1660 @@
+[
+  {
+    "case": "prefill8k",
+    "requests": [
+      {
+        "query_len": 8192,
+        "kv_len": 8192,
+        "num_draft_tokens": 0,
+        "chunked": false
+      }
+    ],
+    "median_us": 213661.0,
+    "sampling_params": {
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "top_k": 0,
+      "min_p": 0.0,
+      "repetition_penalty": 1.0,
+      "presence_penalty": 0.0,
+      "frequency_penalty": 0.0
+    },
+    "ranks": [
+      {
+        "num_tokens": 8192,
+        "kv_blocks": 1095,
+        "routing": "balanced",
+        "num_local_tokens": 8192,
+        "num_tokens_after_padding": 8192,
+        "batch_order": [
+          "bench-0"
+        ],
+        "timing_scope": "target_sampler_and_drafter",
+        "sampler": {
+          "valid_token_ids": true,
+          "graph_deterministic": true
+        },
+        "eager_repeat": {
+          "max_abs": 5.40625,
+          "relative_rms": 1.1482861042022705
+        },
+        "graph_vs_eager": {
+          "max_abs": 5.34375,
+          "relative_rms": 1.1482644081115723
+        },
+        "graph_deterministic": false,
+        "finite": true,
+        "state_reset_bytes": 198465280,
+        "drafter": {
+          "method": "dspark",
+          "acceptance": "all",
+          "num_draft_tokens": 5,
+          "output_shape": [
+            1,
+            5
+          ],
+          "graph_matches_eager": true,
+          "valid_token_ids": true
+        },
+        "latency_us": {
+          "timer": "graph_events_rank_max",
+          "median": 213661.0,
+          "sample_spread_pct": 0.3219103515148163,
+          "mean": 213707.578125,
+          "std": 745.7578735351562,
+          "min": 212534.453125,
+          "p90": 214718.796875,
+          "count": 100,
+          "samples_us": [
+            213586.5,
+            213758.86,
+            212671.55,
+            213581.55,
+            213671.94,
+            212586.66,
+            212809.5,
+            213662.27,
+            214713.42,
+            214588.06,
+            214795.55,
+            213600.06,
+            212631.23,
+            212764.66,
+            213362.23,
+            212973.25,
+            214572.52,
+            212880.53,
+            213599.28,
+            215547.31,
+            213717.11,
+            215632.0,
+            213725.05,
+            214039.3,
+            212871.17,
+            213032.44,
+            213606.09,
+            213332.58,
+            213016.05,
+            212643.77,
+            212747.53,
+            212825.41,
+            212534.45,
+            212561.3,
+            213504.89,
+            214033.3,
+            213602.42,
+            212727.53,
+            213606.98,
+            213511.75,
+            212846.73,
+            213644.66,
+            213855.59,
+            213551.98,
+            213146.81,
+            212897.41,
+            213815.58,
+            212691.53,
+            212735.06,
+            212752.86,
+            212569.0,
+            213746.66,
+            213413.91,
+            214063.02,
+            213482.58,
+            214653.19,
+            212616.66,
+            213687.3,
+            213605.3,
+            213884.58,
+            214202.25,
+            213595.61,
+            214926.78,
+            215321.44,
+            214347.27,
+            214806.84,
+            213917.73,
+            213308.09,
+            214683.88,
+            214665.09,
+            214767.16,
+            213362.62,
+            214679.5,
+            212789.81,
+            213187.84,
+            213258.69,
+            212587.81,
+            214010.81,
+            213851.67,
+            214499.31,
+            214809.34,
+            214468.03,
+            214047.89,
+            214523.11,
+            213659.75,
+            213712.09,
+            214521.39,
+            213658.81,
+            213763.86,
+            213748.78,
+            213470.31,
+            214362.88,
+            213756.73,
+            213866.19,
+            214576.44,
+            213675.22,
+            214778.67,
+            214561.7,
+            214863.27,
+            213874.39
+          ]
+        }
+      },
+      {
+        "num_tokens": 8192,
+        "kv_blocks": 1095,
+        "routing": "balanced",
+        "num_local_tokens": 8192,
+        "num_tokens_after_padding": 8192,
+        "batch_order": [
+          "bench-0"
+        ],
+        "timing_scope": "target_sampler_and_drafter",
+        "sampler": {
+          "valid_token_ids": true,
+          "graph_deterministic": true
+        },
+        "eager_repeat": {
+          "max_abs": 5.34375,
+          "relative_rms": 1.1512815952301025
+        },
+        "graph_vs_eager": {
+          "max_abs": 5.84375,
+          "relative_rms": 1.147222638130188
+        },
+        "graph_deterministic": false,
+        "finite": true,
+        "state_reset_bytes": 198465280,
+        "drafter": {
+          "method": "dspark",
+          "acceptance": "all",
+          "num_draft_tokens": 5,
+          "output_shape": [
+            1,
+            5
+          ],
+          "graph_matches_eager": true,
+          "valid_token_ids": true
+        },
+        "latency_us": {
+          "timer": "graph_events_rank_max",
+          "median": 213661.0,
+          "sample_spread_pct": 0.3219103515148163,
+          "mean": 213707.578125,
+          "std": 745.7578735351562,
+          "min": 212534.453125,
+          "p90": 214718.796875,
+          "count": 100,
+          "samples_us": [
+            213586.5,
+            213758.86,
+            212671.55,
+            213581.55,
+            213671.94,
+            212586.66,
+            212809.5,
+            213662.27,
+            214713.42,
+            214588.06,
+            214795.55,
+            213600.06,
+            212631.23,
+            212764.66,
+            213362.23,
+            212973.25,
+            214572.52,
+            212880.53,
+            213599.28,
+            215547.31,
+            213717.11,
+            215632.0,
+            213725.05,
+            214039.3,
+            212871.17,
+            213032.44,
+            213606.09,
+            213332.58,
+            213016.05,
+            212643.77,
+            212747.53,
+            212825.41,
+            212534.45,
+            212561.3,
+            213504.89,
+            214033.3,
+            213602.42,
+            212727.53,
+            213606.98,
+            213511.75,
+            212846.73,
+            213644.66,
+            213855.59,
+            213551.98,
+            213146.81,
+            212897.41,
+            213815.58,
+            212691.53,
+            212735.06,
+            212752.86,
+            212569.0,
+            213746.66,
+            213413.91,
+            214063.02,
+            213482.58,
+            214653.19,
+            212616.66,
+            213687.3,
+            213605.3,
+            213884.58,
+            214202.25,
+            213595.61,
+            214926.78,
+            215321.44,
+            214347.27,
+            214806.84,
+            213917.73,
+            213308.09,
+            214683.88,
+            214665.09,
+            214767.16,
+            213362.62,
+            214679.5,
+            212789.81,
+            213187.84,
+            213258.69,
+            212587.81,
+            214010.81,
+            213851.67,
+            214499.31,
+            214809.34,
+            214468.03,
+            214047.89,
+            214523.11,
+            213659.75,
+            213712.09,
+            214521.39,
+            213658.81,
+            213763.86,
+            213748.78,
+            213470.31,
+            214362.88,
+            213756.73,
+            213866.19,
+            214576.44,
+            213675.22,
+            214778.67,
+            214561.7,
+            214863.27,
+            213874.39
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "case": "decode128",
+    "requests": [
+      {
+        "query_len": 6,
+        "kv_len": 19594,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9909,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14487,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 8835,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 20770,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 23854,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15344,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15263,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 11098,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18152,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 13104,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 12354,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15661,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21102,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18860,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 10423,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14440,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14543,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 11763,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16299,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 11799,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 12896,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15772,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19546,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16290,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16161,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 17317,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 11707,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14825,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 20119,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 12815,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18557,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 20469,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14216,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 20845,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18817,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14475,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14827,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9306,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 23545,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19362,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9859,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 20030,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16596,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9334,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21557,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9978,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19221,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 10184,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21979,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 17206,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18599,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21238,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15581,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 10290,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21070,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 13921,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22356,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 23022,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 20296,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 13592,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 24533,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16106,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21873,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 10519,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21833,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14169,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19590,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9998,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18983,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 10953,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 11712,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 13100,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9521,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22106,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15141,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15138,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 10513,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14926,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19023,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 13962,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19044,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21865,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 23562,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14959,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9693,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 8952,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22811,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9799,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19151,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 23118,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18276,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 23964,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16516,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 8765,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22605,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19825,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 8469,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 8954,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 11194,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 20080,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21276,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 19432,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 23567,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22912,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 24379,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 10030,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 8989,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14688,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16024,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9800,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22168,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 12246,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16644,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15531,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 21117,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 9497,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 18699,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 15380,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 14012,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 24520,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 17474,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 12784,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 12169,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22264,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 16514,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 22024,
+        "num_draft_tokens": 5,
+        "chunked": false
+      },
+      {
+        "query_len": 6,
+        "kv_len": 12999,
+        "num_draft_tokens": 5,
+        "chunked": false
+      }
+    ],
+    "median_us": 71545.953125,
+    "sampling_params": {
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "top_k": 0,
+      "min_p": 0.0,
+      "repetition_penalty": 1.0,
+      "presence_penalty": 0.0,
+      "frequency_penalty": 0.0
+    },
+    "ranks": [
+      {
+        "num_tokens": 768,
+        "kv_blocks": 19213,
+        "routing": "balanced",
+        "num_local_tokens": 768,
+        "num_tokens_after_padding": 768,
+        "batch_order": [
+          "bench-0",
+          "bench-1",
+          "bench-2",
+          "bench-3",
+          "bench-4",
+          "bench-5",
+          "bench-6",
+          "bench-7",
+          "bench-8",
+          "bench-9",
+          "bench-10",
+          "bench-11",
+          "bench-12",
+          "bench-13",
+          "bench-14",
+          "bench-15",
+          "bench-16",
+          "bench-17",
+          "bench-18",
+          "bench-19",
+          "bench-20",
+          "bench-21",
+          "bench-22",
+          "bench-23",
+          "bench-24",
+          "bench-25",
+          "bench-26",
+          "bench-27",
+          "bench-28",
+          "bench-29",
+          "bench-30",
+          "bench-31",
+          "bench-32",
+          "bench-33",
+          "bench-34",
+          "bench-35",
+          "bench-36",
+          "bench-37",
+          "bench-38",
+          "bench-39",
+          "bench-40",
+          "bench-41",
+          "bench-42",
+          "bench-43",
+          "bench-44",
+          "bench-45",
+          "bench-46",
+          "bench-47",
+          "bench-48",
+          "bench-49",
+          "bench-50",
+          "bench-51",
+          "bench-52",
+          "bench-53",
+          "bench-54",
+          "bench-55",
+          "bench-56",
+          "bench-57",
+          "bench-58",
+          "bench-59",
+          "bench-60",
+          "bench-61",
+          "bench-62",
+          "bench-63",
+          "bench-64",
+          "bench-65",
+          "bench-66",
+          "bench-67",
+          "bench-68",
+          "bench-69",
+          "bench-70",
+          "bench-71",
+          "bench-72",
+          "bench-73",
+          "bench-74",
+          "bench-75",
+          "bench-76",
+          "bench-77",
+          "bench-78",
+          "bench-79",
+          "bench-80",
+          "bench-81",
+          "bench-82",
+          "bench-83",
+          "bench-84",
+          "bench-85",
+          "bench-86",
+          "bench-87",
+          "bench-88",
+          "bench-89",
+          "bench-90",
+          "bench-91",
+          "bench-92",
+          "bench-93",
+          "bench-94",
+          "bench-95",
+          "bench-96",
+          "bench-97",
+          "bench-98",
+          "bench-99",
+          "bench-100",
+          "bench-101",
+          "bench-102",
+          "bench-103",
+          "bench-104",
+          "bench-105",
+          "bench-106",
+          "bench-107",
+          "bench-108",
+          "bench-109",
+          "bench-110",
+          "bench-111",
+          "bench-112",
+          "bench-113",
+          "bench-114",
+          "bench-115",
+          "bench-116",
+          "bench-117",
+          "bench-118",
+          "bench-119",
+          "bench-120",
+          "bench-121",
+          "bench-122",
+          "bench-123",
+          "bench-124",
+          "bench-125",
+          "bench-126",
+          "bench-127"
+        ],
+        "timing_scope": "target_sampler_and_drafter",
+        "sampler": {
+          "valid_token_ids": true,
+          "graph_deterministic": false
+        },
+        "eager_repeat": {
+          "max_abs": 3.59765625,
+          "relative_rms": 0.05569368600845337
+        },
+        "graph_vs_eager": {
+          "max_abs": 3.59765625,
+          "relative_rms": 0.05274093896150589
+        },
+        "graph_deterministic": false,
+        "finite": true,
+        "state_reset_bytes": 359629312,
+        "drafter": {
+          "method": "dspark",
+          "acceptance": "all",
+          "num_draft_tokens": 5,
+          "output_shape": [
+            128,
+            5
+          ],
+          "graph_matches_eager": false,
+          "valid_token_ids": true
+        },
+        "latency_us": {
+          "timer": "graph_events_rank_max",
+          "median": 71545.953125,
+          "sample_spread_pct": 0.05680352821946144,
+          "mean": 71553.7890625,
+          "std": 71.87457275390625,
+          "min": 71404.2890625,
+          "p90": 71654.671875,
+          "count": 100,
+          "samples_us": [
+            71585.41,
+            71465.93,
+            71529.8,
+            71523.92,
+            71488.45,
+            71642.97,
+            71582.97,
+            71654.33,
+            71563.48,
+            71528.93,
+            71556.93,
+            71531.37,
+            71437.09,
+            71512.77,
+            71543.77,
+            71662.37,
+            71458.93,
+            71745.05,
+            71571.12,
+            71555.13,
+            71595.61,
+            71673.29,
+            71712.37,
+            71638.88,
+            71528.37,
+            71585.52,
+            71607.57,
+            71521.65,
+            71412.77,
+            71596.01,
+            71506.12,
+            71420.57,
+            71433.69,
+            71559.05,
+            71618.93,
+            71570.05,
+            71542.97,
+            71465.65,
+            71504.84,
+            71558.29,
+            71407.38,
+            71511.88,
+            71470.17,
+            71515.01,
+            71522.29,
+            71564.57,
+            71540.37,
+            71404.29,
+            71550.25,
+            71641.29,
+            71538.65,
+            71606.28,
+            71618.33,
+            71608.09,
+            71510.21,
+            71625.73,
+            71556.65,
+            71679.2,
+            71512.09,
+            71555.69,
+            71534.8,
+            71547.8,
+            71529.97,
+            71572.05,
+            71592.65,
+            71657.8,
+            71663.25,
+            71513.2,
+            71642.89,
+            71544.33,
+            71533.53,
+            71512.97,
+            71708.81,
+            71523.12,
+            71670.65,
+            71498.41,
+            71599.57,
+            71731.85,
+            71609.21,
+            71573.93,
+            71447.73,
+            71516.73,
+            71541.88,
+            71504.29,
+            71617.25,
+            71519.41,
+            71481.77,
+            71561.16,
+            71502.2,
+            71533.89,
+            71533.89,
+            71547.57,
+            71612.41,
+            71552.21,
+            71530.8,
+            71411.09,
+            71478.57,
+            71588.77,
+            71549.09,
+            71455.77
+          ]
+        }
+      },
+      {
+        "num_tokens": 768,
+        "kv_blocks": 19213,
+        "routing": "balanced",
+        "num_local_tokens": 768,
+        "num_tokens_after_padding": 768,
+        "batch_order": [
+          "bench-0",
+          "bench-1",
+          "bench-2",
+          "bench-3",
+          "bench-4",
+          "bench-5",
+          "bench-6",
+          "bench-7",
+          "bench-8",
+          "bench-9",
+          "bench-10",
+          "bench-11",
+          "bench-12",
+          "bench-13",
+          "bench-14",
+          "bench-15",
+          "bench-16",
+          "bench-17",
+          "bench-18",
+          "bench-19",
+          "bench-20",
+          "bench-21",
+          "bench-22",
+          "bench-23",
+          "bench-24",
+          "bench-25",
+          "bench-26",
+          "bench-27",
+          "bench-28",
+          "bench-29",
+          "bench-30",
+          "bench-31",
+          "bench-32",
+          "bench-33",
+          "bench-34",
+          "bench-35",
+          "bench-36",
+          "bench-37",
+          "bench-38",
+          "bench-39",
+          "bench-40",
+          "bench-41",
+          "bench-42",
+          "bench-43",
+          "bench-44",
+          "bench-45",
+          "bench-46",
+          "bench-47",
+          "bench-48",
+          "bench-49",
+          "bench-50",
+          "bench-51",
+          "bench-52",
+          "bench-53",
+          "bench-54",
+          "bench-55",
+          "bench-56",
+          "bench-57",
+          "bench-58",
+          "bench-59",
+          "bench-60",
+          "bench-61",
+          "bench-62",
+          "bench-63",
+          "bench-64",
+          "bench-65",
+          "bench-66",
+          "bench-67",
+          "bench-68",
+          "bench-69",
+          "bench-70",
+          "bench-71",
+          "bench-72",
+          "bench-73",
+          "bench-74",
+          "bench-75",
+          "bench-76",
+          "bench-77",
+          "bench-78",
+          "bench-79",
+          "bench-80",
+          "bench-81",
+          "bench-82",
+          "bench-83",
+          "bench-84",
+          "bench-85",
+          "bench-86",
+          "bench-87",
+          "bench-88",
+          "bench-89",
+          "bench-90",
+          "bench-91",
+          "bench-92",
+          "bench-93",
+          "bench-94",
+          "bench-95",
+          "bench-96",
+          "bench-97",
+          "bench-98",
+          "bench-99",
+          "bench-100",
+          "bench-101",
+          "bench-102",
+          "bench-103",
+          "bench-104",
+          "bench-105",
+          "bench-106",
+          "bench-107",
+          "bench-108",
+          "bench-109",
+          "bench-110",
+          "bench-111",
+          "bench-112",
+          "bench-113",
+          "bench-114",
+          "bench-115",
+          "bench-116",
+          "bench-117",
+          "bench-118",
+          "bench-119",
+          "bench-120",
+          "bench-121",
+          "bench-122",
+          "bench-123",
+          "bench-124",
+          "bench-125",
+          "bench-126",
+          "bench-127"
+        ],
+        "timing_scope": "target_sampler_and_drafter",
+        "sampler": {
+          "valid_token_ids": true,
+          "graph_deterministic": false
+        },
+        "eager_repeat": {
+          "max_abs": 3.90625,
+          "relative_rms": 0.09645525366067886
+        },
+        "graph_vs_eager": {
+          "max_abs": 3.4453125,
+          "relative_rms": 0.057247187942266464
+        },
+        "graph_deterministic": false,
+        "finite": true,
+        "state_reset_bytes": 359629312,
+        "drafter": {
+          "method": "dspark",
+          "acceptance": "all",
+          "num_draft_tokens": 5,
+          "output_shape": [
+            128,
+            5
+          ],
+          "graph_matches_eager": false,
+          "valid_token_ids": true
+        },
+        "latency_us": {
+          "timer": "graph_events_rank_max",
+          "median": 71545.953125,
+          "sample_spread_pct": 0.05680352821946144,
+          "mean": 71553.7890625,
+          "std": 71.87457275390625,
+          "min": 71404.2890625,
+          "p90": 71654.671875,
+          "count": 100,
+          "samples_us": [
+            71585.41,
+            71465.93,
+            71529.8,
+            71523.92,
+            71488.45,
+            71642.97,
+            71582.97,
+            71654.33,
+            71563.48,
+            71528.93,
+            71556.93,
+            71531.37,
+            71437.09,
+            71512.77,
+            71543.77,
+            71662.37,
+            71458.93,
+            71745.05,
+            71571.12,
+            71555.13,
+            71595.61,
+            71673.29,
+            71712.37,
+            71638.88,
+            71528.37,
+            71585.52,
+            71607.57,
+            71521.65,
+            71412.77,
+            71596.01,
+            71506.12,
+            71420.57,
+            71433.69,
+            71559.05,
+            71618.93,
+            71570.05,
+            71542.97,
+            71465.65,
+            71504.84,
+            71558.29,
+            71407.38,
+            71511.88,
+            71470.17,
+            71515.01,
+            71522.29,
+            71564.57,
+            71540.37,
+            71404.29,
+            71550.25,
+            71641.29,
+            71538.65,
+            71606.28,
+            71618.33,
+            71608.09,
+            71510.21,
+            71625.73,
+            71556.65,
+            71679.2,
+            71512.09,
+            71555.69,
+            71534.8,
+            71547.8,
+            71529.97,
+            71572.05,
+            71592.65,
+            71657.8,
+            71663.25,
+            71513.2,
+            71642.89,
+            71544.33,
+            71533.53,
+            71512.97,
+            71708.81,
+            71523.12,
+            71670.65,
+            71498.41,
+            71599.57,
+            71731.85,
+            71609.21,
+            71573.93,
+            71447.73,
+            71516.73,
+            71541.88,
+            71504.29,
+            71617.25,
+            71519.41,
+            71481.77,
+            71561.16,
+            71502.2,
+            71533.89,
+            71533.89,
+            71547.57,
+            71612.41,
+            71552.21,
+            71530.8,
+            71411.09,
+            71478.57,
+            71588.77,
+            71549.09,
+            71455.77
+          ]
+        }
+      }
+    ]
+  }
+]

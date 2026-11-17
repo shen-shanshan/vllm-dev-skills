@@ -72,11 +72,24 @@
 - 计划和执行方式见 `agentx/perf-plan.md`。第 1 轮带 UMBP，因 UMBP server 失去响应导致 engine 停顿了几分钟，结果作废（详见 perf-plan 第 5 节）。
 - 用户决定：**第 2 轮不使用 UMBP**，配置保持 DEP2 + `--prefill-schedule-interval 11` + `--kv-cache-dtype fp8_e4m3` 不变。
 
+## step 级测试（`vllm bench forward`，2026-11-17）
+
+- 详见 `forward/results/README.md`。DEP2，dummy 权重，#2/#3/#4 全开对比全不开：
+  - prefill16k：393.36 → 392.46 ms（−0.23%）；
+  - prefill8k：214.41 → 213.62 ms（−0.37%，在噪声范围内）；
+  - `decode128`（每步 768 token）：71.81 → 71.54 ms（−0.38%）。
+- **未解决：** fused 在"先跑 prefill、再跑 `decode128`"时有 3/7 次 GPU 端卡死（graph 回放时 GPU 利用率 100%）；base 跑了 2 次，没有卡住。需要定位卡在哪个 kernel，以及是否由融合引入。
+
+## AgentX c256 端到端结果（2026-11-17，不带 UMBP）
+
+- 用第 3 轮重跑的 base（没有停顿）对比第 2 轮的 fused：总吞吐 272,272 → 270,450 tok/s/GPU（−0.7%），P90 interactivity 15.72 → 15.10（−4.0%），都在 fast 模式的噪声范围内。端到端结果为持平，已写入 PR 描述。详见 `agentx/perf-plan.md` 第 7 节。
+
 ## 待办
 
 - [ ] 补抓一份 FlyDSL 路径下的 decode trace（DEP2，与 prefill 配置相同）
 - [x] 查 #8：第 0 层 `wq_a+wkv` 输入的量化 213 µs 没能复现，后两次 trace 都是约 39 µs，判断是首次运行的偶发情况
 - [ ] 查启动日志中 aiter 对各 shape 报 "w_scale 1x32 is untuned" 的原因（trace 中 kernel 名带 `wb32x32`）
 - [ ] 确定融合方向（A / B）和第一个要做的站点
-- [ ] 第 2 轮 AgentX c256 A/B（不带 UMBP），结果写入 PR 描述
+- [x] 第 2 轮 AgentX c256 A/B（不带 UMBP）：base 有 JIT 停顿，分辨不出收益，改用 `vllm bench forward`
+- [ ] 定位 fused 在 bench forward 中 `decode128` 偶发卡死的原因（`forward/hang_catch.sh`）
 - [ ] 另开任务：定位 UMBP 在 DEP2 + MegaMoE + fp8_e4m3 配置下失去响应的原因（可能影响 InferenceX #5036）

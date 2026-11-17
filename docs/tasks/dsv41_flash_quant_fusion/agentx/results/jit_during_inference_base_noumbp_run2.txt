@@ -1,0 +1,6 @@
+02:38:14 _pa_mqa_logits_mxfp4_kernel. This causes a latency spike; consider extending warmup to cover this shape/config
+02:38:18 _sparse_mla_fp8. This causes a latency spike; consider extending warmup to cover this shape/config.
+02:56:12 launch (kernels=megamoe_prepare_compact_m64_dcu32_pcu32_pc1536_qcu64qcap256_fov_runtime_dyn_tss6920_v13). This
+02:56:29 launch (kernels=megamoe_stage2_compact_t64x256x256_sbm128_fp8_nt0_p1cu240s0_pad0_sk96_bh1b20apf1da0sp4x2_bf16l
+02:59:09 launch_radix_topk_one_block (kernels=radix_topk_one_block_decode_short_k512_b1024_w64_v0_s0). This causes a la
+03:00:15 _mask_candidates_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
