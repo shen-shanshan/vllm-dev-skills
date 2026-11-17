@@ -18,9 +18,9 @@
 | # | GEMM（N×K） | 上游 producer → `_kernel` | prefill 量化 (µs) | decode 量化 (µs) | 涉及的层 | 在 producer 侧融合的做法 | 现状 |
 |---|---|---|---:|---:|---|---|---|
 | 1 | **`wo_b`**（5120×8192） | `wo_a`（AITER `bmm_a8w8_mxscale`，只输出 BF16） | **77** | 4.7 | 每层 | 改 aiter，让 bmm 的 epilogue 输出 MXFP8；或者 `wo_a` 改回 Triton，用 `QUANT_OUT` epilogue | #63821、#66856（均基于 Triton `wo_a`，需要和 FlyDSL 版对比） |
-| 2 | **`wq_a+wkv`**（1792×5120） | Mega-MHC（输出 BF16） | 41 | 3–5 | 每层（第 0 层除外） | 给 `mega_mhc` 传 `out_dtype="mxfp8"`（aiter 已支持，gfx950 上输出 row-major scale） | **已完成（本地，未提交）**，见 `mega_mhc_mxfp8_pr.md` |
-| 3 | **shared `gate_up`**（4608×5120） | pre-FFN x（Mega-MHC 输出） | 41 | 4.8 | 每层 | 同上，用 FFN 侧的 Mega-MHC 输出 mxfp8。MegaMoE 在 `megamoe_prepare` 里还会自己量化一次，不做 `forward_prequant`（compact 路径已在 `megamoe_prepare` 内融合量化） | **已完成（本地，未提交）**，见 `mega_mhc_mxfp8_pr.md` |
-| 4 | **shared `down`**（5120×2304） | `act_and_mul`（BF16，本身 48 µs） | 20 | 5.9 | 每层 | 新写一个 `silu_and_mul + MXFP8 quant` kernel，两个 kernel 合成一个 | 无人在做，aiter 只有 MXFP4 版本 |
+| 2 | **`wq_a+wkv`**（1792×5120） | Mega-MHC（输出 BF16） | 41 | 3–5 | 每层（第 0 层除外） | 给 `mega_mhc` 传 `out_dtype="mxfp8"`（aiter 已支持，gfx950 上输出 row-major scale） | **已完成**（vLLM `98de3d8aff`），见 `mega_mhc_mxfp8_pr.md` |
+| 3 | **shared `gate_up`**（4608×5120） | pre-FFN x（Mega-MHC 输出） | 41 | 4.8 | 每层 | 同上，用 FFN 侧的 Mega-MHC 输出 mxfp8。MegaMoE 在 `megamoe_prepare` 里还会自己量化一次，不做 `forward_prequant`（compact 路径已在 `megamoe_prepare` 内融合量化） | **已完成**（vLLM `98de3d8aff`），见 `mega_mhc_mxfp8_pr.md` |
+| 4 | **shared `down`**（5120×2304） | `act_and_mul`（BF16，本身 48 µs） | 20 | 5.9 | 每层 | 新写一个 `silu_and_mul + MXFP8 quant` kernel，两个 kernel 合成一个 | **已完成**（vLLM `2532459f72`），见 `mega_mhc_mxfp8_pr.md` |
 | 5 | **`wq_b`**（32768×1280） | q/kv RMSNorm（`kernel.kd`，35 µs） | 11 | 4.8 | 每层 | norm 和量化合成一个 kernel | #66572（Triton，bit-exact）、#65837（aiter，非 bit-exact） |
 | 6 | **indexer `wq_b`**（4096×1280） | 同一份 qr 又量化一遍 | 13 | 约 5 | 有 indexer 的层 | 和 #5 共用同一份量化结果 | 上面两个 PR 都已覆盖 |
 | 7 | **engram `wkv`**（25600×6144） | engram 查表（表本身是 MXFP8，被反量化成 BF16 后再量化） | 52–57 | 5.7 | 第 1、14 层 | `EngramBatch` 直接输出 FP8 和 row-major scale | 无人在做 |
@@ -45,7 +45,7 @@
 
 ## #2 / #3 结果（2026-11-16）
 
-- 代码：vLLM `60bd6dd2ed` 上的本地改动（5 个 ROCm-only 文件），PR 描述见 `mega_mhc_mxfp8_pr.md`。
+- 代码：vLLM `98de3d8aff`（基于 `60bd6dd2ed`，5 个 ROCm-only 文件），PR 描述见 `mega_mhc_mxfp8_pr.md`。
 - prefill trace：`vllm-profile-traces/dsv41_flash/dep2_8k1k_c256_prefill_mhc_mxfp8/`。
   - `mega_mhc → _kernel` 和 `ep_combine → _kernel`（shared `gate_up`）都从每 step 40 次降到 0 次；
   - 每 step 独立量化从 211 次 / 4.73 ms 降到 131 次 / 2.58 ms；
@@ -53,9 +53,30 @@
 - GSM8K（`gsm8k/`）：基线 strict 0.9257 / flexible 0.9272，改动后 strict 0.9356 / flexible 0.9348，差异在噪声范围内（kernel 级 bit-exact）。
 - 局限：decode 时每个 rank ≤128 token 且处于 FULL graph capture 中，会走 mHC overlap 路径（layer input 来自 Triton），这部分 decode 没有收益。
 
+## #4 结果及 #2/#3/#4 合并后的结果（2026-11-16）
+
+- 代码：vLLM `2532459f72`，新增 `vllm/models/deepseek_v4/amd/silu_and_mul_mxfp8.py`（Triton），在 `DeepseekV4MLP.forward` 中接入；单测 `tests/kernels/models/amd/test_dsv41_mxfp8_input_fusion.py`（22 个用例通过，#2/#3/#4 均 bit-exact）。
+- prefill trace：`vllm-profile-traces/dsv41_flash/dep2_8k1k_c256_prefill_quant_fusion/`（GPU 0,1）。以完整 M 执行的层的中位数：
+
+| 融合点 | 融合前（两个 kernel 之和） | 融合后 | 节省 |
+|---|---:|---:|---:|
+| #2 attention seam：Mega-MHC + 量化 | 434–443 µs | 413–420 µs（仅 #2/#3 那次为 422–433） | 约 5–22 µs |
+| #3 FFN seam：Mega-MHC + `gate_up` 量化 | 449–459 µs | 428–436 µs（仅 #2/#3 那次为 440–443） | 约 10–20 µs |
+| #4 `silu_and_mul_with_clamp` + 量化 | 66.8–67.2 µs | 37.9–38.5 µs | 约 29 µs（−43%） |
+
+- 每 step 独立量化：211 次 / 4.73 ms → 91 次 / 2.06 ms。
+- GSM8K（#2+#3+#4）：strict 0.9265 / flexible 0.9272（基线 0.9257 / 0.9272）。
+
+## 端到端测试（AgentX c256，2026-11-16）
+
+- 计划和执行方式见 `agentx/perf-plan.md`。第 1 轮带 UMBP，因 UMBP server 失去响应导致 engine 停顿了几分钟，结果作废（详见 perf-plan 第 5 节）。
+- 用户决定：**第 2 轮不使用 UMBP**，配置保持 DEP2 + `--prefill-schedule-interval 11` + `--kv-cache-dtype fp8_e4m3` 不变。
+
 ## 待办
 
 - [ ] 补抓一份 FlyDSL 路径下的 decode trace（DEP2，与 prefill 配置相同）
 - [x] 查 #8：第 0 层 `wq_a+wkv` 输入的量化 213 µs 没能复现，后两次 trace 都是约 39 µs，判断是首次运行的偶发情况
 - [ ] 查启动日志中 aiter 对各 shape 报 "w_scale 1x32 is untuned" 的原因（trace 中 kernel 名带 `wb32x32`）
 - [ ] 确定融合方向（A / B）和第一个要做的站点
+- [ ] 第 2 轮 AgentX c256 A/B（不带 UMBP），结果写入 PR 描述
+- [ ] 另开任务：定位 UMBP 在 DEP2 + MegaMoE + fp8_e4m3 配置下失去响应的原因（可能影响 InferenceX #5036）

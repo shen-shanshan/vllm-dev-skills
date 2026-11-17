@@ -22,6 +22,12 @@ DP=${DP:-1}
 # the InferenceX DP2 recipe uses 11. Empty keeps the engine default (1).
 PREFILL_SCHEDULE_INTERVAL=${PREFILL_SCHEDULE_INTERVAL:-}
 SYNTHETIC_AL=${SYNTHETIC_AL:-}
+# MoE backend flags. The default is the recipe's expert TP on AITER fused MoE;
+# DEP is e.g. MOE_ARGS="--enable-expert-parallel --moe-backend aiter_mega_moe --all2all-backend mori".
+MOE_ARGS=${MOE_ARGS:---moe-backend aiter}
+# KV cache dtype, e.g. fp8_e4m3 (per-tensor fp8 rows, vllm-project/vllm#66036).
+# Empty keeps the engine default.
+KV_CACHE_DTYPE=${KV_CACHE_DTYPE:-}
 # main's extensible KV cache (#56492, on by default on ROCm) backs the KV cache
 # with VMM pages, which hipIpcGetMemHandle rejects, so the standalone UMBP
 # server cannot map it. Off for every arm, baseline included, to keep KV sizing
@@ -60,6 +66,11 @@ if [[ "${DP}" -gt 1 ]]; then
 else
   EXTRA+=(--tensor-parallel-size 2 --monokernel)
 fi
+read -r -a MOE_FLAGS <<< "${MOE_ARGS}"
+EXTRA+=("${MOE_FLAGS[@]}")
+if [[ -n "${KV_CACHE_DTYPE}" ]]; then
+  EXTRA+=(--kv-cache-dtype "${KV_CACHE_DTYPE}")
+fi
 if [[ -n "${PREFILL_SCHEDULE_INTERVAL}" ]]; then
   EXTRA+=(--prefill-schedule-interval "${PREFILL_SCHEDULE_INTERVAL}")
 fi
@@ -78,7 +89,6 @@ exec "${VLLM_BIN}" serve "${MODEL}" \
   --tool-call-parser deepseek_v41 \
   --enable-auto-tool-choice \
   --reasoning-parser deepseek_v41 \
-  --moe-backend aiter \
   --gpu-memory-utilization 0.9 \
   --attention-config '{"indexer_kv_dtype":"mxfp4","indexer_sparse_logits":true}' \
   --block-size 128 \
