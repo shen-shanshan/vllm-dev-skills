@@ -1,6 +1,6 @@
 ---
 name: vllm-rocm-env-prepare
-description: Prepare a vLLM ROCm development environment inside an already-running `vllm/vllm-openai-rocm` nightly container (MI355X / gfx950). Clones the dev repos into /home/shashen/vllm (vllm, vllm-dev-skills, InferenceX, ATOM, mori), symlinks vllm-dev-skills skills into ~/.claude/skills, writes git/vim/node/claude config, syncs vllm main and builds a no-compile editable `.venv` that reuses the image's precompiled binaries, installs pre-commit, locates model weights/datasets, and optionally builds MORI with UMBP into the venv. Every step is skipped when already done. Out of scope — pulling the image or starting the container. Use when the user has just entered a fresh container and asks to set up / initialize the vllm rocm dev environment. Triggered by requests like "帮我初始化容器内的 vllm rocm 开发环境", "准备 vllm rocm 开发环境", "搭建 vllm 开发环境", "安装带 UMBP 的 mori", "prepare vllm rocm dev env", "/vllm-rocm-env-prepare".
+description: Prepare a vLLM ROCm development environment inside an already-running `vllm/vllm-openai-rocm` nightly container (MI355X / gfx950). Clones the dev repos into /home/shashen/vllm (vllm, vllm-dev-skills, InferenceX, ATOM, mori, vllm-work-files), symlinks vllm-dev-skills skills into ~/.claude/skills, writes git/vim/node/claude config, syncs vllm main and builds a no-compile editable `.venv` that reuses the image's precompiled binaries, installs pre-commit, locates model weights/datasets, and optionally builds MORI with UMBP into the venv. Every step is skipped when already done. Out of scope — pulling the image or starting the container. Use when the user has just entered a fresh container and asks to set up / initialize the vllm rocm dev environment. Triggered by requests like "帮我初始化容器内的 vllm rocm 开发环境", "准备 vllm rocm 开发环境", "搭建 vllm 开发环境", "安装带 UMBP 的 mori", "prepare vllm rocm dev env", "/vllm-rocm-env-prepare".
 ---
 
 # vLLM ROCm Env Prepare
@@ -21,7 +21,10 @@ git clone https://github.com/shen-shanshan/vllm-dev-skills.git
 git clone https://github.com/shen-shanshan/InferenceX.git
 git clone https://github.com/shen-shanshan/ATOM.git
 git clone https://github.com/shen-shanshan/mori.git
+git clone https://github.com/shen-shanshan/vllm-work-files.git
 ```
+
+`vllm-work-files` is a private repo and the container has no GitHub credentials, so its clone usually fails (`could not read Username`). Do not retry or block on it; continue the other steps and remind the user to clone it manually, e.g. `! cd /home/shashen/vllm && git clone https://<user>:<PAT>@github.com/shen-shanshan/vllm-work-files.git && git -C vllm-work-files remote set-url origin https://github.com/shen-shanshan/vllm-work-files.git` (the last command strips the token from `.git/config`).
 
 For an existing `vllm` checkout, make sure the `upstream` remote exists (`git -C vllm remote -v`); add it if missing.
 

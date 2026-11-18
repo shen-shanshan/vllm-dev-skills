@@ -6,7 +6,7 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/10）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/18）。
 
 # 二、项目介绍
 
@@ -41,7 +41,7 @@
 
 **Skill 效果**：把这些步骤固化成一个可重复执行的流程，已经完成的步骤会自动跳过：
 
-- **代码仓与 Skill**：将 vLLM、vllm-dev-skills、InferenceX、ATOM、MORI 等代码仓 Clone 到宿主机挂载的持久化目录中，并把 vllm-dev-skills 中的 Skill 软链接到 `~/.claude/skills/`；
+- **代码仓与 Skill**：将 vLLM、vllm-dev-skills、InferenceX、ATOM、MORI、vllm-work-files（私有仓，克隆失败时提示手动克隆）等代码仓 Clone 到宿主机挂载的持久化目录中，并把 vllm-dev-skills 中的 Skill 软链接到 `~/.claude/skills/`；
 - **基础配置**：写入 Git 用户信息与常用 Alias、Vim 配置，安装 claude-hud 依赖的 Node.js，并链接 Claude Code 可执行文件；
 - **免编译的 vLLM 开发环境**：同步 `main` 分支后，将当前分支对齐到镜像中 vLLM 的构建 Commit，拷贝镜像里预编译好的 `*.so`，再创建继承系统 site-packages 的 `.venv`，以 Editable 方式安装源码，这样修改 Python 代码后无需重新编译即可生效；
 - **模型与数据集**：优先复用只读挂载的 `/shared` 中已有的权重和数据集，没有时再下载到工作目录；
