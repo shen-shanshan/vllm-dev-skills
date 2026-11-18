@@ -1,4 +1,0 @@
-03:25:21 _pa_mqa_logits_mxfp4_kernel. This causes a latency spike; consider extending warmup to cover this shape/config
-03:25:21 _sparse_mla_fp8. This causes a latency spike; consider extending warmup to cover this shape/config.
-03:36:10 _silu_and_mul_mxfp8_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
-03:41:28 _mask_candidates_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
