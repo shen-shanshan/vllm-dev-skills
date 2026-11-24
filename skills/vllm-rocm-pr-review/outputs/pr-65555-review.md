@@ -1,32 +1,32 @@
 ---
 pr: 65555
 repo: vllm-project/vllm
-head_sha: ca339b970838b5f8c2e0befe23f657c82c9386cd
+head_sha: 71b308aaa86e4f46879f73ce74a573110d70ae9b
 verdict: needs-work
-reviewed_at: 2026-11-09T07:53:36Z
+reviewed_at: 2026-11-24T03:21:03Z
 skill: vllm-rocm-pr-review
 ---
 
 # PR #65555: [ROCm][DSv4.1] Score the sparse-indexer prefill on ShardQ token slices
 
-> **Author**: @AMD-yanfeiwang | **State**: OPEN | **Date**: 2026-11-04（最后推送 2026-11-06）
-> **Branch**: `AMD-yanfeiwang:rocm-dsv41-indexer-row-shard` → `main` | **Labels**: rocm, deepseek, DSv4.1
-> **Changes**: +486 -48 lines across 10 files（含依赖 PR #66052 的提交）| **ROCm 相关性**: 完全相关（DeepSeek-V4.1 ROCm 稀疏 indexer prefill 路径）
-> **CI 状态**: 未获取（本次未拉取 checks，CI 结果未知）
+> **Author**: @AMD-yanfeiwang | **State**: OPEN（非 draft） | **Date**: 2026-11-04（最近一次更新 2026-11-24，merge main）
+> **Branch**: `AMD-yanfeiwang:rocm-dsv41-indexer-row-shard` → `main` | **Labels**: rocm, DSv4.1, deepseek
+> **Changes**: +533 -48 lines across 10 files | **ROCm 相关性**: 完全相关（DSv4.1 ROCm 稀疏 indexer prefill，触及 `rocm_aiter_mla_sparse.py` / `rocm_paged_mxfp4_indexer.py` 两个 ROCm 算子文件与共享的 `mla/indexer.py`）
+> **CI**: 未运行——pre-run-check 失败（无 `ready` label / 作者阈值），pre-commit 与 Buildkite 全部 skipped；仅 DCO / Mergify / PR-title 检查存在。本报告不引用任何测试通过结论。
 > 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
 
 ---
 
 ## 1. 总结 (Summary)
 
-本 PR 让 ROCm 上 DeepSeek-V4.1 的稀疏 indexer prefill 沿用上游 ShardQ（#63956）的 zigzag 按 token 切分：TP>1 时每个 rank 只为自己那一份 prefill token 打分（包括 ratio-2 indexer、两级候选的 candidate source 和 consumer 层），然后用 `all_gatherv` 把各 rank 的 int32 top-k 行收集回来，再 `index_copy_` 回 token 顺序。attention 本身仍按 head 切分，不做 ShardQ 的 q/out all-to-all。FP8 indexer op（`rocm_aiter_sparse_attn_indexer`）和 MXFP4 paged indexer op（dense/gather 两种）都接入了这套流程。PR 的第一个提交就是 #66052（ShardQ host 索引缓冲区的异步调度竞争修复），本 PR 依赖它。
+在 ROCm 上让 DeepSeek-V4.1 的稀疏 indexer prefill 沿用 `sparse_mla_shard_q`（#63956）的 zigzag token 切分：每个 TP rank 只对自己那一片 prefill token 计算 indexer logits/top-k（包括两级候选层：candidate source 与 consumers），随后用 `all_gatherv` 把 int32 top-k 收集并 `index_copy_` 回 token 顺序；**attention 本身仍保持按 head 切分**。FP8 indexer 算子与 MXFP4 indexer 算子（dense + gather 两种 consumer）都接入，MXFP4 builder 改为在重编号后的 query range 上规划 chunk，并用 chunk 自带的 `req_start` 代替二分查找定位首请求。PR 首个 commit 与 #66052 完全相同（共享 builder 的 host buffer 竞争修复）。
 
 ## 2. 背景与动机 (Background & Motivation)
 
-- 上游 #63956 把 TP 下 DSA prefill 从“按 head 切”改成 ShardQ（按 token 切、Ulysses 风格），并删除了原来的 indexer 行切分（`indexer_tp_shard_min_rows` 已废弃）。但 ShardQ 只覆盖经过 `MLAAttention` 的模型，DeepSeek-V4/V4.1 的 attention 不走这条路，所以 DSv4.1 在 #63956 之后**两个平台上都没有 prefill indexer 切分了**，每个 TP rank 都要把全部 prefill token 打一遍分。
-- 1M 上下文时 indexer prefill 的代价是 O(T×context)，各 rank 重复计算浪费很大。本 PR 只在 ROCm 上把它恢复：indexer 部分复用 ShardQ 的 split，attention 仍按 head 切。
-- 作者在 “Why not full ShardQ” 中解释了原因：ROCm sparse MLA 不 pad head，ShardQ 的收益主要来自 padding 浪费的消除；而 RCCL 上没有 symmetric memory，每个压缩层要多两次 all-to-all，代价比 top-k 交换大得多。
-- 和 #56944 的关系：#56944 用自己的行切分加 AllReduce(MAX) 来切 FP8 op 的 prefill 行，不覆盖候选层和 MXFP4。本 PR 基于更新的 ShardQ split，覆盖范围更大。两者都改 FP8 op 的 prefill 循环，只能合入一个。
+- #63956 引入 ShardQ（Ulysses 风格的 token 切分稀疏 MLA prefill），同时**移除了**旧的 indexer 行切分；但 DeepSeek-V4/V4.1 的 attention 不经过 `MLAAttention`，所以 #63956 之后 DSv4.1 在两个平台上都没有 prefill indexer 切分。本 PR 在 ROCm 上用 ShardQ 的切分把它补回来。
+- 不做“完整 ShardQ”（attention 也按 token 切）的理由：ROCm 稀疏 MLA 不 pad head，token 切 attention 主要只增加每个压缩层两次 q/out all-to-all（RCCL，symmetric memory 仅 CUDA），通信量远大于 top-k 交换；留作 follow-up。
+- 与 #56944（ROCm 自有行切分 + AllReduce(MAX)，不覆盖 MXFP4 与候选层）是**替代设计**，二者都改 FP8 算子的 prefill 循环，只能落一个。
+- PR 声称（MI355X，DeepSeek-V4.1-Flash，单 prompt TTFT）：TP4 recipe 配置 1M −19.7%、TP2 1M −8.9%、TP4 FP8 + `--no-swa-bounded-replay` 1M −47.6%；2K–16K 在 ±1 ms 内，32K 左右持平，64K 起获益；GSM8K / passkey 无变化。以上数字来自 PR 描述中的表格，未附启动/测量命令 `[unverified]`。
 
 ## 3. 代码修改分析 (Code Change Analysis)
 
@@ -34,94 +34,79 @@ skill: vllm-rocm-pr-review
 
 | 模块 | 改动 |
 |------|------|
-| `vllm/models/deepseek_v41/amd/rocm.py` (+18/-1) | 新增 `_indexer_shardq_enabled()` 门控（`sparse_mla_shard_q` 开启、TP>1、无 DCP/PCP、mixed cudagraph 不是 FULL），满足时给 indexer 的 `k_cache` 设置 `use_shardq` 和 `gather_shardq_topk` |
-| `vllm/v1/attention/backends/mla/indexer.py` (+34/-31) | ①（#66052）用 `upload_shardq_indices()` 每步分配新的 host 内存上传 gather indices 和重编号的 query 范围，替代复用的 `CpuGpuBuffer`；② prefill metadata 新增 `shardq_split`、`shardq_query_start_loc_cpu`；③ chunk metadata 新增 `req_start` |
-| `vllm/v1/attention/backends/mla/rocm_paged_mxfp4_indexer.py` (+8/-4) | `plan_prefill_chunks` 改用 `chunk.req_start` 定位首个请求（去掉 `bisect`）；ShardQ 下按重编号后的 query 范围做规划 |
-| `vllm/v1/attention/ops/rocm_aiter_mla_sparse.py` (+55/-4) | 新增 `_gathers_shardq_topk`、`reserve_shardq_exchange`（profiling 时预留显存）、`exchange_shardq_topk`（`all_gatherv` + `index_copy_`）；FP8 op 的 prefill 按 `shardq_gather_indices` 取 q/weights，循环结束后做交换 |
-| `vllm/v1/attention/ops/rocm_paged_mxfp4_indexer.py` (+19) | `_layer()` 在 ShardQ 下 gather q/q_scale/weights；两个 MXFP4 op 在 prefill 后调用交换，profiling 分支做预留 |
-| `vllm/config/attention.py` (+3/-1) | `sparse_mla_shard_q` 文档补充 ROCm DSv4.1 的语义 |
-| tests（4 个文件） | 新增 FP8 op ShardQ 测试；MXFP4 新增 `test_prefill_shardq_split_matches_replicated`；plan 测试适配 `req_start`；`test_shardq.py` 新增异步上传竞争测试（#66052） |
+| `vllm/v1/attention/backends/mla/indexer.py`（共享，CUDA/ROCm 都用） | commit 1（=#66052）：去掉复用的 `CpuGpuBuffer`，新增 `upload_shardq_indices()` 每步用新 host 内存上传；commit 2/3：`DeepseekV32IndexerPrefillChunkMetadata.req_start`、`DeepseekV32IndexerPrefillMetadata.shardq_split / shardq_query_start_loc_cpu / shardq_rows` |
+| `vllm/v1/attention/ops/rocm_aiter_mla_sparse.py`（FP8 indexer 算子） | 新增 `_gathers_shardq_topk` / `reserve_shardq_exchange` / `exchange_shardq_topk`；prefill 循环改读 `q_fp8[indices]` / `weights[indices]`；循环后交换 top-k；profiling 分支预留交换内存 |
+| `vllm/v1/attention/ops/rocm_paged_mxfp4_indexer.py`（MXFP4 indexer 算子） | `_layer()` 在 ShardQ 下按 `shardq_gather_indices` 收集 q/scale/weights；两个算子在 prefill 之后、decode 之前调用 `exchange_shardq_topk`；profiling 预留 |
+| `vllm/v1/attention/backends/mla/rocm_paged_mxfp4_indexer.py`（MXFP4 builder） | `plan_prefill_chunks` 用 `chunk.req_start` 取代 `bisect`；`build()` 在 ShardQ 下用重编号 query range（CPU + 再次 H2D 的 device 副本）规划 |
+| `vllm/models/deepseek_v41/amd/rocm.py` | `_indexer_shardq_enabled()` 门控：`sparse_mla_shard_q` 且 TP>1、无 DCP/PCP、mixed cudagraph 非 FULL；满足时给 indexer K cache 置 `use_shardq = gather_shardq_topk = True` |
+| `vllm/config/attention.py` | `sparse_mla_shard_q` docstring 增加 ROCm DSv4.1 说明 |
+| 测试（4 个文件） | 新 `test_rocm_dsv41_indexer_shardq.py`（FP8 算子，2/4 路）、`test_prefill_shardq_split_matches_replicated`（MXFP4 dense/gather）、`test_prefill_plans_on_shardq_query_ranges`（CPU builder）、`test_indexer_upload_survives_next_build`（#66052 部分） |
 
 ### 3.2 架构 / 流程图
 
-单个 indexer 层在 ShardQ prefill step 中的数据流（每个 TP rank 执行相同的流程）：
+单个 prefill step 内某一 indexer 层（TP=4）的数据流：
 
 ```mermaid
 flowchart TD
-    A[Indexer builder.build] --> B{use_shardq 且 build_shardq_split 非空?}
-    B -- 否 --> R[原路径：全部 prefill token 按 token 顺序打分]
-    B -- 是 --> C[upload_shardq_indices：<br/>arange 共 D 行 ++ 本 rank token + D<br/>每步新的 pinned 内存]
-    C --> D[searchsorted 重编号 query_start_loc<br/>chunks 在紧凑空间切分，req_start 记录首请求]
-    D --> E[Op：q/weights 按 shardq_gather_indices gather<br/>前 D 行是 decode 行]
-    E --> F[逐 chunk 打分并做 top-k<br/>写 topk_buffer 的紧凑行 D..D+n_rank]
-    F --> G{该层 gather_shardq_topk?}
-    G -- 否 --> H[保持紧凑 top-k<br/>供 token 切分的 attention 使用]
-    G -- 是 --> I[all_gatherv：各 rank 的紧凑行<br/>按 rank 顺序拼接]
-    I --> J[index_copy_ 到 token_ids + D<br/>恢复 token 顺序]
-    J --> K[decode 路径：行 0..D，不变]
-    K --> L[head 切分的 sparse MLA 读取 token 顺序的 top-k]
+    A[Builder: build_shardq_split<br/>zigzag 切分 prefill token] --> B[upload_shardq_indices<br/>gather 索引 = decode 恒等前缀 + 本 rank token]
+    B --> C[重编号 query_start_loc<br/>chunk 在紧凑空间上规划<br/>chunk.req_start 记录首请求]
+    C --> D{indexer 算子}
+    D -->|FP8| E[prefill_q = q_fp8&#91;indices&#93;<br/>逐 chunk logits + top-k<br/>写到紧凑行 start..start+local]
+    D -->|MXFP4| F[_layer: q/scale/weights 全部按 indices 收集<br/>dense / gather prefill 写紧凑行]
+    E --> G[exchange_shardq_topk]
+    F --> G
+    G --> H[all_gatherv 各 rank 的紧凑行<br/>sizes = num_tokens_per_rank]
+    H --> I[index_copy_ 到 rows = token_ids + num_decode_tokens<br/>恢复 token 顺序]
+    I --> J[decode 路径写行 0..ndt<br/>不与交换区域重叠]
+    J --> K[head 切分的稀疏 MLA attention<br/>读完整 token 顺序 top-k]
 ```
 
-两级候选层的行布局（candidate 从不交换）：
-
-```mermaid
-sequenceDiagram
-    participant S as Source 层 20（candidate_write）
-    participant P as candidate_blocks 缓冲区（每个 rank 本地）
-    participant C as Consumer 层 24/28/32/36
-    participant T as topk_indices_buffer
-    S->>P: 按本 rank 紧凑顺序写候选块
-    S->>T: 紧凑 top-k，然后 all_gatherv 并 index_copy_ 回 token 顺序
-    C->>P: 按同样的紧凑顺序读候选块（同一个 split）
-    C->>T: 紧凑 top-k，然后 all_gatherv 并 index_copy_ 回 token 顺序
-```
-
-与同批 PR 的关系：
+候选层的一致性（不交换 candidate）：
 
 ```mermaid
 graph LR
-    M[upstream/main fdd90995] --> A66052[#66052 fresh host 索引上传<br/>be5437ab2f]
-    A66052 --> P65555[#65555 本 PR<br/>prefill ShardQ indexer]
-    M --> P66047[#66047 decode 行 TP 切分]
-    P65555 -. 文本冲突：imports 和测试 .- P66047
-    P65555 -. 设计互斥：FP8 op prefill 循环 .- P56944[#56944 FP8 行切分 + AllReduce MAX]
+    S[candidate source 层<br/>紧凑顺序写 candidate_blocks] -->|同一 step 同一 split| C1[consumer 24/28/32/36<br/>紧凑顺序读 candidate_blocks]
+    C1 --> T[各自 top-k 后 exchange]
+    R[SWA bounded replay 开启时<br/>source 与 consumers 都在 replay batch 内<br/>用同一份 replay 元数据] -.-> S
 ```
 
 ### 3.3 关键实现细节
 
-- **门控**：`_indexer_shardq_enabled()` 与上游 `SparseMLAAttentionImpl.use_shardq` 的条件基本一致（少了 HiSparse 判断，见 §7），只作用于 `DeepseekV41ROCMAiterMLAAttention`。因为非 kv-source 的 index source 共享 kv-source 的 `k_cache`，同一个 metadata key 下所有层的标志一致。
-- **紧凑布局**：`indices = arange(D) ++ (local_token_ids + D)`，D 是 `split.num_decode_tokens`。如果 indexer 自己的 decode 阈值把一些 split 视为 decode 的短请求算成 prefill，这些行在每个 rank 上都会计算，且不参与交换（`assert num_decode_tokens <= split.num_decode_tokens`）。
-- **交换**：`local = topk[D : D+sizes[rank], :width]`，`all_gatherv(local.contiguous(), sizes)`，然后 `topk[:, :width].index_copy_(0, token_ids + D, gathered)`。`token_ids` 按 rank 分组且组内升序，正好对应 `all_gatherv` 的拼接顺序。我用 CPU 复刻了 zigzag split 和这段逻辑，在 D>0、width 小于 buffer 宽度、TP=2/4/8 的 200 组随机输入下，交换后都和复制计算的结果逐行一致。
-- **集合通信路径**：在 `CudaCommunicator.all_gatherv` 中，aiter 自定义 AG 只用于 FULL cudagraph 的 uniform batch，而本门控排除了 FULL mixed，所以 prefill 一定走 pynccl/RCCL 的 `ncclBroadcast` 组。sizes 全部相等时会退化为 `all_gather`。
-- **Chunk 规划修复**：短请求在某个 rank 上可能没有 token，这时重编号后的 `query_start_loc` 会出现相等的边界，`bisect_right` 会跳过这个空请求，导致首请求错位。现在改用 chunk 自带的 `req_start`（唯一构造点 `build_prefill_chunk_metadata` 传入的是绝对请求下标）。整个 chunk 都没有本地 token 时，`range(0, chunk_m, …)` 为空，不会生成 0 行的 chunk。
-- **显存**：profiling 分支对 sharded 层额外预留 `empty_like(q, q_scale, weights, topk_buffer)`，按整 batch 的上界算，覆盖实际的紧凑 gather 加交换缓冲。
-- **#66052（作为本 PR 第一个提交）**：异步调度下，下一步的 build 可能早于本步 non-blocking H2D 实际执行，复用 pinned 缓冲会被覆盖，所以改为每步分配新的 host 内存。`test_indexer_upload_survives_next_build` 用 `torch.cuda._sleep` 构造了这个时序。
+- **索引数学（已逐项核对）**：`ShardQSplit.token_ids` 是 `zigzag_split` 的 `argsort` 结果（int64，相对 decode 之后的首个 token），按 rank 分组；gather 索引为 `arange(split.num_decode_tokens) ++ (local_token_ids + num_decode_tokens)`（int32）。prefill chunk 的 `token_start/token_end` 位于该紧凑空间，FP8 与 MXFP4 都用同一空间索引 q、weights、`candidate_blocks` 与 `topk_indices_buffer`。交换时 `local = topk[start : start + sizes[rank]]`（`start = split.num_decode_tokens`），`all_gatherv` 按 rank 顺序拼接，恰好与 `split.token_ids` 的分组顺序一致，`index_copy_(0, token_ids + start, gathered)` 把每一行写回原位且每行恰写一次。
+- **decode 前缀**：builder 已有 `assert num_decode_tokens <= split.num_decode_tokens`，gather 索引前缀是恒等映射，所以 indexer 自身 decode 行（≤ ShardQ decode 行）读写的都是原始行；ShardQ 判为 decode、indexer 判为 prefill 的短请求行在所有 rank 上就地重复计算，不参与交换。
+- **执行顺序**：两类算子都在 prefill 之后、decode 之前交换；decode 只写 `[0, ndt)`，与交换区 `[split.ndt, …)` 不重叠。MXFP4 的 decode 行切分（#66047）只在无 prefill 的 step 启用，二者不会同时生效。
+- **集体通信对称性**：交换的门控是 `split is not None and gather_shardq_topk`，二者在各 rank 上由同一 scheduler 输出确定；交换调用位于 chunk 循环之外（某 rank 没有 chunk 也会调用）。`build_shardq_split` 在任一 rank 分不到 token 时返回 None，因此不会出现零长度参与方。
+- **`req_start`**：`build_prefill_chunk_metadata` 传入的 `start_idx` 是含 decode 偏移的绝对请求下标；重编号后某请求在本 rank 可能为空（多个相同的 query_start），`bisect_right` 会落到空请求之后，`req_start` 修正了这一点。
+- **`shardq_rows` 缓存**：931ed048ea 把 `token_ids + start` 的 device 副本挂在本 step 的 prefill 元数据上，同组后续层复用。
+- **profiling**：`reserve_shardq_exchange` 对 q、weights（MXFP4 还有 q_scale）与 `topk_indices_buffer` 各 `empty_like` 一份并同时存活，覆盖运行时收集副本 + `all_gatherv` 输出的峰值。
+- **CUDA 路径**：交换/预留只在两个 ROCm 算子里调用；共享 builder 只是多存三个字段 + `req_start`（CUDA 消费者不读）；commit 1 的行为变化属于 #66052 的范围。CUDA 行为未改变 `[已验证]`。
 
 ## 4. 涉及的技术原理 (Technical Principles)
 
-- **DSA / 稀疏 indexer**：DeepSeek V3.2/V4 的 Lightning Indexer 为每个 query token 在压缩 KV 上打分，再取 top-k（V4.1 是 512）作为 sparse MLA 的 KV 索引。prefill 的代价是 O(T_q × T_kv)，1M 上下文时占 TTFT 的很大比例。V4.1 另有两级候选：source 层（20）先选候选块，consumer 层（24/28/32/36）只在候选池里打分。
-- **ShardQ / Ulysses 序列切分**：TP 下 attention 本来按 head 切，但每个 rank 的 indexer 都要处理全部 token。ShardQ 把每个请求切成 2×TP 段，rank r 拿第 r 段和第 2TP-1-r 段（zigzag），以平衡 causal 计算量。上游 CUDA 让 attention 也按 token 切（两次 all-to-all）。本 PR 在 ROCm 上只切 indexer，最后 all-gather top-k。
-- **all_gatherv / RCCL**：可变长度的 all-gather 用 `ncclGroupStart` 加 N 次 `ncclBroadcast` 实现。int32 的 top-k 行（512×4B 每 token）通信量远小于 q/out 的 all-to-all。
-- **异步调度与 pinned 内存竞争**：MRV2 异步调度时，CPU 在构建第 N+1 步 metadata 时 GPU 还在执行第 N 步。复用的 pinned buffer 如果被改写，未执行的 non-blocking H2D 会读到新数据。
-- **SWA bounded replay（CDNA4 默认）**：最后一个 kv-source 层之后的层在 prefill 时只处理每个请求最后 window（128）个 token。replay 子 batch 有自己的 metadata 和 split，所以收益主要来自前面的 ratio-2 indexer 层。
+- **DSA 稀疏 indexer**：每个 query token 用轻量 MQA（FP8 或 MXFP4 K cache）对其全部（压缩后）上下文打分，取 top-k（V4.1 为 512）个 KV 位置供稀疏 MLA 使用。prefill 的开销与 `T × context` 成正比，1M 上下文时成为 TTFT 主项。
+- **ShardQ / zigzag 切分**：每个请求切成 `2·tp` 段，rank r 拿第 r 段和第 `2tp−1−r` 段，使因果注意力下各 rank 的工作量均衡。本 PR 只把 indexer 打分按此切分，attention 仍按 head 切，所以只需要一次 top-k 的 `all_gatherv`（`T × 512 × 4B`）而不是 q/out 两次 all-to-all。
+- **DSv4.1 两级候选**：candidate source（层 20）先选候选块写 `candidate_blocks`，consumers（24/28/32/36）只在候选块内打分（dense 掩码或 gather 紧凑打分）。只要 source 与 consumers 使用同一 step 同一切分，candidate 行可以一直保持紧凑顺序，无需交换。
+- **SWA bounded replay（CDNA4 默认）**：最后一个 KV source 层之后的层只在每个请求最后 128 个 token 的 replay batch 上运行，因此 replay 层 indexer 的 ShardQ 是在 replay batch 的元数据上独立判定的；收益主要来自 ratio-2 indexer。
+- **异步调度与 pinned buffer**：下一步元数据在本步 non-blocking H2D 尚未执行时就会构建，复用的 pinned buffer 会被覆盖——这是 #66052 修复的竞争。
 
 ## 5. 评论区讨论亮点 (Discussion Highlights)
 
-- 目前没有实质性的人工 review。两条 `claude[bot]` review 只是说明“fork PR 自动 review 已禁用”。
-- `mergify[bot]`（2026-11-05）报告过合并冲突。作者 11-06 rebase 后 PR 显示可合并。本地验证：PR head 现在可以干净地合入 `upstream/main`（fdd90995）。
-- PR 描述自己说明了与 #56944 的设计互斥，以及对 #66052 的依赖。这两点需要 maintainer 确定合入顺序。
+- **@okorzh-amd**（11-11）整理了相关 PR 关系：#66052 为依赖（其 head 即本 PR 第一个 commit）；#56944 为替代方案（同一 FP8 prefill 循环，行切分 + AllReduce(MAX)，MXFP4 与候选层保持复制）；#66071 为替代/冲突（CUDA DSv4.1 token 切分 ShardQ，`indexer.py` 文本冲突，其 `model_state.py` 让 replay builder `use_shardq=False`，在 ROCm 上只会让 replay 层保持复制，仍一致）；#66047 为冲突（同一 MXFP4 函数的 decode 行切分，行区间不相交，rebase 后可组合）；#63956 已合并。另有两条针对 `rocm_aiter_mla_sparse.py` 与 `rocm_paged_mxfp4_indexer.py` 的 inline 评论，均已 Resolved（内容在抓取文本中不可见），931ed048ea “Upload the ShardQ exchange rows once per step” 疑似对其中一条的回应。
+- **相关 PR 现状（来自页面时间线）**：#66047 已 Merged，且已通过 merge main 并入本分支；#66071 已 Closed；#66052 Open；新出现 #67219（[Perf][DSv4.1] Compose ShardQ with the candidate-only indexer prefill，Open）与 #67208（[ROCm][Perf][GLM-5.3-Flash] Shard the kpool indexer prefill across TP，Draft），二者都引用本 PR，可能复用或冲突于同一套交换逻辑；ROCm/aiter#8190（gfx950 `paged_mxfp4_mqa_logits` 间歇性错误 logits 修复）也引用本 PR。
+- 无 maintainer 的设计性评论；多次 needs-rebase，作者以 merge main 方式解决（3 个 merge commit，冲突解决已核对，仅涉及测试与 docstring/builder 初始化）。
 
 ## 6. 风险与潜在问题 (Risk Analysis)
 
 | 风险 | 严重程度 | 说明 |
 |------|---------|------|
-| 测试只用 mock 集合通信和纯 prefill batch | Medium | 见 §7 ⚠️【测试】，真实 RCCL 交换和 decode+prefill 混合 step 没有自动化覆盖 |
-| 默认开启且不区分架构 | Medium | 见 §7 ⚠️【兼容性】，gfx942 / FP8 路径只靠 MI355X 验证 |
-| 与 #66047 同时合入 | Medium | 文本冲突（imports 和测试），语义组合（prefill 交换后接 decode 交换）没有测试，见 §7 📝 |
-| 与 #56944 设计互斥 | Low | 只能合一个，需要 maintainer 决定 |
-| 每层每步额外的 H2D 和 gather | Low | 见 §7 📝【性能】 |
-| 性能数字不可追溯 | Low | 部分数字是在最终 head 之前测的，见 §7 📝 |
-| 门控与上游重复 | Low | 两处门控可能演化不一致，见 §7 📝【可维护性】 |
+| 混合 decode+prefill 的 ShardQ step 没有算子级测试 | Medium | 见 §7 ⚠️【测试】；索引数学经静态核对正确，但 `start` 偏移/恒等前缀从未被测试覆盖 |
+| CI 完全未运行 | Medium | 见 §7 ⚠️【测试】；涉及 Tier-1 ROCm 算子文件 |
+| 默认开启，ROCm 上的收益阈值与 CUDA 不同 | Medium | 见 §7 ⚠️【性能】；1024 token 起即启用，但单 prompt 盈亏点约 32K |
+| 与 #66052 / #56944 / #67219 的合并顺序 | Medium | 见 §7 ⚠️【设计】 |
+| `req_start` 默认 0 的静默回退 | Low | 见 §7 📝 |
+| 每步重复 H2D 重编号 query range | Low | 见 §7 📝 |
+| 批不变（batch-invariant）模式下 top-k 顺序随批形状变化 | Low | 见 §7 📝 `[推测]` |
+| CUDA 回归 | Low | 新逻辑只在 ROCm 算子中调用，共享 builder 仅新增字段 |
 
 ---
 
@@ -129,106 +114,88 @@ graph LR
 
 | 类型 | 🔴 | ⚠️ | 📝 |
 |------|----|----|----|
-| 测试 | — | 1 | — |
-| 兼容性 | — | 1 | — |
-| 可维护性 | — | — | 3 |
-| 性能 | — | — | 1 |
-| 注释/文档 | — | — | 1 |
+| 测试 | — | 2 | — |
+| 性能 | — | 1 | 1 |
+| 设计 | — | 1 | 1 |
+| 可维护性 | — | — | 1 |
+
+静态核对结论（无需作者行动）：`exchange_shardq_topk` 的 `start` / `sizes` / `rows` 与 `zigzag_split` 分组顺序一致；FP8 与 MXFP4 的 decode 行均不受 gather 影响；交换在 decode 之前且区间不重叠；候选源/消费者在 replay 与非 replay 两种情况下使用同一元数据；交换调用对各 rank 对称；CUDA 行为不变。未发现 🔴 级问题。
 
 ---
 
-**⚠️【测试】交换路径只用 mock 验证，混合 decode+prefill step 和 builder 到 op 的整合没有覆盖** `[已验证]`
+**⚠️【测试】算子级测试只覆盖纯 prefill（`num_decode_tokens = 0`），混合 step 的偏移逻辑未被测试** `[已验证]`
 
-- **问题**: 两个新 kernel 测试（`tests/kernels/attention/test_rocm_dsv41_indexer_shardq.py:186-211`、`tests/kernels/attention/test_rocm_paged_mxfp4_indexer.py:687-757`）都把 `get_tp_group` 换成了假的 `all_gatherv`，后者直接返回**参考结果**里按 `token_ids` 排好的行（`return ref[len(gathered) - 1][token_ids]`）。所以“交换后整个 buffer 等于参考结果”这一断言只验证了 `index_copy_` 的行映射，没有验证各 rank 实际算出的行被正确拼接。此外：① 所有新测试都是 `num_decodes=0` / `ShardQSplit(0, …)`，D>0 的偏移（`start = split.num_decode_tokens`）以及 indexer decode 数小于 split decode 数的情况没有测到；② chunk 是测试自己构造的，`upload_shardq_indices`、`req_start`、重编号的 `query_start_loc` 和 op 之间没有端到端测试；③ 没有多进程 RCCL 测试（`tests/v1/attention/test_shardq.py` 已经有 spawn 多进程的模板可以参考）。
-- **影响**: 混合 step（decode 行在前加上长 prefill）是线上最常见的情形，任何偏移错误都会把 top-k 写到错误的行，造成静默精度下降，不会报错。现在只有 PR 描述里的 GSM8K / passkey 端到端结果能兜住。我用 CPU 复刻验证了 D>0 时的映射逻辑是对的，但这不能替代仓库内的回归测试。
-- **行动**: 建议作者 ① 在至少一个新测试里加入 D>0 的 decode 行，并加一个 split decode 数大于 indexer decode 数的用例；② 让假的 `all_gatherv` 返回各 rank 真实的 `local`（先跑完所有 rank 再统一拼接），或者参考 `test_shardq.py` 加一个 2 进程的 RCCL 测试；③ 补一个从 `DeepseekV32IndexerMetadataBuilder.build` 到 op 的小规模整合测试。
+- **问题**: `tests/kernels/attention/test_rocm_dsv41_indexer_shardq.py:186` 与 `tests/kernels/attention/test_rocm_paged_mxfp4_indexer.py:831` 都构造 `ShardQSplit(0, token_ids, counts)`，元数据 `num_decodes=0 / num_decode_tokens=0`；CPU builder 测试同样 `num_decodes=0`。而实际服务中最常见的 ShardQ step 是“decode（含 DSpark 的 1+5 spec 行）+ 长 prefill”的混合 step：此时 gather 索引带恒等前缀、`exchange_shardq_topk` 的 `start = split.num_decode_tokens > 0`、indexer 自己的 `num_decode_tokens` 可能小于 ShardQ 的（短 extend 被 ShardQ 当作 decode）、MXFP4 的 `_layer()` 让 decode 路径读的是**收集后的** q。这些分支都没有被任何测试执行；`all_gatherv` 也被替换为返回参考行的假函数。
+- **影响**: 静态核对显示当前数学是对的，但这正是将来最容易被改坏、且一旦错位就是静默错误 top-k（输出变差但不崩溃）的地方；现有测试对它没有任何保护。
+- **行动**: 建议作者为两个算子测试增加 `num_decode_tokens > 0` 的参数化（例如 4 个 decode 请求 × next_n=6，外加一个长度介于 indexer 与 ShardQ 阈值之间的短 extend），并断言 decode 行在交换后保持不变、prefill 行回到正确位置。
 
-**⚠️【兼容性】ShardQ indexer 默认对所有 ROCm 架构开启，但只在 MI355X（gfx950）上验证过** `[已验证]`（gfx942 上是否有问题 `[推测]`）
+**⚠️【测试】CI 未运行，Tier-1 ROCm 算子改动没有任何 AMD CI 结果** `[已验证]`
 
-- **问题**: `vllm/models/deepseek_v41/amd/rocm.py:86-95` 的门控只看 `sparse_mla_shard_q`（默认 True）、TP、DCP/PCP 和 cudagraph 模式，不区分架构。在 gfx942（MI300X/MI325X）上，DSv4.1 会通过 `SparseAttnIndexer.forward_hip` 或 `--monokernel` 的 `Gfx942SparseAttnIndexer`（prefill 时回落到同一个 FP8 op）进入 ShardQ prefill。PR 的 Validation 只有 MI355X 的数据，FP8 路径只测了 TP4。
-- **影响**: 改动本身是架构无关的 Python 代码（gather、RCCL all_gatherv、index_copy_），出现数值问题的可能性不大。但这是**默认开启**的新路径，在 MI300X 的 TP8 部署中，RCCL 拓扑、`top_k_per_row_prefill` 回退分支、gfx942 上 fnuz FP8 q 的 gather 都没有验证过。如果出问题，用户需要自己知道去关 `sparse_mla_shard_q=false`。
-- **行动**: 建议作者补一组 gfx942（MI300X/MI325X）TP8 的 GSM8K 和 1M TTFT 数据；如果短期内做不到，建议先把门控限制在 gfx950（`_ON_GFX950`），并在 PR 描述里说明 kill-switch 的用法。
+- **问题**: pre-run-check 失败（无 `ready` label），pre-commit 与 Buildkite 全部 skipped。`.buildkite/test-amd.yaml` 的 kernels/attention 作业会收集新测试，但本 PR 没有触发过它；PR 描述中“Existing … pass”是作者在单卡 MI355X 上的本地结果。
+- **影响**: 改动触及 `rocm_aiter_mla_sparse.py`（DSv3.2 / GLM-5 在 ROCm 上同样走这个 FP8 算子）与共享 `mla/indexer.py`；若有导入顺序、mypy 或 pre-commit 问题，或其他模型的 ROCm 测试回归，目前都无法发现。
+- **行动**: 建议 review 时请 maintainer 加 `ready` label，跑通 pre-commit 与 AMD kernels/attention 作业（含新增的 `test_rocm_dsv41_indexer_shardq.py`），并至少跑一次 DSv3.2 的 ROCm sparse indexer 测试确认没有回归。
 
-**📝【可维护性】ROCm 门控是上游门控的手工复制，并且少了 HiSparse 条件** `[已验证]`
+**⚠️【性能】ROCm 沿用 CUDA 的 `sparse_mla_shard_q_min_tokens=1024` 默认值，但自身数据显示盈亏点约 32K；中等批次的证据较弱** `[已验证]`（影响 `[推测]`）
 
-- **问题**: `_indexer_shardq_enabled()`（`rocm.py:86-95`）与 `SparseMLAAttentionImpl.__init__` 中的 `use_shardq` 条件（`sparse_mla_attention.py:772-780`）几乎逐行相同，但少了 `hisparse_config is None`。目前 DSv4.1 的 ROCm 路径没有 HiSparse（已 grep 确认），所以现在不会触发。
-- **影响**: 上游以后给 ShardQ 加新的排除条件（比如 DBO、新的 CP 模式）时，ROCm 这份副本很容易漏改，ShardQ 会在不支持的配置下被静默启用。
-- **行动**: 建议作者把共同的条件提取到 `vllm/v1/attention/ops/shardq.py` 的一个 helper（例如 `shardq_config_enabled(vllm_config)`），两处都调用它；至少补上 HiSparse 条件，或者加注释说明为什么不需要。
+- **问题**: `vllm/models/deepseek_v41/amd/rocm.py:98-107` 在 TP>1 时默认开启。ROCm 版本的机制与 CUDA 不同：只切 indexer，attention 不切，每个 indexer 层额外付一次 `[prefill_tokens, 512]` int32 的 RCCL `all_gatherv` + `index_copy_` + q/weights 收集。PR 自己的表格显示 2K–16K 在 ±1 ms 内、32K 约持平、64K 起才有收益；批量短 prompt 只给出“±10% 噪声内、无一致方向”。没有 TP8 数据，也没有贴出启动与测量命令。
+- **影响**: 大多数服务 step 处在 1K–32K token 区间，默认开启在那里最好也只是持平；在 TP8（每 rank 切片更小、通信占比更高）或更高并发下是否会变慢，目前没有证据。
+- **行动**: 建议作者补一组 serving 级测量（例如 TP4/TP8、4K–16K prompt 的并发扫描，报告吞吐与 TTFT 的 p50/p99，并附命令），或者为 ROCm DSv4.1 设置独立的最小 token 阈值（例如接近实测盈亏点），而不是直接继承 CUDA 的 1024。
 
-**📝【性能】每层每步重复 H2D 上传交换行索引，MXFP4 builder 也重复上传 query 范围** `[已验证]`（开销大小 `[推测]`）
+**⚠️【设计】与 #66052 / #56944 / #67219 的合并顺序需要先定下来** `[已验证]`
 
-- **问题**: `exchange_shardq_topk` 在每个 sharded indexer 层都执行一次 `async_tensor_h2d(split.token_ids + start)`（`rocm_aiter_mla_sparse.py:1338`），每次都要分配 pinned 内存、拷贝 int64 数据并发起 H2D；同一步内所有层的这份数据完全相同。`RocmMxfp4IndexerMetadataBuilder.build` 也再次上传了 base builder 已经上传过的重编号 `query_start_loc`（`rocm_paged_mxfp4_indexer.py:450`）。FP8 op 的 `q_fp8[indices]` 还会把用不到的 decode 行一起 gather。
-- **影响**: 每层每步多一次小 H2D 和 host 分配（最多 32K×8B）。对 1M prefill 的 TTFT 影响很小，但在 256K 以下 ShardQ 收益只有 2–5% 的区间可能占到可测量的比例。
-- **行动**: 建议作者在 builder 里把 `token_ids + num_decode_tokens` 的 device 张量（int64）和重编号后的 device `query_start_loc` 一次性存进 `DeepseekV32IndexerPrefillMetadata`，op 和 MXFP4 builder 直接复用。
+- **问题**: ① 首个 commit 4a1c8a826f 与 #66052 的 122c86d15a 完全相同（range-diff `=`），但 #66052 还有后续测试 commit b6eb97eb6e，它把同一个测试重写为 `test_indexer_build_survives_next_build`（通过 builder 的 `build()` 测试）。无论哪个后合，`tests/v1/attention/test_shardq.py` 都会冲突。② #56944 是同一 FP8 prefill 循环的替代设计（PR 描述也承认只能合一个）。③ #67219（Open）与 #67208（Draft）都引用本 PR，涉及同一套 ShardQ indexer prefill 逻辑；#66071 已 Closed，其冲突暂时不存在。
+- **影响**: 先合本 PR 会让 #66052 只剩测试改动且与本 PR 的测试冲突；同时合入两个设计会让 FP8 循环出现两套切分。
+- **行动**: 建议先合 #66052，本 PR rebase 时丢弃 4a1c8a826f 及其测试（采用 #66052 的版本）；建议 review 时请 AMD maintainer 明确关闭或改造 #56944，并确认 #67219 是叠加在本 PR 之上还是与它竞争。
 
-**📝【可维护性】依赖 #66052，与 #66047 有文本冲突，与 #56944 设计互斥** `[已验证]`
+**📝【可维护性】`req_start` 默认值 0 让 `plan_prefill_chunks` 在漏传时静默规划错误** `[已验证]`
 
-- **问题**: 本 PR 第一个提交 `be5437ab2f` 就是 #66052 的 head，内容完全一致。在本地克隆中，先合 #66047 再合本 PR，会在 `vllm/v1/attention/backends/mla/rocm_paged_mxfp4_indexer.py` 的 imports（本 PR 删除了 `bisect`，#66047 增加了 `replace`/`envs`/`cdiv`/`get_tensor_model_parallel_rank`）和 `tests/kernels/attention/test_rocm_paged_mxfp4_indexer.py`（`_forward_context`、`_decode_metadata` 签名、新测试位置）产生冲突。语义上两者可以组合：prefill 交换先执行，decode 交换后执行，各 rank 的调用顺序一致；#66047 的 `_decode_rank_rows` 切的是本 PR gather 后的 q，而 gather 后 q 的前 D 行仍是 decode 行。但这个组合没有测试。本 PR 单独合入当前 `upstream/main` 是干净的。
-- **影响**: 合入顺序不当会产生冲突，或在冲突解决时引入 import/签名错误。两种 decode/prefill 切分同时存在时，mixed step 的行为没有被验证。
-- **行动**: 建议 review 时与 maintainer 确定合入顺序（#66052，然后本 PR 和 #66047 中的一个，再 rebase 另一个），并在后合入的 PR 里补一个 decode 切分和 prefill ShardQ 同时开启的 mixed step 测试；同时请作者和 #56944 的作者确认只保留一种 FP8 prefill 切分方案。
+- **问题**: `vllm/v1/attention/backends/mla/indexer.py:429` `req_start: int = 0`；`rocm_paged_mxfp4_indexer.py:233` 去掉 `bisect` 后完全依赖它。目前生产中唯一的构造点 `build_prefill_chunk_metadata`（:2122）会传值，但任何新的构造点（或测试 helper）忘传时都会用请求 0 的 query range/上下文去规划，不会报错。
+- **行动**: 建议作者去掉默认值（所有构造点改为关键字传参），或在 `plan_prefill_chunks` 里加一条廉价的断言 `query_start_loc[first] <= t0 <= query_start_loc[first + chunk.num_reqs]`。
 
-**📝【可维护性】`req_start` 默认值为 0，漏传时会静默选错首请求** `[已验证]`
+**📝【性能】重编号后的 query range 在同一 step 内被 H2D 上传两次** `[已验证]`
 
-- **问题**: `DeepseekV32IndexerPrefillChunkMetadata.req_start: int = 0`（`indexer.py:427`）。`plan_prefill_chunks` 已经去掉了 `bisect` 兜底，完全信任这个字段。目前唯一的构造点 `build_prefill_chunk_metadata` 会正确传入。
-- **影响**: 以后新增的构造点（比如 PCP 或新 builder）如果忘了传，有 decode 前缀的 step 会从第 0 个请求开始规划，导致 `context_lens`/`row_ends` 错位，造成静默错误。
-- **行动**: 建议作者去掉默认值（改为必填字段），或者在 `plan_prefill_chunks` 里加一个廉价断言，例如 `query_start_loc[first] <= t0 < query_start_loc[first + chunk.num_reqs]`（对空请求按非严格不等式处理）。
+- **问题**: 基类 builder 已经执行 `query_start_loc = async_tensor_h2d(query_start_loc_cpu, self.device)`（indexer.py:1625），但只保存了 CPU 副本；MXFP4 builder 在 `rocm_paged_mxfp4_indexer.py:569-571` 再上传一次（每次都新分配 pinned 暂存区）。
+- **行动**: 建议作者把 device 副本也挂到 `DeepseekV32IndexerPrefillMetadata` 上（与 `shardq_query_start_loc_cpu` 并列），MXFP4 builder 直接复用。
 
-**📝【注释/文档】性能数字无法追溯，部分数字不是在最终 head 上测的** `[已验证]`
+**📝【设计】prefill ShardQ 门控没有像 decode 行切分那样排除 `VLLM_BATCH_INVARIANT`** `[推测]`
 
-- **问题**: PR 描述中的 TTFT 表（例如 TP4 1M −19.7%，FP8 无 replay −53.3%）没有附带命令、日志或脚本链接。作者也注明 256K 行和 TP2 行“是在 chunk-planning 修复之前测的”。本次 review 无法核实这些数字，按 `[unverified]` 处理。数字的趋势在机制上说得通：indexer prefill 计算量降到约 1/TP，交换只传 int32 top-k。
-- **影响**: 不影响正确性，但 maintainer 无法复现，也无法判断 256K 以下的收益（2–5%）是否超出噪声。
-- **行动**: 建议作者附上 benchmark 命令（含 `--no-swa-bounded-replay`、`indexer_kv_dtype`、DSpark 配置）和原始输出，并在最终 head 上重测 256K 和 TP2 两行。
-
-> 其他已检查但未发现问题的点：交换只在默认流上执行（indexer_op 在 `_sparse_indexer_and_attn` 中串行调用，没有 aux stream 和 RCCL 并发）；各 rank 的 split 只取决于 common metadata，集合通信调用对称；replay 子 batch 有自己的 split，source 和 consumer 在同一个 forward context 中，紧凑顺序一致；整 chunk 无本地 token 时不会生成 0 行 chunk；短上下文跳过路径（`fill_short_context_topk_indices`）直接写 token 顺序，不受影响；aiter 自定义 AG 只在 FULL graph 下启用，prefill 交换不会走它。AMD CI 的 `test-amd.yaml` 会跑整个 `kernels/attention` 目录，新测试会被收录。
+- **问题**: `DeepseekV41RocmMxfp4IndexerMetadataBuilder` 的 decode 行切分在 `VLLM_BATCH_INVARIANT` 下关闭（`rocm_paged_mxfp4_indexer.py:602`），而 `_indexer_shardq_enabled` 没有这个条件；PR 描述自己也说明“行内 top-k 顺序取决于批形状”，同一请求是否走 ShardQ 又取决于同批的其他请求是否把 step 推过 1024 token。
+- **行动**: 建议作者确认批不变模式是否需要逐位一致；若需要，在 `_indexer_shardq_enabled` 中同样排除 `VLLM_BATCH_INVARIANT`，以和 decode 行切分保持一致。
 
 ## 8. 结论 (Verdict)
 
-⚠️ **NEEDS WORK**：核心的紧凑布局、交换映射和 `req_start` 修复经过源码追踪和 CPU 复刻验证，都是正确的，没有发现必须阻塞的问题。但这是 ROCm DSv4.1 TP>1 默认开启的新路径，仓库内测试只用 mock 集合通信，覆盖的是纯 prefill batch，且只在 gfx950 上验证过。建议补上混合 step / 真实 RCCL 测试，并处理 gfx942 的验证或门控后再合入。合入顺序需要与 #66052、#66047、#56944 协调。
+**⚠️ NEEDS WORK**
+
+设计取舍清晰（只切 indexer、用一次 top-k `all_gatherv` 代替两次 all-to-all），索引数学、执行顺序、候选层一致性与集体通信对称性经静态核对都是正确的，CUDA 路径不受影响。需要补的是：混合 decode+prefill step 的算子级测试、实际跑一次 CI（含 AMD kernels/attention），以及针对 ROCm 默认开启阈值的 serving 级证据；合并前还应与 #66052 / #56944 确定顺序。
 
 ## 9. 英文 Review 评论 (Copy-Paste English Comments)
 
-**C1** `tests/kernels/attention/test_rocm_dsv41_indexer_shardq.py:186-196` — ⚠️ comment
+**C1** `tests/kernels/attention/test_rocm_dsv41_indexer_shardq.py:186` — ⚠️ comment
 
 ```text
-The fake all_gatherv here returns the reference rows (ref[...][token_ids]) rather than the
-locals each rank actually produced, so the "whole buffer matches after the exchange" assert
-only checks the index_copy_ row mapping. Also, every new test uses num_decode_tokens=0
-(ShardQSplit(0, ...)), so the D-row offset in exchange_shardq_topk and the case where the
-indexer counts fewer decodes than the split are not covered, and the chunks are hand-built
-rather than coming from upload_shardq_indices / req_start in the builder. Could you add a
-mixed decode+prefill case (D > 0), make the fake gather concatenate the real per-rank
-locals, and ideally add a 2-process RCCL test along the lines of tests/v1/attention/test_shardq.py?
-The same applies to test_prefill_shardq_split_matches_replicated in test_rocm_paged_mxfp4_indexer.py.
+Both new op tests (this one and test_prefill_shardq_split_matches_replicated in test_rocm_paged_mxfp4_indexer.py) build ShardQSplit(0, ...) with num_decode_tokens=0, so the mixed decode+prefill step is never exercised. That is the common serving case under DSpark: the gather indices carry an identity prefix, exchange_shardq_topk starts at split.num_decode_tokens > 0, the indexer's own decode count can be smaller than ShardQ's, and the MXFP4 decode path reads the gathered q. The math looks right to me, but a mistake there would silently misplace top-k rows. Could you add a case with decode rows (e.g. a few next_n=6 decodes plus a short extend between the two thresholds) and assert the decode rows are untouched after the exchange?
 ```
 
-**C2** `vllm/models/deepseek_v41/amd/rocm.py:609-613` — ⚠️ comment
+**C2** `vllm/models/deepseek_v41/amd/rocm.py:98-107` — ⚠️ comment
 
 ```text
-This turns the ShardQ indexer on by default for every ROCm arch whenever TP > 1, including
-gfx942 (the FP8 op path and the --monokernel Gfx942SparseAttnIndexer, whose prefill falls
-back to the same op), but the validation in the description is MI355X only. The change is
-mostly arch-agnostic Python, but since this is a new default path, could you add a
-gfx942 TP8 accuracy/TTFT data point, or limit the gate to gfx950 for now and mention
-sparse_mla_shard_q=false as the kill switch in the description?
+This turns the split on by default for every TP>1 DSv4.1 ROCm deployment, using the CUDA-tuned sparse_mla_shard_q_min_tokens=1024. On ROCm only the indexer is sharded, so every indexer layer pays an extra [tokens, 512] int32 RCCL all_gatherv plus index_copy. Your own table puts the break-even around 32K tokens, and the batched short-prompt result is "within ±10% noise". Could you add a serving-level measurement at the step sizes most traffic hits (e.g. TP4 and TP8, 4K–16K prompts across a concurrency sweep, with commands), or give ROCm its own threshold closer to the measured break-even?
 ```
 
-**C3** `vllm/models/deepseek_v41/amd/rocm.py:86-95` — 📝 nit
+**C3** `vllm/v1/attention/backends/mla/rocm_paged_mxfp4_indexer.py:233` — 📝 nit
 
 ```text
-_indexer_shardq_enabled duplicates the use_shardq condition in SparseMLAAttentionImpl
-(sparse_mla_attention.py) but drops the hisparse_config is None check. DSv4.1 on ROCm
-doesn't use HiSparse today, so this is not a bug yet, but the two copies will drift when
-upstream adds new exclusions. Consider moving the shared config predicate into
-vllm/v1/attention/ops/shardq.py and calling it from both places.
+Now that the bisect is gone, plan_prefill_chunks fully trusts chunk.req_start, and that field defaults to 0. A future constructor or test helper that forgets it would plan request 0's ranges with no error. Consider dropping the default, or adding a cheap check here such as query_start_loc[first] <= t0 <= query_start_loc[first + chunk.num_reqs].
 ```
 
-**C4** `vllm/v1/attention/ops/rocm_aiter_mla_sparse.py:1338` — 📝 nit
+**C4** `vllm/v1/attention/backends/mla/rocm_paged_mxfp4_indexer.py:569-571` — 📝 nit
 
 ```text
-exchange_shardq_topk re-uploads split.token_ids + start (pinned alloc + H2D) for every
-sharded indexer layer in every step, although it is identical for the whole step; the MXFP4
-builder likewise re-uploads the renumbered query_start_loc the base builder already
-uploaded. Consider building the device row indices (int64) and the renumbered
-query_start_loc once in DeepseekV32IndexerMetadataBuilder.build and storing them on the
-prefill metadata, so the ops just reuse them.
+The base builder already uploads the renumbered query_start_loc (indexer.py, right after upload_shardq_indices) but keeps only the CPU copy, so this re-uploads it through a fresh pinned staging buffer every step. Consider also storing the device tensor on DeepseekV32IndexerPrefillMetadata next to shardq_query_start_loc_cpu and reusing it here.
+```
+
+## 10. 英文总结评论 (Overall Review Summary)
+
+```text
+Sharding only the indexer and all-gathering the int32 top-k is a reasonable fit for ROCm, and I traced the index math: the gather and exchange offsets match zigzag_split's rank order, decode rows never overlap the exchanged range, and candidate rows stay consistent between source and consumers. The CUDA path is unchanged. Before merge, please add op tests for mixed decode+prefill steps (all current tests use num_decode_tokens=0), get CI and the AMD attention jobs running, and back the default-on 1024-token threshold with serving-level data or a ROCm-specific threshold. Landing #66052 first, then rebasing, avoids the test_shardq.py conflict.
 ```

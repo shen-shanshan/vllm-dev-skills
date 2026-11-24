@@ -1,44 +1,46 @@
 ---
 pr: 60852
 repo: vllm-project/vllm
-head_sha: 92740a0876773b95db2411f045cf20152a070dfe
+head_sha: 16aaf7c66d2933e5e09e4976a6a180d3adffbdcd
 verdict: needs-work
-reviewed_at: 2026-11-20T08:52:19Z
+reviewed_at: 2026-11-24T03:19:03Z
 skill: vllm-rocm-pr-review
 ---
 
 # PR #60852: [Bugfix][MoRIIO] Handle WRITE cancellation before submission
 
-> **Author**: @yuzhouo7 | **State**: OPEN | **Date**: 2026-10-09（最后更新 2026-11-14）
-> **Branch**: `fix/moriio-zero-submit-cancel-20261009` → `main` | **Labels**: bug, needs-rebase, kv-connector
-> **Changes**: +1016 -53 lines across 12 files（相对旧 merge base `f5d93296`，其中包含一份旧版 #59058）| **ROCm 相关性**: 完全相关（MoRIIO KV connector，ROCm 专属 PD 分离传输）
+> **Author**: @yuzhouo7 | **State**: OPEN | **Date**: 2026-10-09（最后更新 2026-11-22）
+> **Branch**: `fix/moriio-zero-submit-cancel-20261009` → `main` | **Labels**: bug, kv-connector（`needs-rebase` 已于 11-21 移除）
+> **Changes**: +536 -42 lines across 11 files（merge base `c2fb5c5aba`，2026-11-21；与当前 main 无冲突）| **ROCm 相关性**: 完全相关（MoRIIO KV connector，ROCm 专属 PD 分离传输）
 > 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
+
+> **复审说明**：本报告是复审。上一版 review 针对旧 head `92740a0`（2026-11-20，结论 needs-work）。之后作者 force-push 了两个 commit：`ba44da7`（原修复 rebase 到含 #59058 正式版和 #64574 的 main）和 `16aaf7c`（"Narrow pre-submit WRITE cancellation"）。收窄提交删掉了 consumer 侧新增的三套去重状态（`_reported_write_transfers`、`_completed_write_transfers`、late-allocation 补发 `write_failed` 的 `_aborted_write_endpoints`）和 `_fail_deferred_task`，把提交闸门从"每个 task 一次"移到 `_do_layer_write`（空 plan 不再关闭闸门），并让 abort 在 decode 尚未分配时按配置的 peer 路由广播 `write_failed`。PR 描述新增了一次 GPU smoke（Qwen3-32B，TP1→TP1，单机 RDMA loopback）。
+> **上一轮问题处理情况**：已解决：① rebase 后 `_resolve_notify_endpoint(ReqMeta)` 的 AttributeError（现在按 `isinstance(ReqMeta)` 读 `tp_size`/`remote_host`）；② 与 #58962/#64154 的去重集合重复，以及 #65712 改成 OrderedDict 后的 `TypeError`（本 PR 已不再修改 consumer 的 `get_transfer_results`）。部分解决：③ 测试（新增 GPU smoke，新测试标了 `cpu_test`，但 CI 仍未运行，未覆盖 TP>1/DP>1）；④ 与 #64154 的 `_mark_request_done` 契约冲突（去重部分已消失，契约分歧仍在，降为 📝）。仍然存在：⑤ 异构 TP/PP 回退无日志（📝）；⑥ 按线程缓存 ZMQ socket 未在描述中说明（📝）。本轮新增 2 条 📝。
 
 ---
 
 ## 1. 总结 (Summary)
 
-MoRIIO WRITE 模式下，prefill（producer）请求被 abort 时，main 直接释放 prefill block，排队中的 WRITE 任务和 decode 侧都得不到明确结果，decode 请求会一直停在 `WAITING_FOR_REMOTE_KVS`（#59114 一类的 hang）。本 PR 给每个 transfer 加了一个跨 target、跨 layer 共享的"提交闸门" `WriteTransferState(submit_started, cancelled)`。abort 时如果还没有任何 RDMA 提交（zero-submit），就零写入地取消 transfer，给 decode 发 `write_failed`，并给 prefill 发一次 release ACK。一旦可能已经提交过，就绝不通知 decode 复用 block，只按 main 的老路径释放一次 prefill block，decode 侧的回收留给 #58962 / #64154。取消只对同构 TP 且 PP=1 生效，其他拓扑保持 main 行为。
+在 MoRIIO WRITE 模式下，prefill（producer）请求被 abort 后，main 直接释放 prefill block，decode 侧收不到任何消息，会一直卡在 `WAITING_FOR_REMOTE_KVS`（#59114 类 hang）；已排队的 WRITE 任务还可能读取已释放的 prefill block。本 PR 给每个 transfer 引入一个共享的提交闸门 `WriteTransferState(submit_started, cancelled)`。如果 abort 抢在第一次真正的 RDMA 提交之前（零提交），就取消 transfer，向 decode 发 `write_failed`，并由 worker 发一次 release ACK 释放 prefill block。只要可能已经提交过，就不通知 decode，沿用已有的完成/失败路径，只释放一次 prefill block。取消只对同构 TP 且 PP=1 生效。收窄后的版本只改 producer 侧，consumer 侧完全沿用 main 的逻辑。
 
 ## 2. 背景与动机 (Background & Motivation)
 
-- WRITE（PUSH）模式中，decode 先分配 block 并通过 ZMQ 把 block id 发给 prefill，prefill 每层 forward 后用单边 RDMA 把 KV 写入 decode，最后发 `write_done`。decode 在收到 `write_done` 之前一直把请求挂在 `WAITING_FOR_REMOTE_KVS`。
-- 在 main 上，prefill 请求 abort 时 `request_finished` 走 `status != FINISHED_LENGTH_CAPPED` 分支，返回 `(False, None)`，prefill block 立即释放。decode 不会收到任何消息。此外，如果此时 WRITE 任务已经排队，它们仍可能从已释放（可能已被复用）的 prefill block 读数据。
-- PR 依赖 #59058（consumer abort 后保留 transfer 映射）。#59058 已于 2026-11-20 以 `c3310a8890` 合入 main，但本 PR 捆绑的是它更早的版本（`a2aa2c9b`）。相关 PR 包括 #59382（生命周期拆分）、#58962（decode 超时）、#64154（fence 卡住的 producer）。
-- PR 描述把"未验证"的范围写得很清楚：GPU/serving、DMA fence、部分提交后的 decode 复用、异构 TP/PP 取消、transfer id 复用都没有验证。PR 声明使用了 Claude 和 Codex 辅助。
+- WRITE（PUSH）模式中，decode 先分配 block，并通过 ZMQ 把 block id 发给 prefill；prefill 在最后一个 prefill chunk 的 forward 中逐层用单边 RDMA 写入 decode，全部完成后发 `write_done`。decode 在收到 `write_done` 前一直把请求挂在 `WAITING_FOR_REMOTE_KVS`。
+- 在 main 上，prefill 请求 abort 时 `request_finished` 走 `status != FINISHED_LENGTH_CAPPED` 分支，返回 `(False, None)`，不会通知 decode。
+- #59058（consumer abort 后保留映射）已以 `c3310a8890` 合入，#64574（DP×TP 端口偏移）也已合入，本 PR 现在基于包含这两者的 main（`c2fb5c5aba`）。相关 PR 包括 #58962（decode 超时）和 #64154（fence 卡住的 producer），PR 描述明确把超时和 fence 留给这两个 PR。
+- 收窄提交的动机（来自 commit message）：decode 尚未分配时按配置的 peer 路由取消；空 WRITE plan 不关闭闸门；取消与正常完成串行化，保证 prefill 只 ACK 一次；复用 main 已有的 terminal 通知去重，不再自建 consumer 侧状态。
+- PR 声明使用了 Claude 和 Codex 辅助。
 
 ## 3. 代码修改分析 (Code Change Analysis)
 
 ### 3.1 修改的模块
 
-下表只列本 PR 自身的 3 个 commit（`a2aa2c9b..92740a08`），不含捆绑的 #59058。
-
 | 文件 | 改动 |
 |------|------|
-| `moriio/moriio_common.py` (+28 -1) | 新增 `WriteTransferState`、`supports_zero_submit_abort(local_tp, remote_tp, pp)`；`WriteTask`/`ReqMeta` 增加 `transfer_state` 字段；`MoRIIOConnectorMetadata.reqs_to_abort`；`add_new_req(..., abort_write=)` |
-| `moriio/moriio_connector.py` (+91 -3) | 调度器：producer WRITE 请求 `FINISHED_ABORTED` 且被准入时，生成 abort meta，保留映射并返回 `(True, None)`，即延迟释放、等 worker 的 ACK。worker：`start_load_kv` 中对 `reqs_to_abort` 调 `abort_before_write`；`reqs_to_save` 先 `bind_transfer`；consumer 侧新增 `_reported_write_transfers`（每个 worker 对同一 transfer 只投一票）和 `_completed_write_transfers`（上限 4096，丢弃迟到的重复 `write_failed`） |
-| `moriio/moriio_engine.py` (+164 -41) | `MoRIIOWriter`：`schedule_write`/`_execute_write_task`/deferred 路径都检查 `cancelled`；每个 target 第一次 post 前，在 `_write_state_lock` 下置 `submit_started=True`；新增 `abort_before_write`、`bind_transfer`、`_fail_deferred_task`；`_mark_request_done` 对已 terminal 的 transfer 不再重复 ACK。`MoRIIOWrapper`：remote allocation 迟到时，对已 abort 的 transfer 补发 `write_failed`；`send_notify` 的 DEALER socket 改为按 `(thread_id, path)` 缓存 |
-| tests (+531 -2) | 新增 `unit/moriio/test_moriio_write_abort.py`（348 行，14 个用例），`test_moriio_unmap.py` +174，其余为给 `__new__` 构造的对象补属性 |
+| `moriio/moriio_common.py` (+25) | 新增 `WriteTransferState`、`supports_zero_submit_abort(local_tp, remote_tp, pp)`；`WriteTask`/`ReqMeta` 新增 `transfer_state` 字段；`MoRIIOConnectorMetadata.reqs_to_abort` |
+| `moriio/moriio_connector.py` (+73) | 调度器 `request_finished`：producer WRITE 请求在 `FINISHED_ABORTED` 且被准入时，优先取 `_req_kv_params` 快照，调用 `fill_remote_pod_from_config` 后生成 abort meta，清理 save/pending/send 状态，保留映射并写入 `_deferred_send_deadlines`，返回 `(True, None)`；peer 地址无法解析且未分配时退回 `(False, None)`。worker：`start_load_kv` 对 `reqs_to_abort` 调用 `abort_before_write`；`save_kv_layer` 对被准入的 meta 先 `bind_transfer`；`_write_blocks_for_req` 跳过已取消的请求 |
+| `moriio/moriio_engine.py` (+154 -42) | `MoRIIOWriter`：新增 `_transfer_states`、`bind_transfer`、`abort_before_write`；`schedule_write`、写线程主循环、deferred 循环和 `_execute_write_task` 都检查 `cancelled`；`_do_layer_write` 在第一个非空 plan 提交前、在 `_write_state_lock` 下把 `submit_started` 置为 True；`_mark_request_done` 改为"只释放一次"并会置 `cancelled`；`_finalize_if_complete` 对已 terminal 的 transfer 不再发 `write_done`；`_resolve_notify_endpoint` 支持 `ReqMeta`。`MoRIIOWrapper`：`send_notify` 的 socket 缓存 key 改为 `(thread_id, path)`；`_handle_remote_blocks_message` 对 terminal transfer 直接 return |
+| tests (+284) | 新增 `test_moriio_write_abort.py`（297 行，`cpu_test` 标记，12 个用例）；其余测试改用真实的 `MoRIIOWrapper()` 构造，并补上 `pp_size`/`_transfer_states` |
 
 ### 3.2 架构 / 流程图
 
@@ -48,66 +50,68 @@ prefill 侧 abort 判定（本 PR 新增部分加粗）：
 flowchart TD
     A[prefill 请求 FINISHED_ABORTED] --> B{"**WRITE 且 do_remote_decode 且<br/>同构 TP 且 PP=1?**"}
     B -- 否 --> M["main 行为：返回 (False, None)<br/>prefill block 立即释放，decode 不知情"]
-    B -- 是 --> C["**调度器：reqs_to_abort + 保留映射<br/>返回 (True, None) 延迟释放**"]
+    B -- 是 --> P{"**add_new_req 能解析 peer?**"}
+    P -- "否且未分配" --> M2["(False, None)：没有可取消的 WRITE"]
+    P -- "否但已分配" --> X["**raise ValueError（scheduler 内）**"]
+    P -- 是 --> C["**reqs_to_abort + 保留映射<br/>返回 (True, None) 延迟释放**"]
     C --> D["worker.start_load_kv → **abort_before_write**"]
-    D --> E{"持 _write_state_lock：<br/>state.submit_started?"}
-    E -- "是（可能已 post）" --> F["**不通知 decode**<br/>走已有完成/失败路径：<br/>_mark_request_done 释放一次 prefill block"]
-    E -- "否（零提交）" --> G["**cancelled=True，标记 terminal**<br/>记下 decode endpoints"]
-    G --> H["向所有 decode DP rank 发 write_failed"]
-    G --> I["done_req_ids += ACK → prefill 释放 block"]
-    G --> J["若 remote allocation 迟到：<br/>**_handle_remote_alloc 补发 write_failed**"]
-    F --> K["decode 继续等待<br/>（回收交给 #58962 / #64154）"]
+    D --> E{"持 _write_state_lock：<br/>submit_started 或 completion_notified<br/>或已 terminal?"}
+    E -- 是 --> F["不通知 decode，走已有完成/失败路径<br/>（finalize 或 _mark_request_done 只 ACK 一次）"]
+    E -- 否（零提交） --> G["**cancelled=True，标记 terminal，<br/>pop 分配信息，done_req_ids += ACK**"]
+    G --> H["**向 remote_dp_size 个 decode DP rank<br/>广播 write_failed**"]
+    H --> I["decode：已映射则立即失败；<br/>未映射则放入 _unmatched_write_failures（上限 4096）等待"]
 ```
 
-写线程与 abort 的串行化：
+写线程与 abort 的串行化（收窄后闸门位于 `_do_layer_write`）：
 
 ```mermaid
 sequenceDiagram
     participant MT as 模型线程 (start_load_kv)
     participant WT as moriio-write-worker
     participant L as _write_state_lock
-    WT->>L: 获取锁
-    WT->>WT: cancelled 或 terminal? → return
-    WT->>WT: submit_started = True
-    WT->>L: 释放锁
-    WT->>WT: _do_layer_write（RDMA post）
-    MT->>L: abort_before_write 获取锁
-    MT->>MT: submit_started 为 True → return False（不发 write_failed）
+    WT->>L: _execute_write_task：cancelled? → return
+    WT->>WT: 构建 plans
+    WT->>L: _do_layer_write（首个非空 plan）
+    WT->>WT: cancelled? → return []；否则 submit_started = True
+    WT->>WT: batch_write（RDMA post）
+    MT->>L: abort_before_write
+    MT->>MT: submit_started 为 True → return False
+    WT->>WT: _mark_write_done → finalize（terminal 则不发 write_done）
 ```
 
 ### 3.3 关键实现细节
 
-- **闸门不可逆**：`submit_started` 只会被置为 True，从不复位；所有 target 和 layer 共用 `_transfer_states[transfer_id]` 这一个对象。注释明确写了 "A submit attempt is irreversible here: even an exception can leave partially posted writes"。
-- **锁序**：`abort_before_write`、`_mark_request_done`、`_fail_deferred_task` 都按 `_write_state_lock → wrapper.lock` 的顺序加锁；`schedule_write`/`_execute_write_task` 在 `_write_state_lock` 内调用 `_is_transfer_terminal`，后者再取 `wrapper.lock`。我没有找到反向加锁的路径。
-- **准入一致**：调度器用 `supports_zero_submit_abort(self.tp_size, remote_tp, pp_size)`，worker 用 `supports_zero_submit_abort(world_size, meta.tp_size)`（`world_size` 即 TP world size）。两边都把 `remote_tp_size or tp_size or 0` 解析为对端 TP，0 视为同构。
-- **为什么只允许同构 TP**：同构 TP 下 prefill rank i 只写 decode rank i。即使不同 rank 一个已提交、一个被取消，decode 各 rank 的 block 也只会被各自对端写入，所以"rank 级零提交"足以证明该 decode rank 的 block 安全。异构 TP 时一个 decode rank 有多个写者，这一推理不成立。
-- **consumer 去重**：`done_recving = _unmatched_write_completions - _reported_write_transfers`；同一次 poll 中 failure 优先于 success；`_reported_write_transfers` 在每次 `start_load_kv` 时与 live 映射求交集。
-- **`send_notify` 按线程分 socket**：abort 回复可能来自模型线程（`start_load_kv`）、notify 监听线程（迟到的 allocation）和写线程，而 ZMQ socket 不是线程安全的。这其实是一个独立的修复。
+- **闸门位置**：收窄前，闸门在 `_execute_write_task` 中构建完 plans 后统一置位；现在下沉到 `_do_layer_write`，空 plan（如 decode prefix cache 已全部命中、`num_skip_blocks` 覆盖整层）直接返回 `[]`，不关闭闸门。`test_empty_plan_does_not_close_submission_gate` 覆盖了这一点。
+- **只 ACK 一次**：`abort_before_write`、`_mark_request_done`、`fail_unallocated_write` 和 `_finalize_if_complete` 都在 `wrapper.lock` 下"检查 terminal + 标记 terminal + 追加 ACK"，所以无论谁先到，prefill 只收到一个 ACK。`abort_before_write` 额外检查 `completion_notified`，避免和正在等待 RDMA 完成的 finalize 抢 ACK。
+- **删除 `_fail_deferred_task` 是安全的**：deferred 任务表示分配信息尚未到达；而任何一次提交都需要分配信息，所以 `fail_unallocated_write` 成功（分配不存在且未 terminal）就意味着不可能有提交。
+- **锁序**：`_write_state_lock → wrapper.lock` 保持一致，没有找到反向加锁的路径。
+- **同构 TP 1:1 推理成立**：`_producer_targets` 在 `consumer_tp == producer_tp` 时 ratio=1，每个 prefill rank 只写同号 decode rank（MLA 也一样），所以"本 rank 零提交"足以证明对应的 decode rank 安全。
+- **`_resolve_notify_endpoint`**：现在接受 `WriteTask | ReqMeta`，用 `isinstance` 选择 `remote_host`/`remote_ip` 和 `tp_size`/`remote_tp_size`，端口仍按 #64574 的 `get_port_offset(dp, tp_rank, remote_tp)` 计算。
 
 ## 4. 涉及的技术原理 (Technical Principles)
 
-- **单边 RDMA 写的安全回收**：RDMA WRITE 由发起方 NIC 直接写入远端注册内存，接收方 CPU 不参与。因此 decode 侧"超时"不能证明不会再有写入。只有 (a) 根本没有 post 过（本 PR 的 zero-submit），(b) 所有 WR 都已完成（`write_done`），或 (c) 接收方撤销对端访问权（fence，#64154 / ROCm/mori#848）三种情况下，decode block 才能安全复用。
-- **WRITE 模式的 block 生命周期**：decode 在 `update_state_after_alloc` 分配 block 并通知 prefill；scheduler 对仍处于 `WAITING_FOR_REMOTE_KVS` 的已结束请求延迟释放 block，直到 `finished_recving`（#59058/#59382）。prefill 侧通过 `request_finished` 返回 `delay_free_blocks=True`，并等 worker 的 release ACK（`finished_sending`）。
-- **KVOutputAggregator 计数语义**：聚合器按"报告次数"递减 `expected_finished_count`，不区分来源 worker。同一 worker 对同一请求重复上报，会被当成另一个 worker 的一票，所以本 PR 以及 #58962、#64154 都在 worker 侧做"每个 worker 只报一次"的去重。
-- **ZMQ socket 线程安全**：同一个 DEALER socket 不能被多个线程同时使用。按线程缓存 socket 是最简单的隔离方式。
+- **单边 RDMA 写的安全回收**：RDMA WRITE 由发起方 NIC 直接写入远端注册内存，接收方 CPU 不参与。只有在 (a) 根本没有 post 过（本 PR 的零提交）、(b) 所有 WR 都已完成（`write_done`）、或 (c) 接收方撤销了对端访问权（fence，#64154）时，decode block 才能安全复用。MoRI 的 `ibv_post_send` 中途失败时，已 post 的 WR 仍在队列中，所以"提交抛异常"也必须当作"可能已提交"。
+- **WRITE 模式只在最后一个 chunk 写**：`build_connector_meta` 只在 `_is_final_prefill_chunk` 时把请求放进 `reqs_to_save`，所以一个 transfer 的全部 layer 写都发生在同一个 step。abort 落在最后一个 chunk 之前，一定是零提交；落在之后，则取决于写线程是否已经 post。
+- **调度器延迟释放**：WRITE 模式的 `update_connector_output` 不会按超时回收（只有 READ 会），prefill block 完全依赖 worker 的 ACK。所以每条被准入的 abort 路径都必须保证 worker 最终会发出 ACK。本 PR 的四条 terminal 路径共用同一个 terminal 检查，可以保证这一点。
+- **decode 侧的早到失败缓冲**：main 的 consumer 把尚未映射的 `write_failed` 放进 `_unmatched_write_failures`（OrderedDict，上限 4096），等 transfer 映射建立后再报失败。收窄版本依赖这一机制处理"abort 早于 decode 分配"的情况。
 
 ## 5. 评论区讨论亮点 (Discussion Highlights)
 
-- **okorzh-amd（11-11）指出了一个回归**：早期版本中，`submit_started` 置位后再抛异常会直接 return，不再发 release ACK，导致 prefill block 泄漏（`has_pending_push_work` 一直为真）。作者修正为"可能已提交后的失败仍按 main 释放一次 prefill block，只是不通知 decode"，并补了 submit 出错以及后续 target/layer 失败的回归测试。
-- **okorzh-amd 指出旧测试用 `__new__` 构造对象**：8 个用例因缺 `_reqs_need_abort` 或 `.mode` 失败。作者已修，但说明只在 CPU 上直接调用了这些函数，**没有在 ROCm 上用 pytest 重跑**。
-- **okorzh-amd 的冲突清单**：#59058 STACKED（捆绑的是旧版）；#64154 CONFLICT（它的 fence 路径依赖 `_mark_request_done` 的"释放"语义，其 `_fail_transfer` 是通知 decode 的模型）；#62552 CONFLICT；#58962 ALTERNATIVE；#65822 冲突时需要保留 `num_skip_blocks`。作者在 11-11 合了当时的 main 和 #59058 head，并把取消限制在 PP=1（因为 #64693 已合入）。
-- 之后 #59058 以另一个修订版本合入了 main（`c3310a8890`），#64574 也已合入，当前 head 与 main 重新冲突（见 §7）。
+- **okorzh-amd（11-11）**：指出早期版本在 `submit_started` 后抛异常会漏发 release ACK。作者改为"可能已提交后的失败仍释放一次 prefill block，只是不通知 decode"，并补了回归测试（当前 `test_possible_submit_failure_releases_source_only`）。
+- **okorzh-amd 的冲突清单**：#59058 STACKED（现已合入，本 PR 已 rebase）；#64154 CONFLICT（其 fence 路径依赖 `_mark_request_done` 返回 bool）；#62552 CONFLICT；#58962 ALTERNATIVE；#65822 需保留 `num_skip_blocks`（已保留）。
+- **11-20 之后**：没有新的人工 review 评论或作者回复。只有作者 11-21 的 rebase force-push（`92740a0 → ba44da7`）和 11-22 的收窄提交；mergify 移除了 `needs-rebase`。PR 描述更新为：CPU 12 个聚焦用例通过，其中 3 个在 `ba44da7` 上失败、在 `16aaf7c` 上通过；另有一次 GPU smoke（Qwen3-32B，TP1/TP1，单机 RDMA loopback，排队时和分配后取消均为 0 次 WRITE、两侧各 1 次 ACK/释放；正常传输和提交后对照组各 64 次提交）。作者自己注明这只是候选版本的 smoke，不是 A/B，也不覆盖跨机和 DMA fence。
 
 ## 6. 风险与潜在问题 (Risk Analysis)
 
 | 风险 | 严重程度 | 说明 |
 |------|---------|------|
-| rebase 到当前 main 后 abort 路径会抛 AttributeError | Medium | 见 §7 ⚠️【兼容性】`_resolve_notify_endpoint` 读取 `ReqMeta` 上不存在的 `remote_tp_size` |
-| 与 #58962 / #64154 / #65712 / #64785 / #66008 改同一批函数 | Medium | 见 §7 ⚠️【设计】三套"每个 worker 只报一次"集合，以及两种对立的"何时可以通知 decode"策略 |
-| 无 GPU / serving 验证，CI 未运行 | Medium | 见 §7 ⚠️【测试】 |
-| 异构 TP / PP>1 abort 保持 main 行为 | Low | 见 §7 📝【设计】；这些拓扑下 abort 仍可能导致 decode hang，以及排队写读取已释放的 prefill block |
-| 并发与锁序 | Low | 已核对：锁序一致，`submit_started` 不可逆，零提交判定与首次 post 在同一把锁下串行 |
-| 可维护性 | Low | 新增 4 个 OrderedDict/set 以及上限常量，状态面继续扩大 |
+| CI 未运行，硬件验证只有 TP1/TP1 单机 | Medium | 见 §7 ⚠️【测试】 |
+| abort 广播 `write_failed` 污染其他 decode DP rank 的早到失败缓冲 | Low | 见 §7 📝【设计】；大 DP、abort 风暴下有理论上的淘汰风险 |
+| 与 #64154 的 `_mark_request_done` 契约分歧 | Low | 见 §7 📝【设计】；去重集合冲突已随收窄消失 |
+| 已分配但 peer 无法解析的请求在 abort 时让 scheduler 抛异常 | Low | 见 §7 📝【正确性】 |
+| 异构 TP / PP>1 abort 仍沿用 main 行为 | Low | 见 §7 📝【设计】 |
+| 并发与锁序 | Low | 已核对：只 ACK 一次，锁序一致，闸门不可逆，删除 `_fail_deferred_task` 不引入新竞态 |
+| 可维护性 | Low | 收窄后状态面明显缩小（consumer 侧零新增状态）；`isinstance` 分派、按线程缓存 socket 未在描述中说明 |
 
 ---
 
@@ -115,81 +119,84 @@ sequenceDiagram
 
 | 类型 | 🔴 | ⚠️ | 📝 |
 |------|----|----|----|
-| 兼容性 | — | 1 | — |
-| 设计 | — | 1 | 1 |
 | 测试 | — | 1 | — |
+| 设计 | — | — | 3 |
+| 正确性 | — | — | 1 |
 | 可维护性 | — | — | 1 |
 
-整体看：零提交闸门的核心逻辑我逐行核对过，是对的。`submit_started` 与 `cancelled` 在同一把 `_write_state_lock` 下判定，首次 post 前置位且不可逆；"可能已提交就不通知 decode"的策略与 MoRI 的部分 post 语义一致（MoRI `src/io/rdma/common.cpp` 中 `ibv_post_send` 中途失败时，已 post 的 WR 仍在队列里）。同构 TP 1:1 写入的推理也成立。主要问题在 rebase 以及与同批 PR 的协调上。
+整体看：收窄后的实现比上一版简洁很多，producer 侧的四条 terminal 路径共用一个"检查 terminal + 标记 + ACK"的临界区，consumer 侧完全复用 main 的逻辑。我逐行核对了 abort 与首次提交、abort 与正常 finalize、abort 与 deferred 超时三组竞态，都只有一个赢家，prefill 也只收到一次 ACK。上一轮的两条主要问题（rebase 后的 AttributeError、去重集合重复与 #65712 的类型冲突）都已解决。剩下的主要是验证范围问题，以及几处可以顺手改进的细节。
 
 ---
 
-**⚠️【兼容性】rebase 到当前 main 后，`abort_before_write` 会在 `_resolve_notify_endpoint(ReqMeta)` 处抛 AttributeError** `[已验证]`
+**⚠️【测试】CI 仍未运行，硬件验证只覆盖 TP1→TP1 单机 loopback，没有覆盖 DP>1/TP>1 的 abort 路由** `[已验证]`
 
-- **问题**: 本 PR 把 `_resolve_notify_endpoint` 的参数放宽为 `WriteTask | ReqMeta`（`moriio_engine.py:782`），由 `abort_before_write`（`:197`）传入 `ReqMeta`。当前 main 已合入 #64574，同一函数改成了 `get_port_offset(..., tp_rank, task.remote_tp_size or self.worker.world_size)`（main `moriio_engine.py:718-722`）。但 `ReqMeta` 是 `@dataclass(slots=True)`，只有 `tp_size` 字段，没有 `remote_tp_size`。如果按 main 解决这处冲突，abort 路径会抛 `AttributeError`。此外，捆绑的 #59058 是 `a2aa2c9b` 版，与 main 的 `c3310a8890` 不同。trial merge 显示本 PR 与 main 在 `test_moriio_unmap.py`（8 处）、`moriio_connector.py`（2 处）、`moriio_common.py`、`moriio_engine.py` 各有冲突。
-- **影响**: `abort_before_write` 运行在 producer 的 `start_load_kv`（模型 runner 线程）。任何被准入的 WRITE abort 都会让这一步抛异常，后果比修复前的 hang 更重。
-- **行动**: 作者应当 rebase 到包含 #59058 和 #64574 的 main，并让 `abort_before_write` 显式传入 decode TP（例如给 `_resolve_notify_endpoint` 增加 `remote_tp_size` 参数，从 `meta.tp_size or world_size` 取值），不要依赖 duck typing。另外建议补一个 DP>1、TP>1 的 abort 端口单测。
+- **问题**: 当前 head 的 pre-run-check 失败（没有 `ready` label），pre-commit 和 Buildkite（包括 `.buildkite/test-amd.yaml` 中的 MoRIIO 单测 step）都被跳过。PR 描述中的 GPU smoke（Qwen3-32B，TP1/TP1，单机 RDMA loopback）和"12 个用例通过"来自作者本地，没有附日志，属于 `[unverified]`。用例数与 `test_moriio_write_abort.py` 的参数化展开结果（12 个）一致。新的 abort 路由在 decode 尚未分配时会向 `remote_dp_size` 个 rank 广播，并按 `(dp, tp_rank, remote_tp)` 计算端口（`moriio_engine.py:202-205, 814-827`），但硬件上只跑了 DP=1、TP=1，正好是端口偏移为 0 的情况。CPU 用例 `test_abort_before_alloc_uses_configured_peer_pods` 用 mock 校验了 DP=16、TP=2 的端口，但没有真实的 ZMQ/RDMA。
+- **影响**: 端口或 host 计算一旦出错，`write_failed` 会发到错误的 decode rank，原本的 decode hang 依然存在，而且没有任何报错（`send_notify` 只在连接失败时记日志）。
+- **行动**: 建议请 maintainer 加 `ready` 并触发 AMD MoRIIO 单测（`/amd-ci run`）。至少做一次 TP≥2（最好再加 DP≥2）的 1P1D WRITE abort 压测，覆盖排队时 abort 和分配后 abort 两种情况，并附上 decode KV 使用率回落、无 `WAITING_FOR_REMOTE_KVS` 残留的日志。
 
-**⚠️【设计】与 #58962 / #64154 / #65712 / #64785 / #66008 改同一批函数：重复的去重机制和对立的 decode 通知策略需要先协调** `[已验证]`
+**📝【设计】分配信息已到时仍向所有 decode DP rank 广播 `write_failed`，会占用其他 rank 的早到失败缓冲** `[已验证]`（影响部分为 `[推测]`）
 
-- **问题**（均已用 `git diff` / `git merge-tree` 在各 PR ref 间核对）:
-  1. **去重机制重复三份**：本 PR 在 WRITE consumer 的 `get_transfer_results` 中加入按 transfer id 的 `_reported_write_transfers`（`moriio_connector.py:1996, 3080, 3125-3130`）；#58962 在同一位置加入按 request id 的 `_write_recv_reported`；#64154 又加入 `_reported_recv_req_ids`。三者都是"每个 worker 对一个 receive 只报一次"，避免 `KVOutputAggregator` 把同一 worker 的重复报告当成另一票。本 PR 与 #58962 在 `moriio_connector.py` 上有 6 处冲突。
-  2. **策略对立**：本 PR 的 `_mark_request_done`（`moriio_engine.py:378-383`）明确规定可能已提交后不通知 decode。#64154 则新增 `_fail_transfer`，在所有已记录的 status 都为 `Succeeded()` 或 `Failed()` 时发送 `write_failed`，让 decode 释放 block。#64154 的 `_finalize_if_complete` 还依赖 `_mark_request_done` 返回 bool，而本 PR 让它返回 None。两者在 `moriio_engine.py` 上有 6 处冲突，#64785 也重写了同样的两个 `except Exception:` 分支。
-  3. **类型冲突**：#65712 把 `_unmatched_write_completions` 从 `set` 改成 `OrderedDict[TransferId, float]`。如果它先合入，本 PR 第 3080 行的 `self._unmatched_write_completions - self._reported_write_transfers` 会变成 `OrderedDict - set`，运行时抛 `TypeError`，而且这处很可能不会被 git 标为冲突。#66008 也改了 `send_notify` 的 socket 缓存，与本 PR 的 `(thread_id, path)` key 冲突。
-- **影响**: 按任意顺序合入都需要人工重写这些函数；如果合并时取错一方，要么丢掉 `write_done`，要么让 decode 在仍可能有写入时释放 block。
-- **行动**: 建议作者与 #58962、#64154 的作者先约定：(a) 只保留一个按 request id 的"已上报"集合，放在 `get_transfer_results` 中，供三个 PR 共用；(b) 以本 PR 的"可能已提交就不通知 decode"作为基线（#64154 的 reviewer 也基于 MoRI 部分 post 语义提出了同样意见）；(c) 合入顺序建议为 #60852 → #58962 → #64154，后合者在 rebase 时适配 `_mark_request_done` 的契约。
+- **问题**: `abort_before_write`（`moriio_engine.py:202-205`）总是对 `range(max(meta.remote_dp_size, 1))` 中的每个 rank 解析端点并发送 `write_failed`，即使 `done_remote_allocate_req_dict` 里已经有该 transfer 的 `decode_dp_rank`（第 222 行把它 pop 掉了，但没有使用）。收窄提交还删除了上一版"分配迟到时补发 `write_failed`"的逻辑，所以"abort 早于 decode 分配"的情况现在完全依赖 decode 侧 `_unmatched_write_failures`（上限 4096，FIFO 淘汰）来暂存这条失败。
+- **影响**: 每次 abort 都会在另外 DP-1 个 decode rank 上留下一条永远匹配不上的记录。在大 DP（例如 DP=16）加上集中 abort（客户端批量断开）的场景下，某个真正属于该 rank、但 decode 还没建立映射的失败，可能先被淘汰，对应的 decode 请求就会重新卡住。这需要短时间内出现约 4096 条未匹配失败，正常负载下不太会触发。
+- **行动**: 建议作者在已有分配信息时只通知 `info.decode_dp_rank`，只有未分配时才广播；或者在 docstring 中写明对 decode 侧缓冲上限的依赖。
 
-**⚠️【测试】没有 GPU / serving 验证，CI 未运行，ROCm 专属用例只在 CPU 上被直接调用过** `[已验证]`
+**📝【设计】`_mark_request_done` 的新契约仍与 #64154 冲突，合入顺序需要约定** `[已验证]`
 
-- **问题**: CI 未运行（无 `ready` label，pre-run-check 失败，pre-commit 与 Buildkite 均被跳过）。PR 描述中的数字（`test_moriio_write_abort.py` 14 passed；MoRIIO 目录 845 passed / 44 skipped / 5 failed）来自作者本地 CPU venv，没有附日志，属于 `[unverified]`。作者回复 okorzh-amd 时说明：被 ROCm 门控的 connector 测试在 CPU 上会 skip，修复后只是直接调用了测试函数，**没有在 ROCm 上用 pytest 重跑**。描述中还把 "GPU/serving at this head" 列为未验证。
-- **影响**: abort 路径涉及模型线程、写线程、notify 线程三方的时序，以及真实 MoRI session 上的 `write_failed` 投递，CPU 单测覆盖不到真实 RDMA 提交与 ZMQ 跨线程的行为。
-- **行动**: 建议作者 rebase 后请 maintainer 触发 AMD MoRIIO 单测 step（`/amd-ci run`），并至少做一次 1P1D WRITE 的 abort 压测（例如客户端在 prefill 排队时断开），附上 decode 侧 KV 使用率回落和无 hang 的日志。
+- **问题**: 本 PR 把 `_mark_request_done`（`moriio_engine.py:377-394`）定为"只释放一次、不通知 decode、返回 None"，并在其中置 `cancelled`。#64154（draft）把同一函数改为返回 `bool`，并在 `_fail_transfer`、fence 路径中依赖这个返回值（`refs/pr-review/64154` 中 `moriio_engine.py:313, 338, 394, 759`）。trial merge 在 `moriio_engine.py`/`moriio_connector.py`/`moriio_common.py` 上都有冲突。上一轮提到的去重集合重复（#58962、#64154）以及 #65712 的 `OrderedDict - set` 问题，随收窄提交已经不存在。
+- **影响**: 后合入的一方需要手工合并这个函数；如果合并时选错了一边，要么漏 ACK，要么在可能仍有写入时通知 decode 复用 block。
+- **行动**: 建议作者在 PR 描述中写明"可能已提交 → 不通知 decode"是 #64154 需要遵循的基线，并和 #64154 作者约定由谁适配返回值。
 
-**📝【设计】异构 TP 和 PP>1 的 abort 仍沿用 main 行为，建议在回退时打日志并跟踪后续** `[已验证]`
+**📝【正确性】已分配但 peer 地址无法解析的请求，abort 时会在 scheduler 的 `request_finished` 中抛出 `ValueError`** `[已验证]`
 
-- **问题**: `supports_zero_submit_abort` 对 `remote_tp != local_tp` 或 `pp_size > 1` 返回 False，于是这些请求在 `request_finished` 中仍走 main 路径：`status != FINISHED_LENGTH_CAPPED` 时返回 `(False, None)`，prefill block 立即释放。
-- **影响**: 在这些拓扑下，abort 仍会让 decode 停在 `WAITING_FOR_REMOTE_KVS`（只能靠 #58962 的超时兜底）；如果写任务已经排队，它们仍会从已释放的 prefill block 读数据。这不是本 PR 引入的回归，但当前没有任何日志能区分这两种行为。
-- **行动**: 建议作者在回退分支加一条 debug/warning 日志（说明拓扑不支持零提交取消），并在 PR 描述或 issue 中跟踪异构 TP / PP 的后续方案。
+- **问题**: `moriio_connector.py:1721-1723` 在 `add_new_req` 抛 `ValueError` 时，如果 `request_id in self._req_kv_params`（即已经 `update_state_after_alloc`），会原样 re-raise。`request_finished` 运行在 EngineCore 的调度循环中。
+- **影响**: 触发条件是：request_id 没有内嵌 peer zmq 地址，`kv_transfer_params` 又缺少 `remote_host`/`remote_handshake_port`/`remote_notify_port`，而且请求在最后一个 chunk 之前被 abort。在 main 上，这类请求只有走到最后一个 chunk 的 `build_connector_meta` 时才会抛异常；abort 时则直接释放。本 PR 把 abort 也变成了让 EngineCore 崩溃的路径。这需要配置错误才会触发，所以只记为备注。
+- **行动**: 建议作者改为记录 warning 并回退到 `(False, None)`（即 main 的行为），不要在 abort 清理路径上抛异常。
 
-**📝【可维护性】按线程缓存 ZMQ socket 是一个独立的修复，建议在描述中单独说明** `[已验证]`
+**📝【设计】异构 TP 和 PP>1 的 abort 仍沿用 main 行为，回退时没有日志**（上一轮遗留）`[已验证]`
 
-- **问题**: `send_notify` 的缓存 key 从 `path` 改为 `(threading.get_ident(), path)`（`moriio_engine.py:1345`）。在 main 上，`write_done` 可能由写线程（`_mark_write_done`）和模型线程（`seal_pending_transfers → _finalize_if_complete`）同时发送，共用同一个 DEALER socket，所以这次改动修的是一个早已存在的线程安全问题，不只是为 abort 服务。#64154 新增的 `fence_abort`/`fence_ack` 发送路径同样需要它。
-- **行动**: 建议作者在 PR 描述的 Details 里单独列出这一点（或拆成单独的小 PR，方便 #64154 / #66008 复用）。
+- **问题**: `supports_zero_submit_abort` 对 `remote_tp != local_tp` 或 `pp_size > 1` 返回 False，这些请求在 `request_finished` 中仍走到 `moriio_connector.py:1784` 的 `(False, None)`，不打任何日志。
+- **影响**: 在这些拓扑下，abort 仍会让 decode 卡住（只能靠 #58962 的超时兜底），已排队的写任务也仍可能读取已释放的 prefill block。这不是本 PR 引入的回归，但现在从日志上无法区分两种行为。
+- **行动**: 建议在准入失败时加一条 debug 日志，并在 PR 描述或 issue 中跟踪异构 TP / PP 的后续方案。
+
+**📝【可维护性】按线程缓存 ZMQ socket 是一个独立的修复，描述中仍未说明**（上一轮遗留）`[已验证]`
+
+- **问题**: `send_notify` 的缓存 key 改为 `(threading.get_ident(), path)`（`moriio_engine.py:1364`）。在 main 上，写线程和模型线程（`seal_pending_transfers → _finalize_if_complete`）本来就可能共用同一个 DEALER socket，所以这修的是一个早已存在的线程安全问题。现在的 PR 描述没有提到这一点。
+- **行动**: 建议在描述的 Behavior 部分单独列出这一点，方便 #64154、#66008 复用和审阅。
 
 ## 8. 结论 (Verdict)
 
 **⚠️ NEEDS WORK**
 
-零提交取消的设计是三个相关 PR 中最保守、也最符合单边 RDMA 语义的：同一把锁串行化，闸门不可逆，可能已提交时绝不让 decode 复用 block。代码逻辑没有发现阻塞性的正确性问题。但当前 head 落后于 main（#59058 已以另一版本合入，#64574 改了端口计算），直接 rebase 会让 abort 路径抛 AttributeError；同时需要和 #58962、#64154 统一去重集合和 decode 通知策略。完成 rebase 和协调、并在 ROCm 上跑过 MoRIIO 单测和一次 abort 压测后，可以合入。
+收窄后的零提交取消实现正确，范围也合适：同一把锁串行化取消与首次提交，闸门不可逆，四条 terminal 路径保证 prefill 只 ACK 一次，可能已提交时绝不让 decode 复用 block；consumer 侧不再新增状态。上一轮的 rebase AttributeError 和去重集合冲突都已解决。剩下的阻碍是验证：CI 没有跑过，硬件上只验证了 TP1/TP1 单机。触发 AMD MoRIIO 单测并补一次 TP≥2（最好 DP≥2）的 abort 压测后，可以合入。几条 📝 可以顺手处理。
 
 ## 9. 英文 Review 评论 (Copy-Paste English Comments)
 
-**C1** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_engine.py:782` — ⚠️ comment
+**C1** `tests/v1/kv_connector/unit/moriio/test_moriio_write_abort.py:1` — ⚠️ comment
 
 ```text
-This branch needs a rebase. #59058 merged as a different revision (c3310a8890), and #64574 changed this helper on main to compute the port with `task.remote_tp_size or self.worker.world_size`. `ReqMeta` is a slots dataclass that only has `tp_size`, so if the conflict is resolved toward main, `abort_before_write` will raise AttributeError in the producer's `start_load_kv`, and every admitted WRITE abort will fail the step. Could you rebase onto current main and pass the decode TP size explicitly (e.g. a `remote_tp_size` argument filled from `meta.tp_size`) rather than relying on duck typing? An abort test with DP>1 and TP>1 would pin the port math.
+The narrowed version reads well, and the rebase fixed the ReqMeta port lookup. CI has not run on this head yet (pre-run-check, so the AMD MoRIIO unit step was skipped), and the GPU smoke covers only TP1 -> TP1 on one host, where the DP/TP port offset is zero. The new abort routing broadcasts write_failed to every decode DP rank using get_port_offset(dp, tp_rank, remote_tp), so a wrong port would silently leave decode hanging. Could a maintainer add `ready` and run the AMD MoRIIO tests? Could you also run one TP>=2 (ideally DP>=2) 1P1D WRITE abort test, with aborts both while queued and after allocation, and attach logs showing decode KV usage returning to baseline?
 ```
 
-**C2** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:3080` — ⚠️ comment
+**C2** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_engine.py:202-205` — ⚠️ comment
 
 ```text
-#58962 (`_write_recv_reported`) and #64154 (`_reported_recv_req_ids`) each add their own "report each receive once per worker" set to this same block, so after merging there would be three sets with the same purpose. Separately, #65712 changes `_unmatched_write_completions` to an OrderedDict, and this set difference would then raise TypeError at runtime, which git may not flag as a conflict. Could you agree with the authors of #58962 and #64154 on a single per-worker reported set keyed by request id, and on a merge order, before either lands?
+When the allocation has already arrived, `done_remote_allocate_req_dict` holds the decode DP rank, but this still sends write_failed to all `remote_dp_size` ranks. Every abort then leaves an entry that will never match in the other ranks' `_unmatched_write_failures`, which holds at most 4096 entries. The late-allocation re-send was removed in this revision, so a pre-allocation abort now relies entirely on that buffer. With a large decode DP and a burst of aborts, a real pending failure could be evicted. Could you notify only `info.decode_dp_rank` when the allocation is known, and broadcast only when it is not?
 ```
 
-**C3** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_engine.py:378-383` — ⚠️ comment
+**C3** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:1721-1723` — ⚠️ comment
 
 ```text
-I agree with the policy here: once a submit may have started, decode must not be told it can reuse its blocks, because MoRI can leave posted WRs queued when ibv_post_send fails partway. #64154 takes the opposite approach. Its `_fail_transfer` sends `write_failed` once every recorded status is Succeeded or Failed, and its finalize path relies on `_mark_request_done` returning a bool. Merging both as they are would either drop `write_done` or let decode free blocks that are still being written. Could you document this contract in the docstring as the baseline that #64154 must follow, and coordinate the order with its author?
+For an allocated request whose peer address cannot be resolved, this re-raises the ValueError from `request_finished`, which runs in the EngineCore scheduler loop. On main the same request is simply freed when it is aborted before its final chunk, so this turns a misconfigured-but-aborted request into an engine crash. Could you log a warning and fall back to `(False, None)` instead? That matches the previous abort behavior and keeps cleanup from raising.
 ```
 
-**C4** `tests/v1/kv_connector/unit/moriio/test_moriio_write_abort.py:1` — ⚠️ comment
+**C4** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_engine.py:377-394` — ⚠️ comment
 
 ```text
-CI has not run on this PR, and the description lists GPU/serving at this head as unverified. The MoRIIO connector tests are skipped off ROCm, and the fix for the `__new__`-built tests was checked by calling the test functions directly on CPU. Could you get the AMD MoRIIO unit-test step triggered after the rebase, and run one 1P1D WRITE abort test on hardware (for example a client disconnect while the request is queued on prefill)? Please attach logs showing decode KV usage returning to baseline with no stuck requests.
+I agree with this contract: after a possible submit, release the source once and never tell decode to reuse its blocks. #64154 (draft) changes this helper to return a bool, and its `_fail_transfer` and fence paths rely on that return value, so the two PRs conflict here. Could you state this contract in the PR description as the baseline #64154 should follow, and agree with its author on who adapts the return type?
 ```
 
 ## 10. 英文总结评论 (Overall Review Summary)
 
 ```text
-The zero-submit gate is sound. Cancellation and the first post are serialized under one lock, the gate is irreversible, and decode is never told to reuse blocks once a submit may have started, which matches MoRI's partial-post behaviour. Before merge: rebase onto current main, where #59058 landed as a different revision and the #64574 port change would make the abort path raise on ReqMeta; agree with #58962 and #64154 on a single per-worker reported set and on when decode may be told write_failed; and run the AMD MoRIIO tests plus one hardware abort test. Approve after that.
+The narrowed zero-submit cancellation looks correct. Cancellation and the first post are serialized under one lock, every terminal path ACKs prefill exactly once, decode is never told to reuse blocks after a possible submit, and the consumer side now reuses main's logic. The rebase also fixed the earlier ReqMeta port lookup. Before merge: run the AMD MoRIIO tests and one TP>=2 (ideally DP>=2) hardware abort test. Also consider notifying only the known decode DP rank instead of broadcasting, and not raising from request_finished on unresolvable peers. Approve after the validation.
 ```
