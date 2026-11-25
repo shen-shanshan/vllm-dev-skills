@@ -3,7 +3,7 @@ pr: 65690
 repo: vllm-project/vllm
 head_sha: 6ac4157894a43fc30531788ed5e4b548193bbfec
 verdict: needs-work
-reviewed_at: 2026-11-20T08:50:28Z
+reviewed_at: 2026-11-25T03:20:00Z
 skill: vllm-rocm-pr-review
 ---
 
@@ -13,6 +13,8 @@ skill: vllm-rocm-pr-review
 > **Branch**: `amd-weisun:moriio-handshake-failure` → `main` | **Labels**: bug, rocm, kv-connector
 > **Changes**: +425 -54 lines across 6 files | **ROCm 相关性**: 完全相关（MoRIIO KV connector READ 路径，ROCm 专属）
 > 本报告分两部分：§1–6 为 PR 详细总结，§7–8 为 ROCm review 意见。
+>
+> **复审说明（2026-11-25）**：head 仍为 `6ac4157`，与 2026-11-20 的 review 相同。本次复审新增一条 ⚠️：PR 描述中的故障注入验证结果早于冷却提交，与当前 head 的行为不符。同时重新核对了合入环境：#60852 已合入 main，与本 PR 三方合并无文本冲突；#63855、#66008、#65923、#65712、#63856 仍为 Open；CI 仍未运行。
 
 ---
 
@@ -83,7 +85,7 @@ flowchart TD
 - @okorzh-amd：失败 engine 每次被引用都会在 `start_load_kv` 中同步重新握手；叠加 #63856 每个 target 约 61 s 的上限，以及单线程 `_handshake_initiation_executor` 串行执行，DP8 prefill 每步可能卡约 8 分钟，整批健康请求一起等待。建议按引用次数暂时直接失败该 engine 的请求。作者采纳，实现了从 1 开始翻倍、上限 512 的引用计数冷却，成功握手后清零。
 - @okorzh-amd 建议标题写清楚改了什么，作者已改名。
 - @okorzh-amd 汇总关联 PR：#65923 堆叠在本 PR 之上（包含本 PR head，补齐多 group / hybrid 的逐请求恢复）；#63856 是依赖（让死掉的对端变成失败而不是挂起）；#63855 在 `start_load_kv` 有 1 处冲突；#63854 是配套（版本不匹配抛 `HandshakeError`，本 PR 将其变为逐请求失败并按冷却重试）；#65712 是 WRITE 侧同类“过期未匹配通知”的兄弟实现。
-- CI：CI 未运行（无 `ready` label，pre-run-check 失败，pre-commit 与 Buildkite 均被跳过）。DCO 通过。mergify 曾在 11-10、11-13 两次提示冲突；本 review 用本地 `git merge-tree` 对当前 `upstream/main` 检查，未发现文本冲突。
+- CI：CI 未运行（无 `ready` label，pre-run-check 失败，pre-commit 与 Buildkite 均被跳过）。DCO 通过。mergify 曾在 11-10、11-13 两次提示冲突。2026-11-25 复审时对 `upstream/main`（`5cc69fe699`，已包含 #60852）逐文件做三方合并，6 个文件均无文本冲突；#60852 改的是 WRITE 侧的预提交取消路径，本 PR 新增的 `_can_route_read_release` 分支位于其后的 READ 分支，二者互不影响。
 - 同批 PR 交叉核对（本 review 在本地 ref 上核对）：
   - **#63855**（kudomcho，gap 6）：真实文本冲突，在 `start_load_kv` 中。#63855 删除了 READ 路径上的懒握手回退与忙等循环，而本 PR 在同一循环中加入了 release 与 failed-engine 分支，后合入者需要手工合并。
   - **#66008**（decode 为 READ 块续租）：语义冲突。本 PR 以“从未读取”为由删除 worker 的 `_reqs_to_send`（在 main 上确实只写不读），而 #66008 把 `_reqs_to_send` 改造成 producer 侧的 READ 租约到期表（`_reap_expired_read_leases` 读取它）。两者同时改这几行，会以文本冲突暴露，不会静默出错，但需要协调谁先合入。
@@ -96,6 +98,7 @@ flowchart TD
 |------|---------|------|
 | 失败粒度是整个 prefill engine（所有 DP rank），健康 DP rank 的请求也被失败并进入冷却 | Medium | 见 §7 ⚠️【设计】 |
 | CI 未运行，新测试尚未在 MI355 MoRIIO step 上跑过 | Medium | 需要 `ready` 或 `/amd-ci run` |
+| 描述中的 e2e 验证早于冷却提交，与 head 行为不符 | Medium | 见 §7 ⚠️【测试】 |
 | 与 #63855（文本）和 #66008（`_reqs_to_send`）冲突 | Medium | 见 §5 与 §7 📝 |
 | 冷却按引用计数，低流量下已恢复的对端仍可能被跳过很长时间；冷却期日志写“handshake failed”但实际没有握手 | Low | 见 §7 📝 |
 | release ack 过期是 Claims 未列出的行为变化，策略与 #65712 不一致 | Low | 见 §7 📝 |
@@ -111,7 +114,7 @@ flowchart TD
 | 设计 | — | 1 | 2 |
 | 注释/文档 | — | — | 1 |
 | 可维护性 | — | — | 1 |
-| 测试 | — | — | 1 |
+| 测试 | — | 1 | 1 |
 
 总体评价：核心改动方向正确，相对 main（任何握手失败都杀死 decode 引擎）是明确的改进。TP 投票与冷却状态的一致性、release 端口计算、`send_notify` 不依赖 session、单 group 判定与 scheduler `_handle_invalid_blocks` 的限制都已核对无误。下列意见集中在失败粒度、与同批 PR 的协调，以及描述中未列出的行为变化。
 
@@ -120,6 +123,12 @@ flowchart TD
 - **问题**: `_eager_handshake_all_dp_ranks` 对一个 engine 的所有 target（每个 DP rank，flexible 模式下每个 DP×TP）汇总成一个 `all_ok`，投票失败后把整个 `remote_engine_id`（`host:handshake_port`）加入 `failed` 并设置冷却（`moriio_connector.py:3483-3497`，冷却期判断在 `3390-3395`）。`start_load_kv` 按 engine 判断（`3542-3543`），而每个请求实际只读自己的 `meta.remote_dp_rank`（`_read_blocks_for_req` 用 `get_engine_name_with_dp(dst_engine_id, remote_dp_rank)` 取 session）。已经握手成功的 DP rank 的 session 会写进 `_remote_agents`，但 engine 不会进入 `_eager_handshaked_engines`，所以这些 rank 的请求同样被失败。
 - **影响**: 触发输入：prefill 为 DP8（`remote_dp_size=8`），其中一个 DP rank 的握手端口不可用（例如它的监听线程因坏消息退出，即 #64756 修复的 main 上的 bug，或两节点之间该端口被防火墙拦截）。此后每个路由到这个 prefill 实例的请求都会失败（`kv_load_failure_policy=fail` 时用户直接看到错误，`recompute` 时在 decode 上本地完整重算），只要该 rank 一直不可达，冷却就会翻倍到 512 次引用，而其余 7 个健康 rank 本可以正常服务。
 - **行动**: 建议作者把失败粒度细化到 target：投票可以对一个按 target 排列的 0/1 向量做 `all_reduce(MIN)`（顺序由 scheduler metadata 决定，各 rank 一致），冷却也按 `(engine, dp_rank)` 记录，`start_load_kv` 只失败 `remote_dp_rank` 落在失败 target 上的请求。如果这次不改，建议在 Limitations 中写明这一粒度，并在日志里给出具体失败的 DP rank。
+
+**⚠️【测试】PR 描述中的故障注入结果早于冷却提交，与当前 head 的行为不符** `[已验证]`
+
+- **问题**: Validation 表写的是“Handshake fails once, kv_load_failure_policy=fail → That request fails; decode stays healthy; the handshake is retried and the next 4 requests return 200”，双节点表也写“That request fails; the next 4 return 200”。但当前 head 中 `HANDSHAKE_FAILURE_COOLDOWN = 1`（`moriio_common.py:492`）：第一次握手失败后，冷却设为 `(1, 2)`，**下一个引用该 engine 的步**会走 `left > 0` 分支直接失败（`moriio_connector.py:3390-3396`），不会握手，再下一步才重试。PR 自己的单测 `test_tp_vote_fails_an_engine_another_rank_could_not_reach` 也断言了这一行为（冷却步的 blocks 进入 `_invalid_block_ids`）。所以按当前代码，“next 4 requests return 200”应该是“紧接着的那一个请求（或那一步中所有路由到该 engine 的请求）也失败，之后才恢复”。这些 e2e 结果是在冷却提交 056aa8f / 91c6370（11-13 之后，回应 @okorzh-amd 的意见）之前跑的，作者没有在 head 上重跑。同一处的测试 docstring（`test_moriio_read_tp.py:589`，“the failed engine is retried next step”）也已过时。
+- **影响**: 不影响正确性，但 reviewer 会按描述理解“一次失败只损失一个请求”。实际上一次瞬时失败会失败两步，而高并发时每一步可能包含该 prefill 实例的几十个新请求；在 `kv_load_failure_policy=fail` 下，这些请求都会直接返回错误。另外，描述里的 e2e 证据没有覆盖当前 head 的冷却与“release 不握手”（6ac4157）这两处行为变化。
+- **行动**: 建议作者在当前 head 上重跑单节点和双节点故障注入并更新两张表，明确写出冷却带来的额外失败；同时修正 `test_failed_handshake_fails_only_its_requests` 的 docstring。如果认为第二步也失败的代价过高，可以考虑冷却从 0 开始（第一次失败后下一步立即重试，第二次失败才开始跳过），但这需要和 @okorzh-amd 的“避免每步卡住”诉求权衡。
 
 **📝【设计】与同批 PR 的冲突：#63855 在 `start_load_kv` 有文本冲突，#66008 会重新使用本 PR 删除的 `_reqs_to_send`** `[已验证]`
 
@@ -150,7 +159,7 @@ flowchart TD
 
 **⚠️ NEEDS WORK**
 
-把“握手失败杀死 decode 引擎”改为“只失败相关请求”方向正确，TP 一致性和 release 路由都经得起核对。合入前建议把失败粒度从整个 prefill engine 细化到 DP rank（至少在描述中说明这一限制），补上 release ack 过期这一未列出的行为变化，并与 #63855、#66008 协调合入顺序；同时需要让 AMD CI 实际跑一次。
+把“握手失败杀死 decode 引擎”改为“只失败相关请求”方向正确，TP 一致性和 release 路由都经得起核对。合入前建议把失败粒度从整个 prefill engine 细化到 DP rank（至少在描述中说明这一限制），在当前 head 上重跑故障注入并更新验证表（冷却会让下一步也失败），补上 release ack 过期这一未列出的行为变化，并与 #63855、#66008 协调合入顺序；同时需要让 AMD CI 实际跑一次。
 
 ## 9. 英文 Review 评论 (Copy-Paste English Comments)
 
@@ -160,19 +169,25 @@ flowchart TD
 The vote and the cooldown are per remote engine, but each request reads only from its own remote_dp_rank. If one DP rank of a DP8 prefill cannot be reached (for example, its handshake listener died, or the port is blocked between nodes), every request routed to that prefill instance fails. The cooldown then keeps doubling to 512 references, even though the other 7 ranks are healthy and their sessions are already in _remote_agents. Could you vote on a per-target 0/1 vector (its order comes from scheduler metadata, so it matches on every rank), key the cooldown by (engine, dp_rank), and fail only the requests whose remote_dp_rank failed? If not, please list this limitation and log the failing DP rank.
 ```
 
-**C2** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:3037-3038` — 📝 comment
+**C2** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_common.py:490-493` — ⚠️ comment
+
+```text
+The fault-injection tables in the description predate the cooldown commits. With HANDSHAKE_FAILURE_COOLDOWN = 1, the step right after a failed handshake hits the cooldown branch and fails that engine's requests without handshaking. test_tp_vote_fails_an_engine_another_rank_could_not_reach asserts exactly this. So "that request fails; the next 4 return 200" no longer describes the head: the next reference fails too, and under load that can be a whole step's worth of requests. Could you rerun the single-node and two-node scenarios on the current head and update both tables? The docstring of test_failed_handshake_fails_only_its_requests ("retried next step") is stale as well.
+```
+
+**C3** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:3037-3038` — 📝 comment
 
 ```text
 Dropping unmatched release acks after defer_timeout changes behavior, but Claims and Details do not mention it. #65712 does the same thing for WRITE write_done notifications with a fixed 60 s TTL and a 4096-entry cap, and says explicitly that it does not rely on defer_timeout because users may set it low. Could you add this to the description and explain why defer_timeout is the right bound here? It would also help to align with #65712 on a single expiry policy, at least on whether to cap the buffer.
 ```
 
-**C3** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:4464-4465` — 📝 comment
+**C4** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:4464-4465` — 📝 comment
 
 ```text
 During the cooldown, every skipped request logs "MoRIIO handshake with %s failed" at error level, but no handshake was attempted in that step. Entering the cooldown also logs nothing, so an operator cannot tell how long the engine will be skipped. Could you log once when an engine enters the cooldown, with the engine and the references left, and word this message differently for cooldown skips?
 ```
 
-**C4** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:534-549` — 📝 comment
+**C5** `vllm/distributed/kv_transfer/kv_connector/v1/moriio/moriio_connector.py:534-549` — 📝 comment
 
 ```text
 This duplicates the routing rules of ReqMeta.add_new_req: the embedded zmq address, or remote_host plus both ports, and the required transfer_id, remote_engine_id and remote_block_ids. If add_new_req gains a required key later and this check is not updated, an unroutable release reaches build_connector_meta again and kills the engine. Could you factor the address resolution out of add_new_req into a helper that returns None when the release cannot be routed, and call it from both places?
@@ -181,5 +196,5 @@ This duplicates the routing rules of ReqMeta.add_new_req: the embedded zmq addre
 ## 10. 英文总结评论 (Overall Review Summary)
 
 ```text
-Thanks, this is a clear improvement: a failed READ handshake now fails only the affected requests instead of the decode engine. The TP vote and the reference-counted cooldown stay consistent across ranks, and releases reuse the normal notify ports. Before merging, I'd ask to narrow failures from the whole prefill engine to the failing DP rank (or document that limit), to describe the new release-ack expiry and align it with #65712, and to sequence this PR with #63855 and #66008, which touch the same code. CI has not run yet. Approve after these changes.
+Thanks, this is a clear improvement: a failed READ handshake now fails only the affected requests, not the decode engine, and the TP vote and reference-counted cooldown stay consistent across ranks. Before merging, I'd ask to narrow failures from the whole prefill engine to the failing DP rank (or document it), to rerun the fault-injection scenarios on the current head, since the cooldown also fails the next reference, to describe the new release-ack expiry, and to sequence this with #63855 and #66008. CI has not run yet. Approve after these changes.
 ```
