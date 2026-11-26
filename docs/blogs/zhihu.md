@@ -6,7 +6,7 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/18）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/26）。
 
 # 二、项目介绍
 
@@ -28,6 +28,7 @@
 | `infx-bench-script-generator` | 性能优化 | 生成在本地服务器上跑 InferenceX Benchmark 的脚本 | ⭐️⭐️⭐️ |
 | `vllm-pr-summary` | 代码 Review | 生成 PR 分析报告 | ⭐️⭐️⭐️⭐️ |
 | `vllm-rocm-pr-review` | 代码 Review | Review AMD/ROCm 相关 PR，并生成可直接贴到 GitHub 的评论 | ⭐️⭐️⭐️⭐️⭐️ |
+| `vllm-vit-cg-pr-review` | 代码 Review | Review ViT（Encoder）CUDA Graph 相关 PR，Review 思路学习自该特性的 Maintainer | ⭐️⭐️⭐️⭐️ |
 | `vllm-multimodal-open-issue-analyzer` | Issue 分析 | 搜集并整理多模态相关的 Open Issue | ⭐️ |
 | `vllm-technical-blog-writer` | 技术写作 | 按我的写作风格撰写或补全 vLLM 技术博客 | ⭐️⭐️ |
 
@@ -201,6 +202,20 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 此外，报告开头会带一段 YAML Front Matter，记录 PR 编号、被 Review 的 Head Commit SHA、Review 结论（`block` / `needs-work` / `lgtm`）和 Review 时间。报告推送到仓库后，Pingboard Dashboard 会读取这些字段，在 PR 详情页展示 AI Review 的结论，并据此判断 PR 在 Review 之后是否又有了新的改动。
 
 输出样例：[pr-29304-review](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-rocm-pr-review/outputs/pr-29304-review.md)。
+
+**`vllm-vit-cg-pr-review`：面向 ViT CUDA Graph PR 的 Review 助手。**
+
+我在维护 [ViT Full CUDA Graph 的 Tracker Issue（#38175）](https://github.com/vllm-project/vllm/issues/38175)，社区里给各个多模态模型接入 Encoder CUDA Graph 的 PR 很多，而且同类问题会反复出现：用了已经被删掉的接口、Budget 计算向上/向下取整弄反、Graph 路径和 Eager 路径的数值实现不一致、忘了更新文档表格和 CI 测试、Benchmark 根本没有测到 Encoder 等。这个 Skill 就是把这些 Review 经验沉淀下来：
+
+- **Review 标准来自真实的 Review 意见**：Skill 采集了 Tracker 中全部 PR 上我和 @Isotr0py 的 Review 评论，从中提炼出规则目录和 Reviewer Playbook（我们各自关注什么、按什么顺序看 Diff、英文评论怎么写），生成的意见和措辞都尽量贴近我们平时的习惯；
+- **对照最新的 vLLM main**：这个子系统的接口迭代很快，Skill 会先同步 vLLM main，再对照 `SupportsEncoderCudaGraph` 协议和 `EncoderCudaGraphManager` 的最新实现检查 PR，逐一核对 Capture、Replay 和 Eager 三条路径是否一致；
+- **报告格式与 `vllm-rocm-pr-review` 相同**：同样是详细总结、按严重程度排序的问题清单（模型接入类 PR 额外附一张集成清单）、Review 结论、带行号的英文评论和 100 词以内的英文总结，同样带 YAML Front Matter；
+- **支持批量 Review**：一句“Review #38175 及其评论区中 Open 的 PR”，Skill 会先列出 Tracker 中仍然 Open 的 PR 及其已有报告是否过期，再逐个生成报告；
+- **一键更新**：`scripts/update_skill.py` 会重新采集 Reviewer 评论，并检查规则里引用的框架文件和接口在 vLLM main 上是否还存在，方便随着接口演进更新规则。
+
+报告推送到仓库后，Pingboard Dashboard 也会展示它；同一个 PR 同时有本 Skill 和 `vllm-rocm-pr-review` 的报告时，Dashboard 优先展示本 Skill 的报告。
+
+输出样例：[pr-63074-review](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-vit-cg-pr-review/outputs/pr-63074-review.md)。
 
 ## 2.8 Issue 分析
 

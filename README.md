@@ -32,6 +32,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 | [infx-bench-script-generator](./skills/infx-bench-script-generator/SKILL.md) | Performance Optimization | Generate local bash scripts (docker run / server start / AgentX client replay) to run an InferenceX srt-slurm recipe benchmark without Slurm, with optional torch profiler prefill/decode step capture. | ⭐️⭐️⭐️ |
 | [vllm-pr-summary](./skills/vllm-pr-summary/SKILL.md) | Code Review | Fetch and analyze a PR from vllm, then generate a report covering PR overview, code change analysis, technical principles, discussion highlights, and risk assessment. | ⭐️⭐️⭐️⭐️ |
 | [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | Code Review | Review AMD/ROCm-related PRs from vllm (aiter/mori/ROCm kernels) and generate a single combined Chinese report: a detailed PR summary (with Mermaid diagrams, technical principles, discussion highlights, and risk table) followed by severity-sorted, type-categorized ROCm review findings, a verdict, copy-paste English comments with file + diff line numbers ready for GitHub PR review, and a short (≤100-word) English overall summary to post as the PR's top-level comment. | ⭐️⭐️⭐️⭐️⭐️ |
+| [vllm-vit-cg-pr-review](./skills/vllm-vit-cg-pr-review/SKILL.md) | Code Review | Review ViT (encoder) CUDA graph PRs from vllm — the model integrations, framework changes and fixes tracked by [#38175](https://github.com/vllm-project/vllm/issues/38175) — against the latest vllm main, following the review habits learned from the feature's maintainers (@shen-shanshan, @Isotr0py). Same combined Chinese report format as `vllm-rocm-pr-review` (detailed summary, severity-sorted findings with an integration checklist, verdict, copy-paste English comments, ≤100-word English summary); can batch-review all open tracker PRs. | ⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue Analysis | Fetch and organize multimodal-related open issues from vllm. | ⭐️ |
 | [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | Technical Writing | Write or complete Chinese vLLM technical blog posts in the author's established style (two-segment `XXX｜XXX` titles; outline headings and points are polished, and sections may be adjusted unless told otherwise), with concise architecture, flow, and sequence diagrams drawn in the author's hand-drawn draw.io style. | ⭐️⭐️ |
 
@@ -280,6 +281,24 @@ https://github.com/vllm-project/vllm/pull/29304
 ```
 
 Output: [pr-29304-review](./skills/vllm-rocm-pr-review/outputs/pr-29304-review.md). 新版报告为单文件两大部分：§1–6 PR 详细总结（整合自 vllm-pr-summary，含 Mermaid 图、技术原理、讨论亮点、风险表），§7–8 ROCm review 意见（按严重程度排序的 findings + verdict），§9 为可直接复制到 GitHub PR review 的英文评论（含文件与 diff 行号），§10 为 100 词以内的英文总结评论（本次 review 的整体结论，可直接发到 PR 评论区）；样式示例见 [example-report.md](./skills/vllm-rocm-pr-review/references/example-report.md)。
+
+**📚 vllm-vit-cg-pr-review**
+
+Prompt (single PR):
+
+```text
+https://github.com/vllm-project/vllm/pull/63074
+/vllm-vit-cg-pr-review
+```
+
+Prompt (batch: every open PR of the tracker):
+
+```text
+review https://github.com/vllm-project/vllm/issues/38175 及其评论区中 open 的 PR
+/vllm-vit-cg-pr-review
+```
+
+Output: [pr-63074-review](./skills/vllm-vit-cg-pr-review/outputs/pr-63074-review.md)（其余见 [outputs/](./skills/vllm-vit-cg-pr-review/outputs/)）。报告格式与 vllm-rocm-pr-review 相同（§1–6 详细总结 / §7–8 findings + verdict / §9 英文行内评论 / §10 英文总结），review 规则改为 ViT CUDA graph 专项：对照 vllm main 的 `SupportsEncoderCudaGraph` 接口与 `EncoderCudaGraphManager`，检查接口同步、capture/replay/eager 数值等价、budget 计算、模态覆盖、文档/example/CI 集成与 benchmark 有效性；判断标准与英文措辞学习自 @shen-shanshan、@Isotr0py 在 tracker PR 中的 review 意见。`python3 scripts/update_skill.py --check-vllm-tree` 一键重新采集 reviewer 评论并检查框架接口是否漂移。同一个 PR 同时有本 skill 与 vllm-rocm-pr-review 的报告时，Pingboard dashboard 优先展示本 skill 的报告。
 
 **📚 vllm-multimodal-open-issue-analyzer**
 
