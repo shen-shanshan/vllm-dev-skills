@@ -146,6 +146,14 @@ PY
 )"
   [ -n "$cid" ] && DOCKER_COMMIT="$cid"
 fi
+# Fallback: release-tag builds (e.g. '0.34.1rc0+rocm100') carry no commit; use
+# the upstream tag 'v<version without local suffix>'.
+if ! [[ "$DOCKER_COMMIT" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+  tag="v${DOCKER_VER%%+*}"
+  git -C "${ROOT}" rev-parse --verify --quiet "${tag}^{commit}" >/dev/null \
+    || git -C "${ROOT}" fetch --quiet upstream "refs/tags/${tag}:refs/tags/${tag}" 2>/dev/null || true
+  DOCKER_COMMIT="$(git -C "${ROOT}" rev-parse --verify --quiet --short=10 "${tag}^{commit}" 2>/dev/null || true)"
+fi
 [[ "$DOCKER_COMMIT" =~ ^[0-9a-fA-F]{7,40}$ ]] || die "could not parse build commit from version '$DOCKER_VER'"
 log "Docker vLLM version : $DOCKER_VER"
 log "Docker build commit : $DOCKER_COMMIT"
