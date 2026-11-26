@@ -30,6 +30,22 @@ echo "node version & location:"
 node -v
 which node  # /usr/bin/node
 
+# Install GitHub CLI from the official apt repo (login is left to the user)
+if ! command -v gh >/dev/null 2>&1; then
+  (type -p wget >/dev/null || (sudo apt-get update && sudo apt-get install -y wget))
+  sudo mkdir -p -m 755 /etc/apt/keyrings
+  wget -nv -O- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+  sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+  sudo apt-get update && sudo apt-get install -y gh
+fi
+# Verify
+echo "-------------------------------------------------------------------------"
+echo "gh version:"
+gh --version | head -1
+
 # Config claude code
 mkdir -p /root/.local/bin
 ln -sf "$(ls -d /root/.local/share/claude/versions/* | sort -V | tail -1)" /root/.local/bin/claude

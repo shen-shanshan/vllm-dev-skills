@@ -1,6 +1,6 @@
 ---
 name: vllm-rocm-env-prepare
-description: Prepare a vLLM ROCm development environment inside an already-running `vllm/vllm-openai-rocm` nightly container (MI355X / gfx950). Clones the dev repos into /home/shashen/vllm (vllm, vllm-dev-skills, InferenceX, ATOM, mori, vllm-work-files), symlinks vllm-dev-skills skills into ~/.claude/skills, writes git/vim/node/claude config, syncs vllm main and builds a no-compile editable `.venv` that reuses the image's precompiled binaries, installs pre-commit, locates model weights/datasets, and optionally builds MORI with UMBP into the venv. Every step is skipped when already done. Out of scope — pulling the image or starting the container. Use when the user has just entered a fresh container and asks to set up / initialize the vllm rocm dev environment. Triggered by requests like "帮我初始化容器内的 vllm rocm 开发环境", "准备 vllm rocm 开发环境", "搭建 vllm 开发环境", "安装带 UMBP 的 mori", "prepare vllm rocm dev env", "/vllm-rocm-env-prepare".
+description: Prepare a vLLM ROCm development environment inside an already-running `vllm/vllm-openai-rocm` nightly container (MI355X / gfx950). Clones the dev repos into /home/shashen/vllm (vllm, vllm-dev-skills, upstream InferenceX, ATOM, vllm-perf-analysis-tools, vllm-work-files; mori only on request), symlinks vllm-dev-skills skills into ~/.claude/skills, writes git/vim/node/claude config, installs the GitHub CLI (`gh`, no login), syncs vllm main and builds a no-compile editable `.venv` that reuses the image's precompiled binaries, installs pre-commit, locates model weights/datasets, and optionally builds MORI with UMBP into the venv. Every step is skipped when already done. Out of scope — pulling the image or starting the container. Use when the user has just entered a fresh container and asks to set up / initialize the vllm rocm dev environment. Triggered by requests like "帮我初始化容器内的 vllm rocm 开发环境", "准备 vllm rocm 开发环境", "搭建 vllm 开发环境", "安装带 UMBP 的 mori", "prepare vllm rocm dev env", "/vllm-rocm-env-prepare".
 ---
 
 # vLLM ROCm Env Prepare
@@ -18,10 +18,18 @@ cd /home/shashen/vllm/
 git clone https://github.com/shen-shanshan/vllm.git
 git -C vllm remote add upstream https://github.com/vllm-project/vllm.git
 git clone https://github.com/shen-shanshan/vllm-dev-skills.git
-git clone https://github.com/shen-shanshan/InferenceX.git
+git clone https://github.com/SemiAnalysisAI/InferenceX.git
 git clone https://github.com/shen-shanshan/ATOM.git
-git clone https://github.com/shen-shanshan/mori.git
+git clone https://github.com/shen-shanshan/vllm-perf-analysis-tools.git
 git clone https://github.com/shen-shanshan/vllm-work-files.git
+```
+
+`InferenceX` is cloned from upstream (`SemiAnalysisAI/InferenceX`), not from the user's fork.
+
+`mori` is optional and NOT cloned by default. Clone it only when the user asks for it or for step 5:
+
+```bash
+git clone https://github.com/shen-shanshan/mori.git
 ```
 
 `vllm-work-files` is a private repo and the container has no GitHub credentials, so its clone usually fails (`could not read Username`). Do not retry or block on it; continue the other steps and remind the user to clone it manually, e.g. `! cd /home/shashen/vllm && git clone https://<user>:<PAT>@github.com/shen-shanshan/vllm-work-files.git && git -C vllm-work-files remote set-url origin https://github.com/shen-shanshan/vllm-work-files.git` (the last command strips the token from `.git/config`).
@@ -43,7 +51,7 @@ Newly linked skills show up after `/reload-plugins` or a Claude Code restart.
 bash <skill_dir>/scripts/init_config.sh
 ```
 
-The script is idempotent: it skips the git config if `~/.gitconfig` already has a `[user]` section, skips the vim line if present, and skips the node.js install if `node` is on PATH. It then links the newest `/root/.local/share/claude/versions/*` to `/root/.local/bin/claude`. The git aliases `cb` / `sync` / `nb` / `db` / `pr` it writes are used in later steps.
+The script is idempotent: it skips the git config if `~/.gitconfig` already has a `[user]` section, skips the vim line if present, and skips the node.js install if `node` is on PATH, and skips the GitHub CLI install (official `cli.github.com` apt repo) if `gh` is on PATH. Do not run `gh auth login`; the user logs in themselves (e.g. `! gh auth login`). It then links the newest `/root/.local/share/claude/versions/*` to `/root/.local/bin/claude`. The git aliases `cb` / `sync` / `nb` / `db` / `pr` it writes are used in later steps.
 
 ## 3. Init vLLM
 
@@ -93,7 +101,7 @@ Report the path you used.
 
 ## 5. (Optional) Install MORI with UMBP into the vLLM venv
 
-Run only when the user asks for it, e.g. for the UMBP KV connector. This step needs `/home/shashen/vllm/mori` and the `.venv` from step 3.
+Run only when the user asks for it, e.g. for the UMBP KV connector. This step needs the `.venv` from step 3 and `/home/shashen/vllm/mori`; if `mori` is missing, clone it first (see step 1).
 
 ```bash
 bash <skill_dir>/scripts/build_mori_umbp.sh   # env overrides: MORI_TAG, MORI_GPU_ARCHS, ROCM_PATH
@@ -118,4 +126,5 @@ Summarize for the user:
 - Which steps ran and which were skipped.
 - The vLLM branch and HEAD after alignment, and whether a force-push is needed (if a rebase happened).
 - The venv path and vLLM version.
+- The `gh` version, and a reminder that `gh` is not logged in yet if `gh auth status` says so.
 - Any failures, with the relevant log lines.

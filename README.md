@@ -18,7 +18,7 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 
 | Name | Category | Description | Rec |
 | :--- | :------- | :---------- | :-- |
-| [vllm-rocm-env-prepare](./skills/vllm-rocm-env-prepare/SKILL.md) | Env Setup | Set up the vLLM ROCm dev environment inside a `vllm/vllm-openai-rocm` nightly container: clone repos, link skills, init git/node/claude config, build a no-compile editable vLLM `.venv` aligned to the image binaries, and optionally build MORI with UMBP. Already-done steps are skipped. | ⭐️⭐️⭐️ |
+| [vllm-rocm-env-prepare](./skills/vllm-rocm-env-prepare/SKILL.md) | Env Setup | Set up the vLLM ROCm dev environment inside a `vllm/vllm-openai-rocm` nightly container: clone repos, link skills, init git/node/claude config, install the GitHub CLI (`gh`, no login), build a no-compile editable vLLM `.venv` aligned to the image binaries, and optionally build MORI with UMBP. Already-done steps are skipped. | ⭐️⭐️⭐️ |
 | [vllm-dev-task-discovery](./skills/vllm-dev-task-discovery/SKILL.md) | Demand Discovery | Analyze contribution opportunities in the vLLM repository for community developers. | ⭐️ |
 | [vllm-feature-tutorial](./skills/vllm-feature-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM features and modules. | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-model-tutorial](./skills/vllm-model-tutorial/SKILL.md) | Code Reading | Generate comprehensive Chinese technical tutorial documents for vLLM models. | ⭐️⭐️⭐️⭐️⭐️ |
@@ -47,7 +47,7 @@ Prompt:
 /vllm-rocm-env-prepare
 ```
 
-Output: 已克隆 / 已同步的代码仓、已链接的 skill、git / node / claude 配置，以及 `/home/shashen/vllm/vllm/.venv` 中的免编译 editable vLLM（可选：venv 中装上带 UMBP 的 MORI），最后汇报哪些步骤执行了、哪些被跳过。
+Output: 已克隆 / 已同步的代码仓、已链接的 skill、git / node / claude 配置、已安装的 GitHub CLI（`gh`，需自行 `gh auth login`），以及 `/home/shashen/vllm/vllm/.venv` 中的免编译 editable vLLM（可选：venv 中装上带 UMBP 的 MORI），最后汇报哪些步骤执行了、哪些被跳过。
 
 **📚 vllm-dev-task-discovery**
 
