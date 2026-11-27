@@ -1,6 +1,6 @@
 ---
 name: vllm-technical-blog-writer
-description: Write or complete Chinese vLLM technical blog posts in the author's established Zhihu style. Use when the user provides a vLLM feature, model, architecture, optimization, or other topic and asks for a full blog post, or provides an existing Markdown outline/draft plus references and asks to research current vllm-project/vllm code and finish the missing sections. Produces concise technical diagrams that reproduce the author's hand-drawn draw.io style (Comic Sans, draw.io color pairs, nested containers, red request / blue output edges) and, alongside every new or edited article, a Zhihu-ready `zhihu.md` copy (no title line, headings promoted one level, PNG images); it stores each new article with its images under this skill's outputs directory.
+description: Write or complete Chinese vLLM technical blog posts in the author's established Zhihu style. Use when the user provides a vLLM feature, model, architecture, optimization, or other topic and asks for a full blog post, or provides an existing Markdown outline/draft plus references and asks to research current vllm-project/vllm code and finish the missing sections. Produces concise technical diagrams that reproduce the author's hand-drawn draw.io style (Comic Sans, draw.io color pairs, nested containers, red request / blue output edges) and, alongside every new or edited article, a Zhihu-ready `zhihu.md` copy (no title line, headings promoted one level, PNG images) and a WeChat Official Account `weixin.md` copy (image placeholders, links moved to plain-text URL lists); it stores each new article with its images under this skill's outputs directory.
 ---
 
 # vLLM Technical Blog Writer
@@ -55,7 +55,7 @@ Research before drafting. Do not rely on model memory for current vLLM behavior.
 7. Add diagrams only where they reduce explanation cost. Follow the diagram guide and render every referenced image.
 8. Add a short summary and a references section. Avoid a generic "future outlook" unless the topic genuinely needs one. End the summary section with the fixed authorship statement from the style profile ("总结与收尾").
 9. Run the quality checklist, then save the article.
-10. Generate the Zhihu version (see "Zhihu version").
+10. Generate the Zhihu and WeChat versions (see "Zhihu version" and "WeChat version").
 
 ### New article output
 
@@ -65,6 +65,7 @@ Create:
 outputs/<article-slug>/
 ├── <article-slug>.md
 ├── zhihu.md                 # Zhihu version, see "Zhihu version"
+├── weixin.md                # WeChat Official Account version, see "WeChat version"
 └── images/
     ├── <diagram-name>.svg
     ├── <diagram-name>.png   # rendered from the SVG, used by zhihu.md
@@ -93,7 +94,7 @@ outputs/<article-slug>/
 7. Edit the existing Markdown file in place. If the draft does not already contain the fixed authorship statement from the style profile, add it at the end of the summary section (before the references).
 8. Put newly created images in an `images/` directory beside that article and use relative links. If the draft already follows another image convention, preserve it unless the user asks to migrate.
 9. Do not create a duplicate article under this skill's `outputs/` for this workflow.
-10. Generate or refresh the Zhihu version as `zhihu.md` beside the edited article (see "Zhihu version"). If that directory already has a `zhihu.md`, overwrite it so it matches the edited article.
+10. Generate or refresh the Zhihu and WeChat versions as `zhihu.md` and `weixin.md` beside the edited article (see "Zhihu version" and "WeChat version"). If that directory already has them, overwrite them so they match the edited article.
 
 ## Zhihu version
 
@@ -105,6 +106,22 @@ Every time an article is written or edited, also produce `zhihu.md` in the same 
 4. Keep everything else identical: body text, lists, code blocks, tables, links, the authorship statement and the references.
 
 When the article changes later, regenerate `zhihu.md` from it instead of editing `zhihu.md` by hand, so the two never drift apart. If the user's repository already keeps a Zhihu copy with extra project-specific differences (for example, vllm-dev-skills' own `docs/blogs/zhihu.md`), keep those differences on top of the rules above.
+
+## WeChat version
+
+Every time an article is written or edited, also produce `weixin.md` in the same directory, for the WeChat Official Account (微信公众号) editor. WeChat takes the title from a separate field, images are uploaded by hand, and external links in the body are not clickable. Only the format changes — never the wording, facts or structure. Derive it mechanically from the finished article (reference: `outputs/vLLM Agentic 推理｜面向 Agent 负载的推理优化/weixin.md`):
+
+1. Drop the title line and the blank line after it. Keep heading levels unchanged (`##` stays `##`).
+2. Replace each image line (`![...](./images/...)`) with a line containing only `image`, a placeholder where the image is uploaded by hand.
+3. Turn every external link in the body into plain text:
+   - an article or blog title becomes `《Title》` (e.g. `[Rebuilding Agentic AI for AMD GPU](url)` → `《Rebuilding Agentic AI for AMD GPU》`); any other link keeps its text (e.g. `[InferenceX AgentX](url)` → `InferenceX AgentX`);
+   - collect the URLs of one section as a quoted list at the end of that section, right before the next heading, one item per link: `> - <link text>：<url>` (keep the original link text, without `《》`), separated from the text above by a blank line;
+   - a PR or issue link whose text is just its number (e.g. `PR [#61482](url)`) becomes plain `#61482` with no quoted entry.
+4. In the authorship statement, replace the linked `` [`vllm-technical-blog-writer`](url) `` with plain `` `vllm-technical-blog-writer` ``, and add `- vllm-technical-blog-writer Skill：<url>` as the last item of the references.
+5. Write each reference as `- <link text>：<url>` instead of `- [<link text>](<url>)`.
+6. Keep everything else identical: body text, lists, tables, code blocks (links inside code stay as they are), inline code and punctuation.
+
+As with `zhihu.md`, regenerate `weixin.md` from the article after every change instead of editing it by hand.
 
 ## Writing constraints
 
@@ -140,6 +157,7 @@ Before finishing, verify:
 - [ ] In completion mode, the user's facts, opinions, and examples were kept; headings and outline points were polished rather than copied, and any section added, removed, or reordered is reported (unless the user asked to keep the section design).
 - [ ] All diagrams are necessary, simple, rendered, and linked with valid relative paths.
 - [ ] New-article output is `outputs/<article-slug>/<article-slug>.md`.
+- [ ] `weixin.md` sits beside the article, is up to date with it, has no title line, uses `image` placeholders, has no Markdown links left (URLs only in end-of-section `> - text：url` lists and the references).
 - [ ] `zhihu.md` sits beside the article, is up to date with it, has no title line, has headings promoted one level, and references only PNG images that exist.
 - [ ] Every article-owned image is under its `images/` directory.
 - [ ] No fixed-width hard wrapping was introduced.

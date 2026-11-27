@@ -36,7 +36,7 @@
 | [vllm-rocm-pr-review](./skills/vllm-rocm-pr-review/SKILL.md) | 代码检视 | 检视 vLLM 中 AMD / ROCm 相关的 PR（aiter / mori / ROCm kernel），生成一份合并的中文报告：详细的 PR 总结（含 Mermaid 图、技术原理、讨论要点和风险表），按严重程度排序、按类型分类的 ROCm 检视意见和结论，可直接复制到 GitHub PR review 的英文评论（含文件与 diff 行号），以及一段 100 词以内、可作为 PR 顶层评论的英文总结。 | ⭐️⭐️⭐️⭐️⭐️ |
 | [vllm-vit-cg-pr-review](./skills/vllm-vit-cg-pr-review/SKILL.md) | 代码检视 | 对照 vLLM 最新 main 分支，检视 [#38175](https://github.com/vllm-project/vllm/issues/38175) 跟踪的 ViT（encoder）CUDA graph PR（模型接入、框架改动和修复），检视习惯学习自该特性的维护者（@shen-shanshan、@Isotr0py）。报告格式与 `vllm-rocm-pr-review` 相同（详细总结、按严重程度排序并附接入检查清单的检视意见、结论、可直接复制的英文评论、100 词以内的英文总结）；支持批量检视 tracker 中所有 open 的 PR。 | ⭐️⭐️⭐️⭐️ |
 | [vllm-multimodal-open-issue-analyzer](./skills/vllm-multimodal-open-issue-analyzer/SKILL.md) | Issue 分析 | 获取并整理 vLLM 中与多模态相关的 open issue。 | ⭐️ |
-| [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | 技术写作 | 按作者既有风格撰写或补全中文 vLLM 技术博客（标题统一为 `XXX｜XXX` 两段式；大纲中的标题和要点会被润色，除非另有说明，章节也可能调整），并按作者手绘 draw.io 风格绘制简洁的架构图、流程图和时序图；每篇文章都会同时生成一份可直接发知乎的 `zhihu.md`。 | ⭐️⭐️ |
+| [vllm-technical-blog-writer](./skills/vllm-technical-blog-writer/SKILL.md) | 技术写作 | 按作者既有风格撰写或补全中文 vLLM 技术博客（标题统一为 `XXX｜XXX` 两段式；大纲中的标题和要点会被润色，除非另有说明，章节也可能调整），并按作者手绘 draw.io 风格绘制简洁的架构图、流程图和时序图；每篇文章都会同时生成可直接发知乎的 `zhihu.md` 和发微信公众号的 `weixin.md`。 | ⭐️⭐️ |
 
 ## 🧭 AI-native 工作流
 
@@ -87,7 +87,7 @@
 
 **7. 撰写博客**
 
-- `vllm-technical-blog-writer`：每完成一个高质量的特性或优化后，写一篇技术博客进行分享，积累个人在业界的影响力。这个 skill 会学习你过往的写作风格和配图配色，生成有个人特色的文章。可以只给一个主题，也可以给一份带 `[Agent TODO]` 标记的 Markdown 草稿让它补全。新文章保存在 [`outputs/`](./skills/vllm-technical-blog-writer/outputs/) 下，并同时生成一份可直接粘贴到知乎的 `zhihu.md`（去掉标题行、各级标题升一级、图片改用 PNG）。
+- `vllm-technical-blog-writer`：每完成一个高质量的特性或优化后，写一篇技术博客进行分享，积累个人在业界的影响力。这个 skill 会学习你过往的写作风格和配图配色，生成有个人特色的文章。可以只给一个主题，也可以给一份带 `[Agent TODO]` 标记的 Markdown 草稿让它补全。新文章保存在 [`outputs/`](./skills/vllm-technical-blog-writer/outputs/) 下，并同时生成一份可直接粘贴到知乎的 `zhihu.md`（去掉标题行、各级标题升一级、图片改用 PNG），以及一份发微信公众号用的 `weixin.md`（图片换成占位符、正文链接改为纯文本网址列表）。
 
 ### 🧑‍⚖️ 作为 vLLM Maintainer
 
