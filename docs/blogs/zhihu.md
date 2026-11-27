@@ -6,7 +6,7 @@
 
 因此，我整理了自己平时在 vLLM 社区工作的 Workflow 以及一些常用的 Skill，放到了 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中，分享给同样想做 Or 正在做 vLLM 社区贡献的朋友。目前仓库中已经有 14 个 vLLM 相关的 Skill，覆盖了从寻找任务、读代码、设计与提交 PR，到性能分析、Code Review 和写技术博客的整个开发流程。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/26）。
+> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/27）。
 
 # 二、项目介绍
 
@@ -130,7 +130,8 @@ vLLM 社区对大型架构变更要求提交 RFC 文档。这个 Skill 能根据
 - **Overview / Claims**：先用 1～2 句话概括改动并关联相关 Issue/PR，再用几条具体的 Claim 说明这个 PR 带来了什么（加速、新功能支持、Bug 修复等）；
 - **Validation**：为每条 Claim 给出复现命令和测试/Benchmark 结果，缺少的数据会用占位符标出，提醒作者补充，而不会凭空编造；
 - **Details**：说明动机、设计取舍、Root Cause 以及局限性，冗长的日志折叠到 `<details>` 中；
-- **Checklist**：原样保留模板中的 Pull Request Checklist，由作者自己勾选。
+- **Checklist**：原样保留模板中的 Pull Request Checklist，并默认全部勾选，个别不适用的项由作者自行取消；
+- **精简为先**：PR 描述只保留最终结论（最终方案、关键说明和测试结果），不写成开发过程的流水账，放弃的方案、中间结果和调试过程一律不写。
 
 对于修改量大、涉及多个文件的 PR 尤其实用。
 

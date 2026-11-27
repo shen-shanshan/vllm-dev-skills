@@ -11,6 +11,15 @@ The format follows vLLM's current PR template ([`.github/PULL_REQUEST_TEMPLATE.m
 
 Take `./references/example-pr-desc.md` as a style reference for the output.
 
+## Core Principle: Short, Final-State Only
+
+The description is a reviewer-facing summary of the **final** change, not a development log. Keep only the conclusions:
+
+- the final design/approach and the few facts a reviewer needs to understand it;
+- the final test and benchmark results.
+
+Drop everything else: abandoned approaches, intermediate attempts and their numbers, debugging history, step-by-step investigation narratives, "first we tried X, then Y" stories, and per-iteration change logs. When updating an existing description, rewrite the affected sections to the new final state instead of appending to them. If a section grows beyond what a reviewer can scan in under a minute, cut it.
+
 ## Workflow
 
 1. **Parse PR number** — extract from URL or direct number
@@ -100,17 +109,17 @@ The output file MUST start with the title, followed by the four template section
 <details>
 <summary> Pull Request Checklist </summary>
 
-- [ ] I used vLLM's `/pr-checklist` skill. (Mandatory for agents, optional for humans).
-- [ ] AI assistance was used during the creation of this PR.
+- [x] I used vLLM's `/pr-checklist` skill. (Mandatory for agents, optional for humans).
+- [x] AI assistance was used during the creation of this PR.
 
-- [ ] **Design Fit:** Minimizes impact on core components, reuses existing functionality, and justifies added complexity.
-- [ ] **Testing and Validation:** Validates the change and ensures any added tests are meaningful and reliable, with CI coverage or documented CI resource constraints and validation performed outside CI.
-- [ ] **Code Quality and Style:** Keeps code and comments clear and concise, and updates relevant documentation and examples.
-- [ ] **Pull Request Contents:** Includes a brief summary and relevant links, supports claims with evidence, explains root causes and implementation trade-offs, and follows the contributing guide.
+- [x] **Design Fit:** Minimizes impact on core components, reuses existing functionality, and justifies added complexity.
+- [x] **Testing and Validation:** Validates the change and ensures any added tests are meaningful and reliable, with CI coverage or documented CI resource constraints and validation performed outside CI.
+- [x] **Code Quality and Style:** Keeps code and comments clear and concise, and updates relevant documentation and examples.
+- [x] **Pull Request Contents:** Includes a brief summary and relevant links, supports claims with evidence, explains root causes and implementation trade-offs, and follows the contributing guide.
 </details>
 ```
 
-Copy the checklist verbatim and leave every box unchecked — the author ticks them. Do not include the `BEFORE SUBMITTING ...` footer; GitHub Actions strips it anyway.
+Copy the checklist verbatim and tick every box (`- [x]`) by default; the author can untick any item that does not apply. Do not include the `BEFORE SUBMITTING ...` footer; GitHub Actions strips it anyway.
 
 ### Writing Guidelines
 
@@ -127,7 +136,7 @@ Copy the checklist verbatim and leave every box unchecked — the author ticks t
   - If CI cannot cover the changed path (hardware / checkpoint unavailable), state the gap and what was validated outside CI.
   - Only use results that appear in the PR body/comments or that the user provides. Never invent numbers — if evidence is missing, leave a clearly marked placeholder such as `<TODO: add benchmark result>` and tell the user.
 - **Details**: For bug fixes, include the root cause. For PD-disaggregation / NIXL connector changes, add a short numbered flow of the request path across P and D instances. Highlight non-obvious choices, tradeoffs, limitations, compatibility impacts, and areas needing maintainer attention.
-- **Conciseness**: Keep every section tight; link full logs or wrap them in `<details>` instead of pasting them inline.
+- **Conciseness**: Short by default — aim for a description a reviewer can read in about a minute. Overview 1-2 lines, Claims 2-4 bullets, Validation one compact table plus the essential commands, Details a short paragraph plus a few bullets. No progress logs, no rejected alternatives unless a reviewer would otherwise ask about them (then one line). Link full logs or wrap them in `<details>` instead of pasting them inline.
 - **Language**: Match the PR title language. If title is in English, write in English. If Chinese, write in Chinese. Default to English.
 - **Tone**: Technical, concise, factual. No filler words.
 

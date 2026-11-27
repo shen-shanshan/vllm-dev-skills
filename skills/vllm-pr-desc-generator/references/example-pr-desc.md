@@ -64,11 +64,11 @@ Tradeoffs and limitations:
 <details>
 <summary> Pull Request Checklist </summary>
 
-- [ ] I used vLLM's `/pr-checklist` skill. (Mandatory for agents, optional for humans).
-- [ ] AI assistance was used during the creation of this PR.
+- [x] I used vLLM's `/pr-checklist` skill. (Mandatory for agents, optional for humans).
+- [x] AI assistance was used during the creation of this PR.
 
-- [ ] **Design Fit:** Minimizes impact on core components, reuses existing functionality, and justifies added complexity.
-- [ ] **Testing and Validation:** Validates the change and ensures any added tests are meaningful and reliable, with CI coverage or documented CI resource constraints and validation performed outside CI.
-- [ ] **Code Quality and Style:** Keeps code and comments clear and concise, and updates relevant documentation and examples.
-- [ ] **Pull Request Contents:** Includes a brief summary and relevant links, supports claims with evidence, explains root causes and implementation trade-offs, and follows the contributing guide.
+- [x] **Design Fit:** Minimizes impact on core components, reuses existing functionality, and justifies added complexity.
+- [x] **Testing and Validation:** Validates the change and ensures any added tests are meaningful and reliable, with CI coverage or documented CI resource constraints and validation performed outside CI.
+- [x] **Code Quality and Style:** Keeps code and comments clear and concise, and updates relevant documentation and examples.
+- [x] **Pull Request Contents:** Includes a brief summary and relevant links, supports claims with evidence, explains root causes and implementation trade-offs, and follows the contributing guide.
 </details>

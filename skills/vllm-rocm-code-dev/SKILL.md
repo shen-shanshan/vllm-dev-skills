@@ -75,7 +75,7 @@ Invoke the `vllm-pr-desc-generator` skill on the **local diff** (no PR link yet;
 Whenever the code changes again (rebase on main, bugfix, review comments, new measurements):
 
 1. Make the code change under the same hard rules and rerun the step-4 self-check.
-2. Update `docs/tasks/<task-slug>.md` in place: fix affected sections (file list, design, conditions, Validation numbers), remove resolved TODOs. Do not append a change log unless the user asks.
+2. Update `docs/tasks/<task-slug>.md` in place: rewrite affected sections (file list, design, conditions, Validation numbers) to the new final state, remove resolved TODOs, and keep it short. Do not append a change log or development history unless the user asks.
 3. Tell the user which sections of the PR description changed.
 
 ## Final Reply
