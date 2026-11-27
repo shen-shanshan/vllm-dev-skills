@@ -63,7 +63,14 @@ Key requirements:
   - **Tables** for parameter references, method comparisons, performance metrics
   - **Code snippets** with file path annotations from actual vLLM source
   - **LaTeX formulas** for algorithm analysis (where applicable)
-- Include a document header with version info and date
+- Include a document header right after the title, in exactly this form (the GitHub Pages site parses it to show the "last updated" banner and to flag documents older than 3 months):
+
+  ```markdown
+  > **分析代码版本**: vLLM `main`，commit `<short SHA of the analyzed vllm main>`
+  > **最后更新**: YYYY-MM-DD
+  ```
+
+  Use today's date for 最后更新, and update it whenever the document is regenerated or revised against newer vLLM code.
 - Include a 文档概述 section with target audience and reading guide
 - End with appendices: code location index and glossary
 
@@ -75,6 +82,10 @@ Save the generated markdown file to `outputs/` directory relative to this skill'
 - Use snake_case for file names
 
 The skill directory is located at the same directory as this SKILL.md file.
+
+### Step 5: Publish to the Website
+
+Every file in `outputs/` is published on the project's GitHub Pages site (`website/` in the vllm-dev-skills repo) automatically. After saving, add an entry for the new document to `website/catalog.yml` under `feature` — pick an existing group (or add one) and write a short card `title` and a one-sentence Chinese `summary`. A document missing from the catalog still appears, but under "其他" with an auto-extracted summary. Mermaid node labels that contain brackets, parentheses or other special characters must be quoted (`A["Embedding<br/>[T, 5120]"]`), otherwise the diagram fails to render on the site.
 
 ## Content Depth Guidelines
 
@@ -93,7 +104,8 @@ Before saving the document, verify:
 - [ ] Document includes actual code snippets from vLLM source with file path annotations
 - [ ] Document follows the Chinese writing convention with English technical terms
 - [ ] All sections have substantive content (no placeholder text)
-- [ ] Document header includes version and date metadata
+- [ ] Document header has the `分析代码版本` and `最后更新: YYYY-MM-DD` lines in the required format
+- [ ] An entry for the document exists in `website/catalog.yml`
 
 ## References
 

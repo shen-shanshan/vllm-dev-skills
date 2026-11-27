@@ -702,7 +702,7 @@ def _build_image_span(self, image_embeds, types):
 
 ```mermaid
 flowchart TB
-    E[Embedding<br/>[T, 5120]] --> HC["mHC 流扩展<br/>[T, 4, 5120]（首层 broadcast + identity pre-mix）"]
+    E["Embedding<br/>[T, 5120]"] --> HC["mHC 流扩展<br/>[T, 4, 5120]（首层 broadcast + identity pre-mix）"]
     HC --> L0["Layers 0-1: SWA-only"]
     L0 --> L1["Layers 2-19: ratio-2 压缩<br/>Engram@1/14 注入"]
     L1 --> L2["Layers 20-39: ratio-1 复用层 20 缓存<br/>分层索引器 24/28/32/36"]

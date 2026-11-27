@@ -1,0 +1,85 @@
+/* vLLM brand colors: blue #30a2ff, yellow #fdb515 */
+:root {
+  --md-text-font: "Yozai";
+  --md-code-font: "JetBrains Mono";
+  --vllm-blue: #30a2ff;
+  --vllm-blue-dark: #1673c9;
+  --vllm-yellow: #fdb515;
+}
+
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: var(--vllm-blue-dark);
+  --md-primary-fg-color--light: var(--vllm-blue);
+  --md-primary-fg-color--dark: #0f5a9e;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffffb3;
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #e09a00;
+  --md-accent-fg-color--transparent: #fdb5151a;
+}
+
+[data-md-color-scheme="default"] {
+  --md-typeset-a-color: var(--vllm-blue-dark);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-typeset-a-color: var(--vllm-blue);
+  --md-accent-fg-color: var(--vllm-yellow);
+}
+
+/* Yellow brand line under the header and tabs */
+.md-header {
+  border-bottom: 3px solid var(--vllm-yellow);
+}
+
+.md-typeset {
+  font-size: 0.8rem;
+  line-height: 1.75;
+}
+
+/* "最后更新" banner at the top of each tutorial */
+.md-typeset .doc-updated {
+  margin: 0.6em 0 1.2em;
+  padding: 0.5em 0.9em;
+  border-left: 4px solid var(--vllm-blue);
+  background: #30a2ff14;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.md-typeset .doc-updated.stale {
+  border-left-color: var(--vllm-yellow);
+  background: #fdb51524;
+}
+
+.md-typeset .doc-updated .stale-note {
+  margin-top: 0.3em;
+  color: #9a6400;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .doc-updated .stale-note {
+  color: var(--vllm-yellow);
+}
+
+/* Date line on the list-page cards */
+.md-typeset .card-updated {
+  font-size: 0.7rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .card-updated.stale::after {
+  content: " · 可能已过期";
+  color: #c98a00;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--vllm-blue);
+}
+
+/* Keep wide diagrams readable */
+.md-typeset img[src$=".svg"] {
+  background: #ffffff;
+  border-radius: 4px;
+}

@@ -2,7 +2,7 @@
 
 > **文档版本**: 1.0
 > **分析代码版本**: vLLM main 分支（截至 2025-06）
-> **最后更新**: 2025-06-15
+> **最后更新**: 2026-06-15
 > **模型系列**: Gemma（Google DeepMind）
 > **模型类型**: VLM（Vision-Language Model, Dense Decoder + ViT Encoder）
 

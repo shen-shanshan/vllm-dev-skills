@@ -6,8 +6,6 @@
 
 在参与 vLLM 社区开发的过程中，我把这些工作中可以沉淀的部分逐步做成了 Claude Code 的 Skill，放在 [vllm-dev-skills](https://github.com/shen-shanshan/vllm-dev-skills) 这个仓库中。上一版介绍是按分类逐个讲 Skill 的；而现在仓库里已经有 17 个 vLLM 相关的 Skill，我的用法也变了：大部分 Skill 不再需要手动输入 `/Skill名称` 去触发，而是在开发过程中由 Agent 根据任务自动选用，Skill 之间也会互相调用。所以这一版换个角度，把这些 Skill 串成一条完整的工作流，介绍每个 Skill 在工作流中的位置和用法，顺带聊聊我对“什么时候该用 AI 自动化”以及“为什么要写技术博客”的一些想法。
 
-> NOTE：本文将会随项目演进持续更新（Last Update：2026/11/27）。
-
 ## 二、几点理念
 
 在介绍具体的工作流之前，先说下我搭这套 Skill 时遵循的几条原则，后面每个 Skill 的取舍基本都由它们决定。
@@ -62,7 +60,7 @@
 
 **`vllm-profile-trace-comparison`：用 Trace 找性能优化机会。**
 
-另一类问题来自性能对比。在 AMD GPU 上，同一个模型、同一套配置，[ATOM](https://github.com/ROCm/ATOM) 的 Decode 性能有时比 vLLM 更好，这时就需要定位差距具体出在哪些 Kernel 上。分别采集两个引擎的 Torch Profiler Trace 后，把模型名和两份 Trace 交给这个 Skill：它会先用脚本从两份 Trace 中各切出一个 Decode Step，再对每种层类型（如 Attention 层、MoE 层）各取一层作为样本，生成逐 Kernel 的对比表：各用了哪些 Kernel、是融合实现还是拆开实现、是否用了多流、量化方式有什么差异、耗时差多少。最后，它只针对 ATOM 明显更快的算子整理出一份 vLLM 的优化 TODO 清单（如还可以做哪些 Kernel Fusion），并按预期收益排序。这个 Skill 原名 `vllm-vs-atom-decode-trace-comparison`，目前支持的对比对象是 ATOM。
+另一类问题来自性能对比。在 AMD GPU 上，同一个模型、同一套配置，其它推理引擎的 Decode 性能有时比 vLLM 更好，这时就需要定位差距具体出在哪些 Kernel 上。分别采集两个引擎的 Torch Profiler Trace 后，把模型名和两份 Trace 交给这个 Skill：它会先用脚本从两份 Trace 中各切出一个 Decode Step，再对每种层类型（如 Attention 层、MoE 层）各取一层作为样本，生成逐 Kernel 的对比表：各用了哪些 Kernel、是融合实现还是拆开实现、是否用了多流、量化方式有什么差异、耗时差多少。最后，它只针对其它推理引擎明显更快的算子整理出一份 vLLM 的优化 TODO 清单（如还可以做哪些 Kernel Fusion），并按预期收益排序。
 
 输出样例：[minimax-m3-trace-comparison_zh_20260905_162716](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-profile-trace-comparison/outputs/minimax-m3-trace-comparison_zh_20260905_162716.md)。
 
@@ -79,6 +77,8 @@ vLLM 的模块设计复杂，看一段代码往往要在十几个文件之间跳
 和前者关注特性不同，这个 Skill 关注 vLLM 中某个具体的模型（如 Qwen3-VL、DeepSeek-V3、Llama 4 等）。它会先查阅模型的技术报告和论文，再结合 vLLM 中的实现代码，讲清楚模型整体架构、输入预处理流程（对 VLM 还会单独分析 ViT 部分）、Forward 计算过程，以及 MoE、MLA、Gated Attention 等相关技术原理。
 
 输出样例：[deepseek_ocr](https://github.com/shen-shanshan/vllm-dev-skills/blob/master/skills/vllm-model-tutorial/outputs/deepseek_ocr.md)。
+
+这两个 Skill 生成的文档都发布在项目的 [GitHub Pages 网站](https://shen-shanshan.github.io/vllm-dev-skills/)上，可以在线阅读。由于 vLLM 的代码一直在变化，每篇文档开头都标注了最后更新时间，距今超过 3 个月的还会额外提醒内容可能已经过期。
 
 ### 4.3 设计方案
 
@@ -98,7 +98,7 @@ vLLM 的模块设计复杂，看一段代码往往要在十几个文件之间跳
 
 我平时在 `vllm/vllm-openai-rocm` Nightly 镜像起的容器里开发，容器经常重建，每次都要重复一遍拉代码仓、写配置、同步 `main` 分支、搭建虚拟环境等步骤。这个 Skill 把这些步骤固化成一个可重复执行的流程，已经完成的步骤会自动跳过：
 
-- **代码仓与 Skill**：将 vLLM、vllm-dev-skills、InferenceX（直接用上游仓库）、ATOM、vllm-perf-analysis-tools 等代码仓 Clone 到宿主机挂载的持久化目录中（MORI 仅在需要时 Clone），并把 vllm-dev-skills 中的 Skill 软链接到 `~/.claude/skills/`；
+- **代码仓与 Skill**：将 vLLM、vllm-dev-skills、InferenceX（直接用上游仓库）、vllm-perf-analysis-tools 等代码仓 Clone 到宿主机挂载的持久化目录中（MORI 仅在需要时 Clone），并把 vllm-dev-skills 中的 Skill 软链接到 `~/.claude/skills/`；
 - **基础配置**：写入 Git 用户信息与常用 Alias、Vim 配置，安装 Node.js 和 GitHub CLI（`gh`，登录留给用户自己完成），并链接 Claude Code 可执行文件；
 - **免编译的 vLLM 开发环境**：将当前分支对齐到镜像中 vLLM 的构建 Commit，拷贝镜像里预编译好的 `*.so`，再创建继承系统 site-packages 的 `.venv`，以 Editable 方式安装源码，这样修改 Python 代码后无需重新编译即可生效；
 - **模型与数据集**：优先复用只读挂载的 `/shared` 中已有的权重和数据集，没有时再下载；
@@ -213,7 +213,7 @@ done
 
 本文以工作流的视角重新介绍了 vllm-dev-skills：作为开发者，从发现问题、学习原理、设计方案、开发代码、测试验证、提交代码到撰写博客，每个阶段都有对应的 Skill，并且大多在开发过程中由 Agent 自动选用；作为 Maintainer，有面向 ROCm 和 ViT CUDA Graph 的 Review Skill；而当新的重复操作出现时，再用 `skill-creator` 把它补进工作流。这套 Skill 记录的是我个人的环境和习惯，更值得参考的是背后的思路：把重复的工作交给 AI，把判断留给自己，并让自己做的事情被看见。
 
-接下来，我会继续补充新的 Skill、优化现有 Skill 的输出质量，并尝试支持 GitHub Pages，提供更好的阅读体验。
+接下来，我会继续补充新的 Skill，并优化现有 Skill 的输出质量。
 
 最后顺带一提，本文是先由我的 [`vllm-technical-blog-writer`](https://github.com/shen-shanshan/vllm-dev-skills/tree/master/skills/vllm-technical-blog-writer) Skill 根据我口述的要点生成初稿，再由我微调完成的，它本身就是这条工作流的最后一环。
 

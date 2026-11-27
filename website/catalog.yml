@@ -1,0 +1,105 @@
+# Groups, card titles and one-line summaries for the tutorial pages.
+# Every Markdown file in skills/vllm-{feature,model}-tutorial/outputs/ is
+# published; a file not listed here is shown in the "其他" group with an
+# auto-extracted summary (and the build prints a warning).
+
+feature:
+  - group: 并行与通算重叠
+    docs:
+      - file: dcp.md
+        title: DCP（Decode Context Parallelism）
+        summary: Decode 阶段把 KV Cache 沿序列维度切分到多卡，消除纯 TP 下的 KV 冗余。
+      - file: prefill_dbo.md
+        title: Prefill Dual-Batch-Overlap（DBO）
+        summary: 把 Prefill Batch 拆成两个 Micro-batch，让计算和 MoE 通信互相重叠，以 DeepSeek-V4 ROCm 为例。
+      - file: dual_batch_overlap.md
+        title: ATOM Dual-Batch-Overlap（TBO）
+        summary: ATOM 中 Prefill 阶段双 Micro-batch 通算重叠的实现细节。
+      - file: multi_stream_overlap.md
+        title: Multi-Stream Overlap
+        summary: vLLM 多流并行工具的设计、使用场景，以及什么时候不能用多流。
+  - group: CUDA Graph 与运行时
+    docs:
+      - file: breakable_cudagraph.md
+        title: Breakable CUDA Graph
+        summary: 不依赖 torch.compile 的 Piecewise CUDA Graph，在 Attention 等自定义算子边界主动打断捕获。
+      - file: vit_full_cuda_graph.md
+        title: ViT Full CUDA Graph
+        summary: 把 ViT 视觉编码器的完整前向捕获为 CUDA Graph，消除 Kernel Launch 开销。
+      - file: model_runner_v2.md
+        title: Model Runner V2
+        summary: 从第一性原理重写的 Model Runner：Persistent Batch、Async Scheduling 等设计。
+      - file: workspace_manager.md
+        title: WorkspaceManager
+        summary: Worker 进程里的全局显存工作区，为 Attention、MoE 等 Kernel 提供临时 Buffer。
+  - group: 启动与 JIT
+    docs:
+      - file: fast_start.md
+        title: Fast Start
+        summary: 常驻的权重守护进程（Weight Cache Daemon），缩短引擎重启和扩缩容的启动时间。
+      - file: jit_kernel_warmup.md
+        title: JIT Kernel Warmup 与 JIT Monitor
+        summary: 提前预热 Triton 等运行时 JIT 编译的 Kernel，避免线上请求出现延迟尖刺。
+  - group: KV Cache 与解耦部署
+    docs:
+      - file: umbp_store_connector.md
+        title: UMBP Store Connector
+        summary: 通过 AMD MORI 的 UMBP 把 KV Block 卸载到主机 DRAM 并复用，含 Standalone 模式。
+      - file: disaggregated_encoder_epd.md
+        title: Disaggregated Encoder（EPD）
+        summary: 把多模态推理拆成 Encoder / Prefill / Decode 三个独立阶段，分别部署在不同实例上。
+      - file: deepseek_v4_kv_cache_multistream.md
+        title: DeepSeek-V4 KV Cache 压缩与多流并行
+        summary: vLLM 为 DeepSeek-V4 设计的 KV Cache 内存压缩和 Multi-Stream 并行优化。
+  - group: 调度与投机解码
+    docs:
+      - file: atom_prefill_delayer.md
+        title: ATOM PrefillDelayer
+        summary: DP-Attention + EP 部署中，跨 DP Rank 对齐 Prefill 的合批器。
+      - file: dspark.md
+        title: DSpark 与 DFlash
+        summary: DeepSeek 提出的置信度调度投机解码框架在 vLLM 中的实现。
+  - group: AMD ROCm
+    docs:
+      - file: amd_aiter_in_vllm.md
+        title: AMD AITER 在 vLLM 中的集成
+        summary: AITER 如何通过能力探测、Backend 选择、Custom Op 和图融合接入 vLLM 的各个算子域。
+
+model:
+  - group: DeepSeek-V4 系列
+    docs:
+      - file: deepseek_v4_1_flash.md
+        title: DeepSeek-V4.1-Flash
+        summary: 552B MoE 新一代架构，逐项对比 DeepSeek-V4-Pro 的设计与 vLLM 实现。
+      - file: deepseek_v4_rocm.md
+        title: DeepSeek-V4（AMD ROCm）
+        summary: DeepSeek-V4 在 ROCm 上的推理路径与 AITER / Triton 算子实现。
+  - group: 多模态模型
+    docs:
+      - file: qwen3_vl.md
+        title: Qwen3-VL
+        summary: 从架构演进到算子级别，剖析 Qwen3-VL 在 vLLM 中的完整实现。
+      - file: kimi_vl.md
+        title: Kimi-VL
+        summary: MoonViT 视觉编码器、MoE 语言模型与多模态输入处理管线。
+      - file: minimax_m3.md
+        title: MiniMax-M3
+        summary: 原生多模态 MoE 模型，vLLM 中 NVIDIA / AMD 双实现的硬件隔离设计。
+      - file: ernie45_vl.md
+        title: ERNIE-4.5-VL
+        summary: 异构 MoE 路由、ViT 视觉编码器与多模态输入处理流程。
+      - file: step3_vl.md
+        title: Step3-VL
+        summary: MFA 注意力机制与 AFD 解耦部署，以及 vLLM 中的代码实现。
+      - file: llama4.md
+        title: Llama 4
+        summary: iRoPE 注意力、MoE 路由与 ViT 视觉编码器的完整计算流程。
+      - file: gemma3.md
+        title: Gemma3
+        summary: Gemma3 全系列的多模态输入处理与 SigLIP ViT 计算流程。
+      - file: minicpm_v.md
+        title: MiniCPM-V
+        summary: ViT 编码器、Perceiver Resampler 视觉压缩与多模态输入处理。
+      - file: deepseek_ocr.md
+        title: DeepSeek-OCR
+        summary: 面向 OCR 和文档解析的视觉语言模型，核心是上下文光学压缩。

@@ -2,7 +2,7 @@
 
 > **文档版本**: 1.0
 > **分析代码版本**: vLLM main 分支（截至 2025-12）
-> **最后更新**: 2025-12-08
+> **最后更新**: 2026-06-11
 > **模型系列**: MiniCPM-V (OpenBMB / ModelBest)
 > **模型类型**: VLM (Vision-Language Model)
 

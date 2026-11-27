@@ -3,7 +3,7 @@
 ## Roadmap
 
 - [ ] Learn how to use [archify](https://github.com/tt-a1i/archify) for blog images drawing.
-- [ ] Support github page for better reading experience.
+- [x] Support github page for better reading experience.
 - [x] Write `vllm-rocm-env-prepare` skill.
 - [x] Write `vllm-rocm-code-dev` skill.
 - [x] Add usage examples (prompts and outputs) for each skill into `README.md`.
