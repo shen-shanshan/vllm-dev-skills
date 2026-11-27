@@ -2,10 +2,11 @@
 
 vLLM 是目前最流行的大模型推理框架之一。作为一个高速迭代的大型开源项目，它的代码库庞大、模块繁多：读懂一个 Feature 的实现路径往往需要好几天，而找任务、搭环境、跑 Benchmark、写 PR 描述、做 Review 这些围绕代码的工作，占用的时间并不比写代码少。
 
-在参与 vLLM 社区开发的过程中，我把这些工作中可以沉淀的部分逐步做成了 Claude Code 的 Skill，放在 vllm-dev-skills 这个仓库中。上一版介绍是按分类逐个讲 Skill 的；而现在仓库里已经有 17 个 vLLM 相关的 Skill，我的用法也变了：大部分 Skill 不再需要手动输入 `/Skill名称` 去触发，而是在开发过程中由 Agent 根据任务自动选用，Skill 之间也会互相调用。所以这一版换个角度，把这些 Skill 串成一条完整的工作流，介绍每个 Skill 在工作流中的位置和用法，顺带聊聊我对“什么时候该用 AI 自动化”以及“为什么要写技术博客”的一些想法。
+在参与 vLLM 社区开发的过程中，我把这些工作中可以沉淀的部分逐步做成了 Claude Code 的 Skill，放在 vllm-dev-skills 这个仓库中，并搭建了一个项目网站，可以在线阅读工作流介绍和这些 Skill 生成的 vLLM 特性与模型技术文档。上一版介绍是按分类逐个讲 Skill 的；而现在仓库里已经有 17 个 vLLM 相关的 Skill，我的用法也变了：大部分 Skill 不再需要手动输入 `/Skill名称` 去触发，而是在开发过程中由 Agent 根据任务自动选用，Skill 之间也会互相调用。所以这一版换个角度，把这些 Skill 串成一条完整的工作流，介绍每个 Skill 在工作流中的位置和用法，顺带聊聊我对“什么时候该用 AI 自动化”以及“为什么要写技术博客”的一些想法。
 
 > - vLLM：https://github.com/vllm-project/vllm
 > - vllm-dev-skills：https://github.com/shen-shanshan/vllm-dev-skills
+> - 项目网站：https://shen-shanshan.github.io/vllm-dev-skills/
 
 ## 二、几点理念
 
@@ -226,10 +227,11 @@ for dir in /path/to/vllm-dev-skills/skills/*/; do
 done
 ```
 
-安装后，在 Claude Code 中用自然语言描述任务即可，如：“我想了解 vLLM 中的 EPD（Encode-Prefill-Decode）特性，请帮我总结一份技术文档。”每个 Skill 的示例 Prompt 和输出样例都可以在仓库的 README 中找到。
+安装后，在 Claude Code 中用自然语言描述任务即可，如：“我想了解 vLLM 中的 EPD（Encode-Prefill-Decode）特性，请帮我总结一份技术文档。”每个 Skill 的示例 Prompt 和输出样例都可以在仓库的 README 中找到；如果只想看技术文档，直接访问项目网站即可。
 
 > - skills：https://github.com/vercel-labs/skills
 > - README：https://github.com/shen-shanshan/vllm-dev-skills/blob/master/README_zh.md
+> - 项目网站：https://shen-shanshan.github.io/vllm-dev-skills/
 
 ## 八、总结
 
@@ -242,6 +244,7 @@ done
 ## 九、参考资料
 
 - vllm-dev-skills：https://github.com/shen-shanshan/vllm-dev-skills
+- vllm-dev-skills 项目网站：https://shen-shanshan.github.io/vllm-dev-skills/
 - Agent Skills：https://agentskills.io/home#why-agent-skills
 - Extend Claude with skills：https://code.claude.com/docs/en/skills
 - vercel-labs/skills：https://github.com/vercel-labs/skills
@@ -249,6 +252,8 @@ done
 
 ---
 
-欢迎感兴趣的朋友 Star、Fork，也欢迎提 Issue 或 PR 贡献新的 Skill！
+欢迎访问项目网站在线阅读，也欢迎感兴趣的朋友 Star、Fork，或者提 Issue 和 PR 贡献新的 Skill！
 
 image
+
+> - 项目网站：https://shen-shanshan.github.io/vllm-dev-skills/
