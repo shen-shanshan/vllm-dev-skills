@@ -65,4 +65,4 @@ vLLM（nightly e975732… 之后，含本 skill 目标镜像）的采集链路�
 
 - `ignore_frontend: true`：关闭 AsyncLLM 前端 profiling，只留 worker 的 CPU/GPU trace（delay/limit 组合时 vllm 自己也会警告前端开销）。
 - **首次真机运行需验证**：① 每 rank trace 的文件命名（TP8 = 8 个 worker 文件）；② trace 是在 max_iterations 到达时自动落盘还是等到 /stop_profile（client 脚本两者都做了，stop_profile 在 replay 结束后必发）。
-- **回退方案**（若单步窗口采不到东西）：去掉 `delay_iterations`/`max_iterations`，让 profiler 覆盖整个 replay，再用 `execute_context_*` step 注解后处理切出想要的步（可配合 vllm-vs-atom-decode-trace-comparison skill 的 extract_trace.py）。
+- **回退方案**（若单步窗口采不到东西）：去掉 `delay_iterations`/`max_iterations`，让 profiler 覆盖整个 replay，再用 `execute_context_*` step 注解后处理切出想要的步（可配合 vllm-profile-trace-comparison skill 的 extract_trace.py）。

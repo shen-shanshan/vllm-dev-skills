@@ -1,6 +1,6 @@
 ---
 name: vllm-technical-blog-writer
-description: Write or complete Chinese vLLM technical blog posts in the author's established Zhihu style. Use when the user provides a vLLM feature, model, architecture, optimization, or other topic and asks for a full blog post, or provides an existing Markdown outline/draft plus references and asks to research current vllm-project/vllm code and finish the missing sections. Produces concise technical diagrams that reproduce the author's hand-drawn draw.io style (Comic Sans, draw.io color pairs, nested containers, red request / blue output edges) and stores each new article with its images under this skill's outputs directory.
+description: Write or complete Chinese vLLM technical blog posts in the author's established Zhihu style. Use when the user provides a vLLM feature, model, architecture, optimization, or other topic and asks for a full blog post, or provides an existing Markdown outline/draft plus references and asks to research current vllm-project/vllm code and finish the missing sections. Produces concise technical diagrams that reproduce the author's hand-drawn draw.io style (Comic Sans, draw.io color pairs, nested containers, red request / blue output edges) and, alongside every new or edited article, a Zhihu-ready `zhihu.md` copy (no title line, headings promoted one level, PNG images); it stores each new article with its images under this skill's outputs directory.
 ---
 
 # vLLM Technical Blog Writer
@@ -55,6 +55,7 @@ Research before drafting. Do not rely on model memory for current vLLM behavior.
 7. Add diagrams only where they reduce explanation cost. Follow the diagram guide and render every referenced image.
 8. Add a short summary and a references section. Avoid a generic "future outlook" unless the topic genuinely needs one. End the summary section with the fixed authorship statement from the style profile ("总结与收尾").
 9. Run the quality checklist, then save the article.
+10. Generate the Zhihu version (see "Zhihu version").
 
 ### New article output
 
@@ -63,8 +64,10 @@ Create:
 ```text
 outputs/<article-slug>/
 ├── <article-slug>.md
+├── zhihu.md                 # Zhihu version, see "Zhihu version"
 └── images/
     ├── <diagram-name>.svg
+    ├── <diagram-name>.png   # rendered from the SVG, used by zhihu.md
     └── <diagram-name>.mmd   # only for Mermaid diagrams
 ```
 
@@ -90,6 +93,18 @@ outputs/<article-slug>/
 7. Edit the existing Markdown file in place. If the draft does not already contain the fixed authorship statement from the style profile, add it at the end of the summary section (before the references).
 8. Put newly created images in an `images/` directory beside that article and use relative links. If the draft already follows another image convention, preserve it unless the user asks to migrate.
 9. Do not create a duplicate article under this skill's `outputs/` for this workflow.
+10. Generate or refresh the Zhihu version as `zhihu.md` beside the edited article (see "Zhihu version"). If that directory already has a `zhihu.md`, overwrite it so it matches the edited article.
+
+## Zhihu version
+
+Every time an article is written or edited, also produce `zhihu.md` in the same directory, for pasting into the Zhihu editor. Zhihu takes the title from a separate field and does not accept SVG images. Derive it mechanically from the finished article — do not rewrite the prose:
+
+1. Drop the title line (`# <主题域>｜<本文核心>`) and the blank line after it; the file starts with the first section heading.
+2. Promote every heading by one level: `##` → `#`, `###` → `##`, `####` → `###`.
+3. Point every image at a PNG: replace `./images/<name>.svg` with `./images/<name>.png`, rendering any missing PNG from its SVG first (e.g. `rsvg-convert -z 2 -o images/<name>.png images/<name>.svg`) and checking the rendered image.
+4. Keep everything else identical: body text, lists, code blocks, tables, links, the authorship statement and the references.
+
+When the article changes later, regenerate `zhihu.md` from it instead of editing `zhihu.md` by hand, so the two never drift apart. If the user's repository already keeps a Zhihu copy with extra project-specific differences (for example, vllm-dev-skills' own `docs/blogs/zhihu.md`), keep those differences on top of the rules above.
 
 ## Writing constraints
 
@@ -125,6 +140,7 @@ Before finishing, verify:
 - [ ] In completion mode, the user's facts, opinions, and examples were kept; headings and outline points were polished rather than copied, and any section added, removed, or reordered is reported (unless the user asked to keep the section design).
 - [ ] All diagrams are necessary, simple, rendered, and linked with valid relative paths.
 - [ ] New-article output is `outputs/<article-slug>/<article-slug>.md`.
+- [ ] `zhihu.md` sits beside the article, is up to date with it, has no title line, has headings promoted one level, and references only PNG images that exist.
 - [ ] Every article-owned image is under its `images/` directory.
 - [ ] No fixed-width hard wrapping was introduced.
 - [ ] No placeholders or unsupported claims remain.

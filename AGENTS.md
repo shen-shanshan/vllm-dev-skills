@@ -6,6 +6,7 @@ Instructions for AI coding agents working in this repository.
 
 - `skills/<skill-name>/SKILL.md` — skill definitions; generated reports go to `skills/<skill-name>/outputs/`.
 - `README.md` / `README_zh.md` — project README in English (default, shown on GitHub) and Simplified Chinese; keep them in sync.
+- `docs/workflow/` — the AI-native workflow diagram shown in both READMEs: `gen_workflow.py` is the source, `workflow_en.svg` / `workflow_zh.svg` are generated from it.
 - `TODO.md` — roadmap, personal learning plan for technical reports, and blog writing tasks.
 
 ## Rules
@@ -45,7 +46,9 @@ README 分为英文版 `README.md`（默认展示）和中文版 `README_zh.md` 
 
    完成后用 `ls -l ~/.claude/skills/<skill-name>` 确认链接指向正确。若同名链接已存在且指向本仓库，无需重复创建。
 2. **更新 `README.md` 和 `README_zh.md`**（两份都要改，规则见 “Keep `README.md` and `README_zh.md` in sync” 一节）：
-   - 新增 skill：在 skill 表格（英文版 `## 🚀 Skills`，中文版 `## 🚀 Skill 列表`）中按类别将其插入到合适位置（Name 链接到 `./skills/<skill-name>/SKILL.md`，填写类别 / 描述 / 推荐度），并在使用示例（英文版 `## 📖 Usages`，中文版 `## 📖 使用示例`）中补充对应的 Prompt 和输出说明，保持与已有条目一致的格式。
-   - 更新 skill：若 skill 的功能、描述、触发方式或用法有变化，同步修改两份 README 中表格的描述及使用示例中的对应内容。
-3. **更新项目介绍博客**：调用 `vllm-technical-blog-writer` skill，更新 `docs/blogs/introduction_to_vllm_dev_skills/` 下的博客（`introduction_to_vllm_dev_skills.md` 与 `zhihu.md` 需保持内容同步），在对应的研发环节小节（如 2.1 环境准备 ~ 2.9 技术写作）中新增或修改该 skill 的介绍，必要时同步调整“后续计划”等相关段落。同时将两篇博客开头 NOTE 中的日期（`本文将会随项目演进持续更新（Last Update：YYYY/MM/DD）`）更新为当天日期。
-4. 完成后在回复中告知用户以上哪些内容已更新（软链接 / `README.md` 与 `README_zh.md` / 博客）。
+   - 新增 skill：在 skill 表格（英文版 `## 🚀 Skills`，中文版 `## 🚀 Skill 列表`）中按类别将其插入到合适位置（Name 链接到 `./skills/<skill-name>/SKILL.md`，填写类别 / 描述 / 推荐度），并在工作流一节（英文版 `## 🧭 AI-native Workflow`，中文版 `## 🧭 AI-native 工作流`）中，把它写进它所属的阶段（发现问题 / 学习原理 / 设计方案 / 开发代码 / 测试验证 / 提交代码 / 撰写博客，或 Maintainer、持续进化部分；没有合适阶段时可以新增或调整阶段），说明它在该阶段的用途、是否由 agent 自动调用，并附上示例 Prompt 或输出链接，保持与已有条目一致的格式。
+   - 更新 skill：若 skill 的功能、描述、触发方式或用法有变化，同步修改两份 README 中表格的描述及工作流一节中的对应内容。
+   - 重命名或删除 skill：同步修改表格、工作流一节和工作流图中的名称。
+3. **更新工作流图**（新增 / 删除 / 重命名 skill，或 skill 所属阶段、用途变化时）：修改 `docs/workflow/gen_workflow.py` 中的 `STAGES` / `MAINTAINER` / `EVOLVE` 数据（中英文用途说明都要填，每行最多 3 个节点），然后运行 `python3 docs/workflow/gen_workflow.py`，同时重新生成 `workflow_en.svg`、`workflow_zh.svg` 以及博客用的 `docs/blogs/images/ai-native-workflow.png`（由中文版渲染）。不要手动编辑生成的 SVG。生成后用 `rsvg-convert` 渲染成 PNG 查看两张图（没有该命令时先 `sudo apt-get install -y librsvg2-bin fonts-noto-cjk`），确认文字没有溢出、重叠或缺字。
+4. **更新项目介绍博客**：调用 `vllm-technical-blog-writer` skill，更新 `docs/blogs/` 下的博客（`introduction_to_vllm_dev_skills.md` 与 `zhihu.md` 需保持内容同步；`zhihu.md` 没有标题行、各级标题比前者高一级，Star 段落放在参考资料之前），在工作流对应的阶段小节（“四、作为开发者”的 4.1 发现问题 ~ 4.7 撰写博客、“五、作为 vLLM Maintainer”或“六、让工作流持续进化”）中新增或修改该 skill 的介绍，必要时同步调整引言中的 skill 数量和总结等相关段落。同时将两篇博客开头 NOTE 中的日期（`本文将会随项目演进持续更新（Last Update：YYYY/MM/DD）`）更新为当天日期。
+5. 完成后在回复中告知用户以上哪些内容已更新（软链接 / `README.md` 与 `README_zh.md` / 工作流图 / 博客）。
