@@ -1,5 +1,7 @@
 # vLLM Dev Skills
 
+**English** | [简体中文](./README_zh.md)
+
 <div align='left'>
   <img src=https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg >
   <img src="https://img.shields.io/badge/License-Apache--2.0-turquoise.svg">
@@ -38,23 +40,25 @@ A curated collection of Claude Code agent skills that accelerate the entire vLLM
 
 ## 📖 Usages
 
+Skills accept prompts in English or Chinese. Skills marked "Chinese" in the table above write their reports in Chinese regardless of the prompt language.
+
 **📚 vllm-rocm-env-prepare**
 
 Prompt:
 
 ```text
-我刚进入 vllm/vllm-openai-rocm:nightly-rocm100 容器，请帮我初始化 vllm rocm 开发环境（Optional：并安装带 UMBP 的 MORI）。
+I just entered a vllm/vllm-openai-rocm:nightly-rocm100 container. Please set up the vLLM ROCm dev environment (optional: also install MORI with UMBP).
 /vllm-rocm-env-prepare
 ```
 
-Output: 已克隆 / 已同步的代码仓、已链接的 skill、git / node / claude 配置、已安装的 GitHub CLI（`gh`，需自行 `gh auth login`），以及 `/home/shashen/vllm/vllm/.venv` 中的免编译 editable vLLM（可选：venv 中装上带 UMBP 的 MORI），最后汇报哪些步骤执行了、哪些被跳过。
+Output: cloned / synced repos, linked skills, git / node / claude config, the GitHub CLI (`gh`; run `gh auth login` yourself), and a no-compile editable vLLM in `/home/shashen/vllm/vllm/.venv` (optional: MORI with UMBP installed into the venv), followed by a report of which steps ran and which were skipped.
 
 **📚 vllm-dev-task-discovery**
 
 Prompt:
 
 ```text
-我想了解 vLLM 的多模态模块中最近还有哪些可以给社区开发者贡献的事情。（Optional：请帮我分析并整理出当前 top 20 的 tasks）
+What are the recent contribution opportunities for community developers in vLLM's multimodal module? (Optional: list the current top 20 tasks.)
 /vllm-dev-task-discovery
 ```
 
@@ -65,7 +69,7 @@ Output: [vllm_dev_task_multimodal_20260611](./skills/vllm-dev-task-discovery/out
 Prompt:
 
 ```text
-我想了解 vLLM 中的 EPD（Encode-Prefill-Decode）特性，请帮我总结一份技术文档。
+I want to learn about the EPD (Encode-Prefill-Decode) feature in vLLM. Please write a technical document about it.
 /vllm-feature-tutorial
 ```
 
@@ -76,7 +80,7 @@ Output: [disaggregated_encoder_epd](./skills/vllm-feature-tutorial/outputs/disag
 Prompt:
 
 ```text
-我想了解 vLLM 中的 DeepSeek-OCR 模型，尤其是其 ViT 部分对多模态输入的处理流程，请帮我总结一份技术文档。
+I want to learn about the DeepSeek-OCR model in vLLM, especially how its ViT processes multimodal inputs. Please write a technical document about it.
 /vllm-model-tutorial
 ```
 
@@ -87,20 +91,20 @@ Output: [deepseek_ocr](./skills/vllm-model-tutorial/outputs/deepseek_ocr.md).
 Prompt:
 
 ```text
-需求背景：
-vLLM 的 EPD 特性目前只支持 ExampleECConnector，我们希望集成 MooncakeECConnector，并通过 Mooncake 来统一管理多种传输后端，比如：TCP/RDMA/SHM。
-相关链接：https://github.com/vllm-project/vllm/pull/33714#issuecomment-3882716972
+Background:
+vLLM's EPD feature currently only supports ExampleECConnector. We want to integrate a MooncakeECConnector and use Mooncake to manage multiple transfer backends, e.g. TCP / RDMA / SHM.
+Related link: https://github.com/vllm-project/vllm/pull/33714#issuecomment-3882716972
 
-设计目标：
-请你参考 vLLM 中 MooncakeConnector 在 PD 分离场景（传输 KV Cache）中的注册和使用方式，实现 MooncakeECConnector，用于支持 EPD 特性下的 Encoder Cache 传输。
-目前，你只需要实现 TCP 传输方式，但需要考虑将来可能支持更多的传输后端，比如：RDMA、SHM 等（保证接口的可扩展性），比如：你可以实现 MooncakeECConnector 基类，TCPMooncakeECConnector 继承该基类，未来需要实现其它传输后端时，可以直接添加 RDMAMooncakeECConnector、SHMMooncakeECConnector 等子类。
-用户通过 vLLM 启动配置来指定使用哪种 Mooncake 传输后端，不支持启动后切换传输方式，默认使用 TCP 传输。
+Goal:
+Following how MooncakeConnector is registered and used for PD disaggregation (KV cache transfer), implement MooncakeECConnector to transfer the encoder cache for EPD.
+Only the TCP backend is needed for now, but keep the interface extensible for more backends such as RDMA and SHM. For example, implement a MooncakeECConnector base class with a TCPMooncakeECConnector subclass, so RDMAMooncakeECConnector, SHMMooncakeECConnector, etc. can be added later.
+Users select the Mooncake transfer backend in the vLLM launch config; switching after startup is not supported, and TCP is the default.
 You also need to rethink how to manage the multi-modal embeddings internally inside vLLM (You might need to introduce "embed blocks" based on hash + position).
 
-注意事项：
-你不需要写测试用例，只写核心代码实现，并生成一份 markdown 格式的设计文档，放到当前项目的根目录下。
+Notes:
+Do not write tests. Only implement the core code, and generate a Markdown design document in the project root.
 
-参考资料：
+References:
 https://kvcache-ai.github.io/Mooncake/getting_started/supported-protocols.html
 https://kvcache-ai.github.io/Mooncake/python-api-reference/transfer-engine.html
 
@@ -114,14 +118,14 @@ Output: [Support Mooncake Based ECConnector for EPD](https://github.com/vllm-pro
 Prompt:
 
 ```text
-RFC 标题：
+RFC title:
 Support ViT Full CUDA Graph
 
-主要内容：
+Main content:
 Add full CUDA graph for the ViT to reduce kernel launch overheads.
-需要支持图像、视频推理，需要支持 Qwen3-VL/Qwen3.5/GLM-V/Kimi K2.5 等主流 VLM 模型。
+Must support image and video inference, and mainstream VLMs such as Qwen3-VL / Qwen3.5 / GLM-V / Kimi K2.5.
 
-相关 PR：
+Related PRs:
 https://github.com/vllm-project/vllm/pull/35963
 https://github.com/vllm-project/vllm/pull/37914
 https://github.com/vllm-project/vllm/pull/38040
@@ -137,22 +141,22 @@ Output: [Support ViT Full CUDA Graph](https://github.com/vllm-project/vllm/issue
 Prompt:
 
 ```text
-【需求背景】：
-https://github.com/vllm-project/vllm/pull/51794 为 vllm 中的 rocm 后端实现了 deepseek-v4 csa multi-stream overlap。现在需要你基于该 PR，继续为 vllm rocm 后端实现 deepseek-v4 hca layer 的 dual-stream overlap。
+[Background]
+https://github.com/vllm-project/vllm/pull/51794 implemented DeepSeek-V4 CSA multi-stream overlap for the ROCm backend in vLLM. Building on that PR, implement dual-stream overlap for the DeepSeek-V4 HCA layer on the vLLM ROCm backend.
 
-【你的任务】：
-参考 /Users/shanshan-shen/Documents/GitHub/ATOM 中 deepseek-v4 hca 的 dual-stream overlap 实现：
+[Task]
+Follow the DeepSeek-V4 HCA dual-stream overlap implementation in /Users/shanshan-shen/Documents/GitHub/ATOM:
 
-对于 HCA 层，先串行执行：mhc_fused_post_pre_gemm_sqrsum_kernel → mhc_pre_big_fuse_rmsnorm_kernel。
+For the HCA layer, first run serially: mhc_fused_post_pre_gemm_sqrsum_kernel → mhc_pre_big_fuse_rmsnorm_kernel.
 
-然后，launch 两条 stream：
-1.default stream：fused wqa+wkv GEMM → q/kv RMSNorm → wq_b → qnorm/RoPE → SWA KV insert
-2.aux stream 0：HCA main compressor
+Then launch two streams:
+1. default stream: fused wqa+wkv GEMM → q/kv RMSNorm → wq_b → qnorm/RoPE → SWA KV insert
+2. aux stream 0: HCA main compressor
 
-最后，join 两条 stream（多流 overlap 部分结束），接下来顺序执行 sparse attention 等后续流程。
+Finally, join the two streams (end of the overlap) and run sparse attention and the rest sequentially.
 
-【注意事项】：
-1.给 vllm rocm 路径的 hca 多流 fork 加 capture-only gate（对齐 ATOM 的 in_hipgraph 规则）；
+[Notes]
+1. Add a capture-only gate to the HCA multi-stream fork on the vLLM ROCm path (matching ATOM's in_hipgraph rule).
 /vllm-rocm-code-dev
 ```
 
@@ -174,8 +178,8 @@ Output: [pr-38061-desc](./skills/vllm-pr-desc-generator/outputs/pr-38061-desc.md
 Prompt:
 
 ```text
-请根据 https://github.com/vllm-project/vllm/pull/38061/changes 中的改动，在 tests/v1/cudagraph/test_encoder_cudagraph.py 中生成对应的测试用例。
-要求尽可能复用 SimpleMockViTModel 的代码，减少冗余。
+Based on the changes in https://github.com/vllm-project/vllm/pull/38061/changes, generate the corresponding test cases in tests/v1/cudagraph/test_encoder_cudagraph.py.
+Reuse the SimpleMockViTModel code as much as possible to reduce redundancy.
 /vllm-test-generator
 ```
 
@@ -250,11 +254,11 @@ Output: [benchmark_comparison_20260323_150830](./skills/vllm-benchmark-result-an
 Prompt:
 
 ```text
-帮我对比分析 vLLM 和 ATOM 在 MiniMax-M3 上的 decode trace 差异。
-模型：MiniMaxAI/MiniMax-M3
-vllm trace：/path/to/vllm-minimax-m3-tp4-8k1k-conc8.json
-atom trace：/path/to/atom-minimax-m3-tp4-8k1k-conc8.json
-报告语言：中文
+Compare the decode traces of vLLM and ATOM on MiniMax-M3.
+Model: MiniMaxAI/MiniMax-M3
+vllm trace: /path/to/vllm-minimax-m3-tp4-8k1k-conc8.json
+atom trace: /path/to/atom-minimax-m3-tp4-8k1k-conc8.json
+Report language: Chinese
 /vllm-vs-atom-decode-trace-comparison
 ```
 
@@ -280,7 +284,7 @@ https://github.com/vllm-project/vllm/pull/29304
 /vllm-rocm-pr-review
 ```
 
-Output: [pr-29304-review](./skills/vllm-rocm-pr-review/outputs/pr-29304-review.md). 新版报告为单文件两大部分：§1–6 PR 详细总结（整合自 vllm-pr-summary，含 Mermaid 图、技术原理、讨论亮点、风险表），§7–8 ROCm review 意见（按严重程度排序的 findings + verdict），§9 为可直接复制到 GitHub PR review 的英文评论（含文件与 diff 行号），§10 为 100 词以内的英文总结评论（本次 review 的整体结论，可直接发到 PR 评论区）；样式示例见 [example-report.md](./skills/vllm-rocm-pr-review/references/example-report.md)。
+Output: [pr-29304-review](./skills/vllm-rocm-pr-review/outputs/pr-29304-review.md). The report is a single file in two parts: §1–6 is a detailed PR summary (merged from vllm-pr-summary, with Mermaid diagrams, technical principles, discussion highlights, and a risk table); §7–8 are the ROCm review findings (sorted by severity) and the verdict; §9 holds English inline comments (with file and diff line numbers) ready to paste into a GitHub PR review; §10 is an English overall summary of at most 100 words to post as the PR's top-level comment. See [example-report.md](./skills/vllm-rocm-pr-review/references/example-report.md) for the style.
 
 **📚 vllm-vit-cg-pr-review**
 
@@ -294,11 +298,11 @@ https://github.com/vllm-project/vllm/pull/63074
 Prompt (batch: every open PR of the tracker):
 
 ```text
-review https://github.com/vllm-project/vllm/issues/38175 及其评论区中 open 的 PR
+Review the open PRs in https://github.com/vllm-project/vllm/issues/38175 and its comments.
 /vllm-vit-cg-pr-review
 ```
 
-Output: [pr-63074-review](./skills/vllm-vit-cg-pr-review/outputs/pr-63074-review.md)（其余见 [outputs/](./skills/vllm-vit-cg-pr-review/outputs/)）。报告格式与 vllm-rocm-pr-review 相同（§1–6 详细总结 / §7–8 findings + verdict / §9 英文行内评论 / §10 英文总结），review 规则改为 ViT CUDA graph 专项：对照 vllm main 的 `SupportsEncoderCudaGraph` 接口与 `EncoderCudaGraphManager`，检查接口同步、capture/replay/eager 数值等价、budget 计算、模态覆盖、文档/example/CI 集成与 benchmark 有效性；判断标准与英文措辞学习自 @shen-shanshan、@Isotr0py 在 tracker PR 中的 review 意见。`python3 scripts/update_skill.py --check-vllm-tree` 一键重新采集 reviewer 评论并检查框架接口是否漂移。同一个 PR 同时有本 skill 与 vllm-rocm-pr-review 的报告时，Pingboard dashboard 优先展示本 skill 的报告。
+Output: [pr-63074-review](./skills/vllm-vit-cg-pr-review/outputs/pr-63074-review.md) (others in [outputs/](./skills/vllm-vit-cg-pr-review/outputs/)). Same report format as vllm-rocm-pr-review (§1–6 detailed summary / §7–8 findings + verdict / §9 English inline comments / §10 English summary), with ViT CUDA graph–specific review rules: checked against vllm main's `SupportsEncoderCudaGraph` interface and `EncoderCudaGraphManager` for interface sync, capture/replay/eager numerical equivalence, budget computation, modality coverage, docs/example/CI integration, and benchmark validity. Review criteria and English wording are learned from @shen-shanshan's and @Isotr0py's reviews on tracker PRs. `python3 scripts/update_skill.py --check-vllm-tree` re-collects reviewer comments and checks for framework interface drift in one step. When a PR has reports from both this skill and vllm-rocm-pr-review, the Pingboard dashboard shows this skill's report first.
 
 **📚 vllm-multimodal-open-issue-analyzer**
 
@@ -315,31 +319,51 @@ Output: [vllm_multimodal_issues_20260425_030830](./skills/vllm-multimodal-open-i
 Scenario 1 — write a complete article from a topic:
 
 ```text
-请以“vLLM 中的 Automatic Prefix Caching”为主题，分析最新代码和相关资料，并参考我过往的写作风格生成一篇完整的中文技术博客。请按需补充简洁的架构图和流程图。
+Write a complete Chinese technical blog post on "Automatic Prefix Caching in vLLM" in my usual writing style, based on the latest code and related materials. Add concise architecture and flow diagrams where useful.
 /vllm-technical-blog-writer
 ```
 
 Scenario 2 — complete an existing Markdown draft:
 
 ```text
-请基于我提供的“vLLM多模态推理｜ViT_Full_CUDA_Graph\index.md”文章模板和参考资料，结合 vllm-project/vllm 最新 main 分支的代码，按 [Agent TODO] 的要求补充剩余内容。新增图片请放在文章同级的 ./images 目录中。
+Using my article template <article-dir>/index.md and the references I provided, together with the latest vllm-project/vllm main branch, fill in the remaining content as required by the [Agent TODO] markers. Put new images in the ./images directory next to the article.
 /vllm-technical-blog-writer
 ```
 
-Output: New articles are saved under [`./skills/vllm-technical-blog-writer/outputs/<article-slug>/`](./skills/vllm-technical-blog-writer/outputs/), with referenced images stored in the article's `images/` directory. Existing drafts are updated in place. Article titles always use the two-segment `XXX｜XXX` form (with “vLLM” when the post is explicitly about vLLM). Outline headings and points are treated as references and may be polished; sections may be added, removed, or reordered unless you explicitly ask to keep the section design.
+Output: New articles are saved under [`./skills/vllm-technical-blog-writer/outputs/<article-slug>/`](./skills/vllm-technical-blog-writer/outputs/), with referenced images stored in the article's `images/` directory. Existing drafts are updated in place. Article titles always use the two-segment `XXX｜XXX` form (with "vLLM" when the post is explicitly about vLLM). Outline headings and points are treated as references and may be polished; sections may be added, removed, or reordered unless you explicitly ask to keep the section design.
 
 **📚 infx-bench-script-generator**
 
 Prompt:
 
 ```text
-我想在本地服务器上跑 dsv4/vllm/mi355x-fp4-mtp/agentic.yaml 的 override_dep8_c64 配置，并且需要用 torch profiler 采集一个完整的 prefill step，所有测试结果放到 /home/shashen/vllm/dsv4_benchmark 目录下，请帮我生成对应的测试脚本。
+I want to run the override_dep8_c64 config of dsv4/vllm/mi355x-fp4-mtp/agentic.yaml on my local server and capture one complete prefill step with the torch profiler. Put all results under /home/shashen/vllm/dsv4_benchmark. Please generate the scripts.
 /infx-bench-script-generator
 ```
 
-Output: 每个 `<recipe>_<override>` 组合一个文件夹，包含 `01_docker_run.sh`（host 起容器）、`02_start_server.sh`（容器内起 server，可选 profiler 配置）、`03_run_client.sh`（容器内跑 AgentX replay）以及 `variant.json`/`variant.env`，示例见 [dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](./skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64/).
+Output: one folder per `<recipe>_<override>` combination, containing `01_docker_run.sh` (start the container on the host), `02_start_server.sh` (start the server inside the container, with optional profiler config), `03_run_client.sh` (run the AgentX replay inside the container), and `variant.json` / `variant.env`. Example: [dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64](./skills/infx-bench-script-generator/outputs/dsv4_vllm_mi355x-fp4-mtp_agentic_override_dep8_c64/).
 
 ## 🛠️ Configuration
+
+**Option 1: install with the [`skills`](https://github.com/vercel-labs/skills) CLI** (requires Node.js).
+
+```bash
+# List the skills available in this repo.
+npx skills add shen-shanshan/vllm-dev-skills --list
+
+# Install one or more skills for Claude Code at user level (~/.claude/skills).
+npx skills add shen-shanshan/vllm-dev-skills -g -a claude-code -s vllm-pr-desc-generator
+
+# Install all skills for Claude Code at user level.
+npx skills add shen-shanshan/vllm-dev-skills -g -a claude-code -s '*' -y
+
+# Update installed skills later.
+npx skills update -g
+```
+
+Drop `-g` to install into the current project (`./.claude/skills`) instead, or change `-a` to target other agents (`'*'` for all). The CLI installs a snapshot of the GitHub repo, so run `npx skills update` to pick up new changes.
+
+**Option 2: soft-link a local clone** (edits in the clone take effect immediately).
 
 ```bash
 # Manually soft-link single skill to claude-code's official skill dir.

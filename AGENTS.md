@@ -5,9 +5,18 @@ Instructions for AI coding agents working in this repository.
 ## Project Layout
 
 - `skills/<skill-name>/SKILL.md` — skill definitions; generated reports go to `skills/<skill-name>/outputs/`.
+- `README.md` / `README_zh.md` — project README in English (default, shown on GitHub) and Simplified Chinese; keep them in sync.
 - `TODO.md` — roadmap, personal learning plan for technical reports, and blog writing tasks.
 
 ## Rules
+
+### Keep `README.md` and `README_zh.md` in sync
+
+README 分为英文版 `README.md`（默认展示）和中文版 `README_zh.md` 两份。任何时候修改 README（无论是否因为新增 / 更新 skill），都必须同时更新这两份文件：
+
+1. 两份内容和结构保持一致（同样的章节、表格行、使用示例和链接），只是语言不同。
+2. 每份只用一种语言，不要中英文混用：英文版中的 Prompt 示例也翻译成英文，中文版中的说明文字使用中文；代码、命令、路径、skill 名、专有名词和 benchmark 原始输出等保持原样。
+3. 两份文件顶部的语言切换链接（`**English** | [简体中文](./README_zh.md)` / `[English](./README.md) | **简体中文**`）保持不变。
 
 ### Sync generated technical reports to `TODO.md`
 
@@ -35,8 +44,8 @@ Instructions for AI coding agents working in this repository.
    ```
 
    完成后用 `ls -l ~/.claude/skills/<skill-name>` 确认链接指向正确。若同名链接已存在且指向本仓库，无需重复创建。
-2. **更新 `README.md`**：
-   - 新增 skill：在 `## 🚀 Skills` 表格中按 Category 将其插入到合适位置（Name 链接到 `./skills/<skill-name>/SKILL.md`，填写 Category / Description / Rec），并在 `## 📖 Usages` 中补充对应的使用示例（Prompt 等），保持与已有条目一致的格式。
-   - 更新 skill：若 skill 的功能、描述、触发方式或用法有变化，同步修改表格中的 Description 及 `## 📖 Usages` 中的对应内容。
+2. **更新 `README.md` 和 `README_zh.md`**（两份都要改，规则见 “Keep `README.md` and `README_zh.md` in sync” 一节）：
+   - 新增 skill：在 skill 表格（英文版 `## 🚀 Skills`，中文版 `## 🚀 Skill 列表`）中按类别将其插入到合适位置（Name 链接到 `./skills/<skill-name>/SKILL.md`，填写类别 / 描述 / 推荐度），并在使用示例（英文版 `## 📖 Usages`，中文版 `## 📖 使用示例`）中补充对应的 Prompt 和输出说明，保持与已有条目一致的格式。
+   - 更新 skill：若 skill 的功能、描述、触发方式或用法有变化，同步修改两份 README 中表格的描述及使用示例中的对应内容。
 3. **更新项目介绍博客**：调用 `vllm-technical-blog-writer` skill，更新 `docs/blogs/introduction_to_vllm_dev_skills/` 下的博客（`introduction_to_vllm_dev_skills.md` 与 `zhihu.md` 需保持内容同步），在对应的研发环节小节（如 2.1 环境准备 ~ 2.9 技术写作）中新增或修改该 skill 的介绍，必要时同步调整“后续计划”等相关段落。同时将两篇博客开头 NOTE 中的日期（`本文将会随项目演进持续更新（Last Update：YYYY/MM/DD）`）更新为当天日期。
-4. 完成后在回复中告知用户以上哪些内容已更新（软链接 / `README.md` / 博客）。
+4. 完成后在回复中告知用户以上哪些内容已更新（软链接 / `README.md` 与 `README_zh.md` / 博客）。
